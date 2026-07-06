@@ -1,0 +1,552 @@
+* {
+    box-sizing: border-box;
+}
+@font-face {
+    font-family: Michroma;
+    src: url(./Recursos/Fuente/Michroma/Michroma-Regular.ttf);
+}
+@font-face {
+    font-family: Audiowide;
+    src: url(./Recursos/Fuente/Audiowide/Audiowide-Regular.ttf);
+}
+@font-face {
+    font-family: Oswald;
+    src: url(./Recursos/Fuente/Oswald/Oswald-VariableFont_wght.ttf);
+}
+body {
+    /*background-color: rgba(22, 42, 30, 0.845);*/
+    display: flex;
+    flex-direction: column;
+    margin: 0px;
+    padding: 0px;
+    min-height: 100vh;
+    min-width: 100%;
+}
+.top-bar, .inicio, .search, .search-box{
+    display: flex;
+    flex-direction: row;
+    background-color: #0b205d;
+    height: 60px;
+    align-items: center;
+    justify-content: space-between;
+}
+.top-bar{
+    position: sticky;
+}
+.inicio{
+    width: 10%;
+    height: 50px;
+    margin-left: 15px;
+} 
+.inicio h2{
+    margin-left: -3px;
+    font-size: 14px;
+    color: #fff;
+    font-family: Michroma;
+    margin-top: 7px;
+}
+.showman {
+    display: flex;
+    flex-direction: row;
+    flex: 1; /* ¡Esta es la clave! */
+    width: 100%;
+}
+
+.search{
+/*display: flex;*/
+background-color: rgb(15, 3, 69);
+width: 200px;
+padding-left: 10px;
+padding-right: 10px;
+height: 35px;
+border-radius: 10px;
+margin-left: -30px;
+color: #fff;
+font-family: Audiowide;
+font-weight: 100;
+font-size: 14px;
+}
+.header-sectionRight{
+    margin-right: 25px;
+}
+
+.home{
+    margin-top: 20px !important;
+}
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 70px;
+    align-items: center;
+    /*height: 100vh;
+    position: fixed;*/
+    min-height: calc(100vh - 60px);
+    padding-top: 20px;
+    flex-shrink: 0;
+}
+.dashboard-container {
+    flex-grow: 1; /* Esto hace que el main "crezca" y ocupe el resto del espacio disponible */
+    padding: 20px; /* Un poco de aire para que no pegue contra el borde */
+    background-color: #051030;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.main-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* La tabla (2 partes) y los resultados (1 parte) */
+    gap: 20px;
+    color: #fff;
+    font-family: Audiowide;
+}
+.table-container, .recent-results {
+    background-color: rgba(11, 32, 93, 0.4) !important;
+    border: 1px solid rgba(30, 58, 138, 0.4) !important;
+    border-style: solid !important;
+    padding: 25px !important;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    text-align: left !important; /* Alinea todo el bloque a la izquierda */
+    width: 100%;
+    max-width: 850px;
+
+}
+.title-tabla{
+    font-family: 'Michroma', sans-serif;
+    font-size: 15px;
+    color: #fff;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+/* Esto hace que la fila de arriba destaque */
+.table-container thead {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid #3b82f6;
+}
+
+.table-container th {
+    color: #60a5fa; /* Azul neón para los títulos de columnas */
+    font-size: 0.9em;
+}
+.table-style{
+    background: transparent !important;
+    width: 100%;
+    border-collapse: collapse !important; /* Permite separar las filas */
+    border-spacing: 0 4px !important;    /* Separación de 4px entre renglones */
+    background-color: #040c24 !important; /* El color azul ultra profundo de la imagen */
+} 
+.table-head-row {
+    background-color: #0b205d !important;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    color: #8fa3d9;
+    text-transform: uppercase;
+}
+
+.table-wrapper {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: transparent !important;
+}
+
+
+
+.table-style th, .table-style td {
+   padding: 12px 8px !important;
+}
+.th-pos { text-align: center; }
+.th-team { text-align: left; }
+.th-pts { color: #5ce1e6 !important; }
+/* Formato general de los renglones de equipos */
+.table-style tbody tr {
+    background-color: rgba(255, 255, 255, 0.02);
+    font-family: 'Audiowide', sans-serif;
+    font-size: 13px;
+    transition: background-color 0.2s ease;
+}
+.table-style tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+}
+.table-style tbody td {
+    padding: 12px 8px !important;
+}
+/* Estilos específicos para celdas internas */
+.td-team-name {
+    font-weight: bold;
+    text-align: left;
+}
+
+.td-diff-positive {
+    color: #4ade80;
+}
+
+.td-pts-total {
+    font-weight: bold;
+    color: #5ce1e6;
+}
+.row-leader {
+    background: rgba(30, 58, 138, 0.15) !important;
+}
+
+.td-pos-lead {
+    text-align: center;
+    font-weight: bold;
+    color: #3b82f6;
+    box-shadow: inset 2px 0 0 0 #5c8cd8 !important;
+}
+.td-pos-normal {
+    text-align: center;
+    font-weight: bold;
+    color: #3b82f6;
+}
+
+
+
+
+/*.dashboard-container {
+    padding: 20px;
+    background-color: #051030; /* Un azul un poco más oscuro que el sidebar para dar profundidad */
+    /*flex-grow: 1; /* Esto hace que el main ocupe todo el espacio sobrante */
+.side-nav{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    gap: 45px;
+}
+.sidebar img{
+    width: 40px;
+    margin-top: 0; /* ELIMINADO EL MARGIN */
+    display: block;
+
+}
+.logoa {
+    width: 60px !important;
+    margin-top: -5px !important;
+
+}
+.hero-section {
+    width: 80%;
+    height: 400px;
+    background-image: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url('./Recursos/Fotos/DSC05325.JPG');
+    background-size: cover;       /* La foto cubre todo el espacio*/
+    background-position: center;  /* Centra la foto*/
+
+    border-radius: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 30px;
+    color: white;
+    box-shadow: 0px 0px 50px rgba(48, 18, 100, 1);
+    font-family: Oswald;
+    margin-bottom: 30px;
+    /*width: 100%;
+    height: 300px; /* O el alto que quieras */
+    
+    /* El degradado oscuro ayuda a que el texto blanco se lea perfecto 
+    background-image: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7)), 
+                      url('ruta-de-tu-foto.jpg');
+    
+    background-size: cover;       /* La foto cubre todo el espacio
+    background-position: center;  /* Centra la foto
+    border-radius: 15px;
+    
+    /* Para centrar el contenido (texto) dentro
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end; /* Texto abajo 
+    padding: 20px;
+    
+    /* La sombra que querías 
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    
+    margin-bottom: 20px;*/
+}
+.hero-section h2 {
+    margin-bottom: 0px;
+}
+.hero-section:hover{
+    width: 82%;
+    height: 420px;
+    transition-duration: 100ms;
+}
+
+
+
+.group-selector {
+    margin-bottom: 20px;
+}
+.cycle-label{
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    color: #8fa3d9;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.basic-section-margin{
+    margin-top: 35px;
+}
+.group-selector p {
+    color: #8fa3d9; /* Un azul claro para los títulos */
+    font-size: 12px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.tabs {
+    display: flex;
+    margin-bottom: 15px;
+}
+.tabs-sup{
+    display: flex;          /* Alinea los botones en una sola fila continua */
+    background-color: #051030; /* El fondo oscuro idéntico a tu dashboard */         /* Separación sutil interna para el efecto cápsula */
+    border-radius: 4px;     /* Bordes redondeados de la barra completa */
+    width: max-content;     /* Se ajusta exactamente al tamaño de los botones */
+    border: 1px solid rgba(255, 255, 255, 0.05); /* Borde sutil general */
+}
+.tab-btn {
+    background-color: transparent; /* Fondo transparente para que tome el de la barra */
+    color: #8fa3d9;         /* Color gris/azul apagado de la imagen para los inactivos */
+    border: none;           /* ELIMINAMOS los bordes individuales que te molestaban */
+    padding: 8px 16px;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 12px;
+    border-radius: 4px;     /* Redondeado interno leve para cada botón */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 0;              /* Eliminamos cualquier margen para que se peguen */
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* El botón activo (el que está seleccionado) */
+.tab-btn.active {
+    background-color: rgba(30, 58, 138, 0.5); /* Fondo azul oscuro traslúcido */
+    color: #fff;            /* Texto completamente blanco */
+    border: 1px solid #1e3a8a; /* Único borde marcado para el botón activo */
+    box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.2); /* Destello interno sutil */
+}
+
+
+
+.search-container {
+    display: flex;
+    align-items: center;
+    background-color: rgb(15, 3, 69);
+    padding: 10px 15px;
+    border-radius: 20px; /* Esto hace que sea ovalada */
+    width: 250px; /* Ajustá este ancho a gusto */
+    height: 35px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+/* El input interno */
+.search-input {
+    background: transparent; /* Transparente, toma el fondo del contenedor */
+    border: none;            /* Quitamos el borde por defecto */
+    outline: none;           /* ¡IMPORTANTE! Quita el borde azul molesto al hacer clic */
+    color: white;            /* Color del texto */
+    flex-grow: 1;            /* Hace que ocupe todo el espacio disponible */
+    padding: 5px;
+    font-family: inherit;
+    font-family: Audiowide;
+}
+.search-input::placeholder{
+    color: #fff;
+}
+/* El icono */
+.search-icon {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    opacity: 0.8;
+}
+.nav-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 50px;         /* Tamaño del círculo */
+    height: 50px;        /* Tamaño del círculo */
+    border-radius: 50%;  /* ¡Esto crea el círculo perfecto! */
+    transition: all 0.3s ease; /* Transición suave para el hover */
+    text-decoration: none; /* Quitamos el subrayado del enlace */
+}
+
+.nav-item.active {
+    background-color: rgba(92, 225, 230, 0.2); /* Color más marcado para el activo */
+    /*border: 1px solid #5ce1e6;*/
+}
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.15); /* Fondo suave al pasar el mouse */
+    transform: scale(1.1); /* Un pequeño zoom para que se sienta interactivo */
+}
+.nav-item img {
+    width: 25px;         /* Ajustá el tamaño del icono a tu gusto */
+    height: 25px;
+    display: block;      /* Elimina espacios extra debajo de la imagen */
+}
+.match-card {
+    display: flex;
+    justify-content: space-between; /* Alinea equipos a los lados y score al medio */
+    align-items: center;
+    padding: 12px;
+    background-color: rgba(255, 255, 255, 0.03); /* Un toque de transparencia */
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6; /* Línea de acento azul */
+    border-right: 4px solid #3b82f6; /* Línea de acento azul */
+    transition: background-color 0.3s;
+}
+
+.match-card:hover {
+    background-color: rgba(255, 255, 255, 0.08); /* Feedback al pasar el mouse */
+}
+
+.team-name {
+    font-family: 'Audiowide', sans-serif;
+    font-size: 0.9em;
+    color: #e0e0e0;
+    text-align: center;
+}
+
+.score {
+    font-family: 'Michroma', sans-serif; /* Usamos tu fuente técnica */
+    font-size: 16px;
+    color: #5ce1e6; /* Azul neón para resaltar el resultado */
+    font-weight: bold;
+    margin-top: -3.5px;
+
+}
+
+
+.group-title-container {
+    margin: 25px 0 15px 0;
+    padding-left: 10px;
+    border-left: 3px solid #3b82f6;
+    display: flex;
+    align-items:flex-start;
+    /* CAMBIAZO CLAVE: Forzamos a que los elementos se apilen uno abajo del otro */
+    flex-direction: column;
+}
+.group-name-sup{
+    margin: 5px 0px;
+}
+.group-name {
+    font-family: 'Michroma', sans-serif;
+    color: #fff;
+    font-size: 20px;
+    margin: 0;
+    display: block;
+}
+
+.group-category {
+    font-family: 'Audiowide', sans-serif;
+    color: #8fa3d9; /* El color clarito que venías usando */
+    font-size: 12px;
+    letter-spacing: 1px;
+    display: block;
+    /* box-sizing: border-box; */
+}
+
+
+
+
+/* Contenedor principal que limita el ancho y maneja el desborde */
+.fechas-carousel-container {
+    width: 100%;
+    overflow-x: auto; /* Permite el scroll horizontal */
+    scroll-behavior: smooth; /* Hace que el deslizamiento sea suave */
+    padding: 5px 0 15px 0;
+    margin-bottom: 10px;
+}
+
+/* Ocultar la barra de scroll en Chrome, Safari y Opera */
+.fechas-carousel-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* Ocultar la barra de scroll en Firefox y IE */
+.fechas-carousel-container {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Los botones alineados en una sola fila infinita */
+.tabs-fechas {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    justify-content: flex-start; /* Alinea al principio para que se note el scroll */
+    width: max-content; /* Fuerza al contenedor a estirarse todo lo necesario */
+    padding: 0 10px;    /* Un poquito de aire a los costados */
+}
+
+/* Ajuste opcional para que los botones de fecha tengan un tamaño fijo y no se deformen */
+.tabs-fechas .tab-btn {
+    min-width: 45px;
+    height: 25px;
+    margin: 0px;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0; /* Evita que el flexbox "apriete" los botones */
+}
+
+
+
+
+
+
+
+
+/* 3. Agregamos la línea finita y sutil debajo de cada fila */
+.table-style tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    background-color: transparent;
+}
+/* --- ESTILOS INTERACTIVOS PARA LAS NUEVAS TABLAS --- */
+/*
+.cat-btn:hover {
+    background: #1e3a8a !important;
+    color: #fff !important;
+    border-color: #3b82f6 !important;
+}
+
+.category-switch .cat-btn.active {
+    background: #1e3a8a !important;
+    color: #fff !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+
+.group-selectors-row button:hover {
+    background: rgba(30, 58, 138, 0.3) !important;
+    color: #fff !important;
+    border-color: rgba(92, 225, 230, 0.4) !important;
+}
+
+.group-selectors-row button.active {
+    background: rgba(30, 58, 138, 0.6) !important;
+    border-color: #3b82f6 !important;
+    color: #fff !important;
+}
+
+#tabla-cuerpo-dinamico tr {
+    transition: background 0.2s ease;
+}
+
+#tabla-cuerpo-dinamico tr:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}*/
+
+
+

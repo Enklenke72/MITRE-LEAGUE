@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="estilo.css">
+    <title>Mitre League 2026</title>
+    <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
+</head>
+<body>
+    <header class="top-bar">
+            <div class="inicio">
+                <img src="Recursos/logonormal (1)sinaper.svg" alt="Logo" class="logoa">
+                <h2>MITRE LEAGUE</h2>
+            </div>
+        <div class="search-container">
+            <input type="text" placeholder="Buscar" class="search-input">
+            <img src="Recursos/search.svg" alt="Lupa" class="search-icon">
+        </div>
+        <div class="header-sectionRight">
+            <div class="notifications">
+            <img src="Recursos/notificaciones fut.png" alt="">
+            </div>
+        </div>
+        </header>
+    <div class="showman">
+        <aside class="sidebar" style="background-color:#0b205d;">
+    <nav class="side-nav">
+        <a href="#home" class="nav-item active">
+            <img src="Recursos/home.svg" alt="Inicio">
+        </a>
+        <a href="#tabla" class="nav-item">
+            <img src="Recursos/Tabla fut.svg" alt="Tabla">
+        </a>
+        <a href="#partidos" class="nav-item">
+            <img src="Recursos/logo pelota fut.svg" alt="Partidos">
+        </a>
+        <a href="#goleadores" class="nav-item">
+            <img src="Recursos/goleadores fut.svg" alt="Goleadores">
+        </a>
+        </nav>
+        </aside>
+        <!-- ///////////////////////////////////// MAIN CONTENT ////////////////////////// -->
+        <main class="dashboard-container">
+
+
+            <div id="sec-home" class="tab-content active" style="width: 100%; max-width: 900px;">
+                <div style="background: radial-gradient(circle, rgba(11,32,93,0.8) 0%, rgba(5,16,48,0.6) 100%); padding: 35px 0 40px; border-radius: 15px; text-align: center;margin-top: -20px; font-family: Michroma;">
+                    <h2 style="font-size: 26px; color: #5ce1e6; text-shadow: 0 0 12px #5ce1e6; margin: 0; letter-spacing: 2px;">MITRE LEAGUE</h2>
+                    <p style="font-family: Audiowide; font-size: 13px; color: #8fa3d9; margin: 12px 0 0 0; text-transform: uppercase; letter-spacing: 4px;">Apertura 2026</p>
+                </div>
+            </div>
+
+
+            <section class="hero-section">
+                <h2>¡Y SE FUE!...</h2>
+                <p>Tras un partido muy friccionado, 5to 2da supo plantarse por 2-1 ante 6to 2da, quienés quedaron eliminados por el perro de Juan Pablo Aguirre.</p>
+            </section>
+
+        <div class="main-grid">
+            <section class="table-container">
+                <h2 class="title-tabla">TABLA DE POSICIONES</h2>
+                <div class="group-selector">
+                    <p class="cycle-label">Ciclo Superior</p>
+                        <div class="tabs-sup">
+                            <button class="tab-btn active" data-grupo="A">Grupo A</button>
+                            <button class="tab-btn" data-grupo="B">Grupo B</button>
+                            <button class="tab-btn" data-grupo="C">Grupo C</button>
+                            <button class="tab-btn" data-grupo="D">Grupo D</button>
+                            <button class="tab-btn" data-grupo="E">Grupo E</button>
+                        </div>
+
+                <div class="group-title-container">
+                    <h3 class="group-name-sup">Grupo A</h3>
+                    <span class="group-category">Clasifican los 2 primeros y los 3 mejores terceros.</span>
+                </div>
+                    
+                <div class="table-wrapper">
+                    <table class="table-style">
+                        <thead>
+                            <tr class="table-head-row" style="background-color: #1e3a8a;"> <th class="th-pos">Pos</th><th class="th-team">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>+/-</th><th class="th-pts">PTS</th>
+                            </tr>
+                        </thead>
+                        <tbody class="tbody-sup">
+                        </tbody>
+                    </table>
+                </div>
+                <br>
+                <hr>
+                <div class="basic-section-margin">
+                <p class="cycle-label">Ciclo Básico</p>
+                        <div class="tabs-bas">
+                            <button class="tab-btn active" data-grupo-bas="A">Grupo A</button>
+                            <button class="tab-btn" data-grupo-bas="B">Grupo B</button>
+                        </div>
+                </div>
+                </div>
+
+                <div class="group-title-container">
+                    <h3 class="group-name-bas">Grupo A</h3>
+                    <span class="group-category">Ciclo Básico</span>
+                </div>
+
+                <table class="table-style">
+                    <thead>
+                        <tr style="background-color: #1e3a8a;"> <th>Pos</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>+/-</th><th>PTS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="tbody-bas">
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="recent-results">
+                <h2>PARTIDOS</h2>
+
+                <div class="fechas-carousel-container">
+                    <div class="tabs-fechas">
+                        <button class="tab-btn active" data-fecha="1">F1</button>
+                        <button class="tab-btn" data-fecha="2">F2</button>
+                        <button class="tab-btn" data-fecha="3">F3</button>
+                        <button class="tab-btn" data-fecha="4">F4</button>
+                        <button class="tab-btn" data-fecha="5">F5</button>
+                        <button class="tab-btn" data-fecha="6">F6</button>
+                    </div>
+                </div>
+                <div class="resultados-lista"></div>
+            </section>
+            <div id="sec-goleadores" class="tab-content" style="width: 100%; max-width: 700px;">
+                <section class="recent-results" style="width: 100%; border-color: #ef4444;">
+                    <h2 style="color: #ef4444; font-family: Michroma;">🏆 PLAYOFFS</h2>
+                    <div style="padding: 30px; text-align: center; font-family: Audiowide;">
+                        <p style="color: #8fa3d9; font-size: 13px; line-height: 1.8;">
+                            Las llaves de eliminación directa y el fixture de la fase final del torneo Clausura se habilitarán en este apartado de forma automática al finalizar la fase regular.
+                        </p>
+                    </div>
+                </section>
+        </div>
+
+        </div>
+        </main>
+    </div>
+
+<script src="JAVASCRIPT/data.js"></script>
+<script src="JAVASCRIPT/main.js"></script>
+</body>
+</html>

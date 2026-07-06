@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Mitre League</title>
+    <link rel="stylesheet" href="estilo.css">
+    <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
+    <style>
+        /* Estilos específicos para que el formulario quede bien centrado y prolijo */
+        @font-face {
+    font-family: Michroma;
+    src: url(./Recursos/Fuente/Michroma/Michroma-Regular.ttf);
+}
+@font-face {
+    font-family: Audiowide;
+    src: url(./Recursos/Fuente/Audiowide/Audiowide-Regular.ttf);
+}
+@font-face {
+    font-family: Oswald;
+    src: url(./Recursos/Fuente/Oswald/Oswald-VariableFont_wght.ttf);
+}
+        .admin-box {
+            background-color: #0b205d;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 0px 20px rgba(37, 33, 131, 0.5);
+            border: 1px dashed #15285e;
+            width: 100%;
+            max-width: 500px;
+            margin-top: 40px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            color: #60a5fa;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .form-group input, .form-group select {
+            background-color: #051030;
+            border: 1px solid #1e3a8a;
+            border-radius: 6px;
+            padding: 10px;
+            color: white;
+            font-family: 'Audiowide', sans-serif;
+            outline: none;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body style="background-color: #051030; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 20px; font-family: 'Audiowide', sans-serif; color: white;">
+
+    <header style="text-align: center; margin-bottom: 20px;">
+        <h1 style="font-family: 'Michroma', sans-serif; font-size: 22px; color: #5ce1e6;">MITRE LEAGUE - STAFF</h1>
+        <p style="color: #8fa3d9; font-size: 14px; margin-top: 5px;">Panel de Carga de Resultados</p>
+    </header>
+
+    <main class="admin-box">
+        <form id="form-partido">
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha del Torneo</label>
+                    <select id="partido-fecha" required>
+                        <option value="1">Fecha 1</option>
+                        <option value="2">Fecha 2</option>
+                        <option value="3">Fecha 3</option>
+                        <option value="4">Fecha 4</option>
+                        <option value="5">Fecha 5</option>
+                        <option value="6">Fecha 6</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ciclo</label>
+                    <select id="partido-ciclo" required>
+                        <option value="superior">Superior</option>
+                        <option value="basico">Básico</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Grupo</label>
+                <select id="partido-grupo-select" required>
+                    </select>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #1e3a8a; margin: 10px 0 20px 0;">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Equipo Local</label>
+                    <select id="partido-local" required>
+                        <option value="">Seleccione grupo primero</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Goles Local</label>
+                    <input type="number" id="goles-local" min="0" placeholder="0">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Equipo Visitante</label>
+                    <select id="partido-visitante" required>
+                        <option value="">Seleccione grupo primero</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Goles Visitante</label>
+                    <input type="number" id="goles-visitante" min="0" placeholder="0">
+                </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 10px;">
+                <div class="form-group">
+                    <label>Horario</label>
+                    <input type="text" id="partido-horario" placeholder="Ej: 14:20" value="14:20">
+                </div>
+                <div class="form-group">
+                    <label>Cancha</label>
+                    <select id="partido-cancha" required>
+                        <option value="Cancha 1">Cancha 1</option>
+                        <option value="Cancha 2">Cancha 2</option>
+                        <option value="Cancha 3">Cancha 3</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="tab-btn active" style="width: 100%; height: 45px; margin-top: 10px; font-size: 14px;">
+                 GUARDAR PARTIDO
+            </button>
+        </form>
+    </main>
+    <main class="admin-box" style="margin-top: 20px; border-color: #e11d48; box-shadow: 0px 0px 20px rgba(225, 29, 72, 0.2);">
+        <h2 style="font-size: 14px; color: #f43f5e; margin-bottom: 15px; text-transform: uppercase; text-align: center;"> Tribunal de Disciplina - Quita de Puntos</h2>
+        
+        <form id="form-sancion">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciclo del Equipo</label>
+                    <select id="sancion-ciclo" required>
+                        <option value="superior">Superior</option>
+                        <option value="basico">Básico</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Puntos a Restar</label>
+                    <input type="number" id="sancion-puntos" min="1" max="10" value="1" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Equipo Sancionado</label>
+                <select id="sancion-equipo" required>
+                    </select>
+            </div>
+
+            <button type="submit" class="tab-btn" style="width: 100%; height: 40px; margin-top: 5px; font-size: 13px; background-color: #991b1b; border-color: #f43f5e;">
+                 Aplicar Sanción
+            </button>
+        </form>
+    </main>
+
+    <div id="lista-sanciones-contenedor" style="width: 100%; max-width: 500px; margin-top: 20px;">
+        <h3 style="font-family:'Michroma', sans-serif; font-size:12px; color:#f43f5e; margin-bottom:10px; text-align:center;">Sanciones Aplicadas</h3>
+        <div id="lista-sanciones-admin"></div>
+    </div>
+
+
+
+    
+    <div style="width: 100%; max-width: 500px; margin-top: 40px; text-align: center;">
+        <h3 style="font-family:'Michroma', sans-serif; font-size:14px; color:#5ce1e6; margin-bottom:15px;">Partidos Registrados</h3>
+        
+        <div class="tabs-fechas-admin" style="display: flex; gap: 5px; justify-content: center; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
+            <button class="tab-btn-admin active" data-fecha-filtro="todas" style="background-color: #1e293b; color: white; border: 1px solid #334155; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">Todas</button>
+            <button class="tab-btn-admin" data-fecha-filtro="1" style="background-color: #051030; color: #8fa3d9; border: 1px solid #1e3a8a; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">F1</button>
+            <button class="tab-btn-admin" data-fecha-filtro="2" style="background-color: #051030; color: #8fa3d9; border: 1px solid #1e3a8a; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">F2</button>
+            <button class="tab-btn-admin" data-fecha-filtro="3" style="background-color: #051030; color: #8fa3d9; border: 1px solid #1e3a8a; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">F3</button>
+            <button class="tab-btn-admin" data-fecha-filtro="4" style="background-color: #051030; color: #8fa3d9; border: 1px solid #1e3a8a; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">F4</button>
+            <button class="tab-btn-admin" data-fecha-filtro="5" style="background-color: #051030; color: #8fa3d9; border: 1px solid #1e3a8a; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">F5</button>
+            <button class="tab-btn-admin" data-fecha-filtro="6" style="background-color: #051030; color: #8fa3d9; border: 1px solid #1e3a8a; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Audiowide';">F6</button>
+        </div>
+
+        <div id="lista-partidos-admin"></div>
+    </div>
+
+
+    <a href="index.html" style="margin-top: 25px; color: #8fa3d9; text-decoration: none; font-size: 12px; border-bottom: 1px solid #1e3a8a; padding-bottom: 2px;">
+        ← Volver al Dashboard Público
+    </a>
+
+    <script src="JAVASCRIPT/data.js"></script>
+    <script src="JAVASCRIPT/admin.js"></script>
+</body>
+</html>
