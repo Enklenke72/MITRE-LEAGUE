@@ -549,11 +549,10 @@ font-size: 14px;
 }*/
 
 /* ==========================================================================
-   ⚡ SECCIÓN RESPONSIVE COMPLETA: MÓVILES (Corregido)
+   ⚡ SECCIÓN RESPONSIVE COMPLETA: MÓVILES (Versión Ajustada)
    ========================================================================== */
 @media (max-width: 768px) {
     
-    /* 1. Reset e impedimento de desborde global */
     html, body {
         max-width: 100vw !important;
         overflow-x: hidden !important;
@@ -561,39 +560,56 @@ font-size: 14px;
         padding: 0;
     }
 
-    /* 2. REPARACIÓN DEL HEADER (Evita que el buscador tape el título) */
+    /* 1. SEPARACIÓN DEL HEADER: Volvemos a hacer fila para que entren el logo y los iconos arriba */
     .top-bar {
         height: auto !important;
         padding: 10px 15px !important;
-        flex-direction: column !important; /* Apilamos el título arriba y el buscador abajo */
-        gap: 10px;
+        display: grid !important;
+        grid-template-columns: 1fr auto; /* Título/Logo a la izquierda, Notificaciones a la derecha */
+        gap: 12px;
     }
 
     .inicio {
-        width: 100% !important;
-        justify-content: center !important;
+        width: auto !important;
+        justify-content: flex-start !important;
         margin-left: 0 !important;
     }
 
     .inicio h2 {
-        font-size: 14px !important;
-        text-align: center;
+        font-size: 13px !important;
+        text-align: left !important;
     }
 
+    /* La campanita y notificaciones se clavan arriba a la derecha */
+    .header-sectionRight {
+        grid-column: 2;
+        grid-row: 1;
+        margin-right: 0 !important;
+        display: flex;
+        align-items: center;
+    }
+
+    .notifications img {
+        width: 22px; /* Tamaño cómodo para el dedo en el celu */
+    }
+
+    /* El buscador pasa a una segunda fila solito, abajo del título y la campana */
     .search-container {
-        width: 100% !important; /* El buscador ahora ocupa todo el ancho cómodo del celu */
-        max-width: 300px;
-        margin: 0 auto !important; /* Centrado */
+        grid-column: 1 / span 2; /* Ocupa todo el ancho de lado a lado */
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 5px 0 0 0 !important;
+        box-sizing: border-box;
     }
 
-    /* 3. REPARACIÓN DE LA ESTRUCTURA PRINCIPAL */
+    /* 2. REPARACIÓN DE LAS CAJAS (Evita que se corten el contenido) */
     .showman {
         flex-direction: column !important;
     }
 
     .dashboard-container {
         padding: 10px !important;
-        padding-bottom: 90px !important; /* Espacio para que la barra de abajo no tape nada */
+        padding-bottom: 90px !important; /* Espacio sagrado para que la barra inferior no tape nada */
         width: 100% !important;
         box-sizing: border-box;
     }
@@ -604,34 +620,45 @@ font-size: 14px;
         gap: 20px;
     }
 
-    /* 4. REPARACIÓN DEL HERO SECTION */
+    /* Forzamos a que los contenedores de las tablas y partidos muestren TODO su contenido */
+    .table-container, .recent-results, #sec-goleadores section {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important; /* 👈 CLAVE: Elimina cualquier alto fijo que las corte */
+        min-height: min-content !important;
+        overflow: visible !important; /* Permite que la caja se estire hacia abajo libremente */
+        padding: 15px !important;
+        box-sizing: border-box;
+    }
+
+    /* 3. HERO SECTION */
     .hero-section {
         width: 100% !important;
+        height: auto !important;
+        min-height: 220px !important;
         box-sizing: border-box;
         margin: 10px 0 !important;
         padding: 20px 15px !important;
     }
 
-    /* 5. EL TRUCO DE ORO PARA LAS TABLAS (Habilitar Scroll Lateral) */
-    /* Al envoltorio de la tabla le damos scroll horizontal para que si no entra, el pibe pueda deslizar la tabla con el dedo sin que se rompa la web */
+    /* 4. SCROLL LATERAL SEGURO PARA TABLAS */
     .table-wrapper {
         width: 100% !important;
         overflow-x: auto !important; 
         -webkit-overflow-scrolling: touch;
+        margin-top: 10px;
     }
 
     .table-style {
-        min-width: 450px; /* Fuerza un ancho mínimo interno para que los datos respiren */
+        min-width: 480px; /* Le damos aire a las columnas de PJ, G, E, P, PTS */
     }
 
-    .table-container, .recent-results {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 15px !important;
-        box-sizing: border-box;
+    .table-style th, .table-style td {
+        padding: 10px 6px !important;
+        font-size: 11px !important;
     }
 
-    /* 6. BARRA DE NAVEGACIÓN FIJA INFERIOR */
+    /* 5. BARRA DE NAVEGACIÓN FIJA INFERIOR */
     .sidebar {
         position: fixed !important;
         bottom: 0 !important;
@@ -645,6 +672,7 @@ font-size: 14px;
         padding: 0 !important;
         z-index: 9999 !important;
         background-color: #0b205d !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .side-nav {
