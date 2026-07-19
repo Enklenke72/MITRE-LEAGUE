@@ -643,21 +643,28 @@ font-size: 14px;
         font-size: 10px;
     }
 
-    /* 4. SCROLL LATERAL SEGURO PARA TABLAS */
-    .table-wrapper {
+    /* 4. REPARACIÓN DIRECTA DE LA CAJA DE TABLAS */
+    .table-container {
         width: 100% !important;
+        max-width: 100% !important;
+        padding: 15px !important;
+        box-sizing: border-box;
+        
+        /* El truco mágico: si la tabla adentro es muy ancha, la caja permite scroll horizontal */
         overflow-x: auto !important; 
-        -webkit-overflow-scrolling: touch;
-        margin-top: 10px;
+        -webkit-overflow-scrolling: touch; /* Hace que el deslizado en iPhone/Android sea fluido */
     }
 
-    .table-style {
-        min-width: 480px; /* Le damos aire a las columnas de PJ, G, E, P, PTS */
+    /* Forzamos a la tabla interna a mantener una estructura legible */
+    .table-container table {
+        min-width: 500px !important; /* Le da el ancho necesario a las columnas para que respiren */
+        width: 100% !important;
     }
 
     .table-style th, .table-style td {
         padding: 10px 6px !important;
         font-size: 11px !important;
+        text-align: center;
     }
 
     /* 5. BARRA DE NAVEGACIÓN FIJA INFERIOR */
