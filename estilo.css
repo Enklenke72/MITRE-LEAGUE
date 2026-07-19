@@ -548,175 +548,75 @@ font-size: 14px;
     background: rgba(255, 255, 255, 0.05) !important;
 }*/
 
-
-
-/* ============================================================
-   RESPONSIVE — AGREGAR AL FINAL DE estilo.css
-   Breakpoints: tablet (≤900px) y móvil (≤600px)
-   ============================================================ */
-
-/* --- TABLET (pantallas menores a 900px) --- */
-@media (max-width: 900px) {
-
-    /* El grid de 2 columnas pasa a 1 sola columna */
-    .main-grid {
-        grid-template-columns: 1fr;
+/* ==========================================================================
+   ⚡ SECCIÓN RESPONSIVE: MÓVILES (Pantallas menores a 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+    
+    /* 1. Ajustamos la estructura principal */
+    .showman {
+        flex-direction: column; /* La barra lateral ahora se va a mover abajo o arriba, no al costado */
     }
 
-    /* La sección de resultados no queda más angosta que la tabla */
-    .recent-results {
-        max-width: 100%;
-    }
-
-    /* El hero se ensancha un poco */
-    .hero-section {
-        width: 95%;
-    }
-    .hero-section:hover {
-        width: 97%;
-        height: 420px;
-    }
-}
-
-/* --- MÓVIL (pantallas menores a 600px) --- */
-@media (max-width: 600px) {
-
-    /* ---- LAYOUT GENERAL ---- */
-
-    /* El sidebar lateral se convierte en barra inferior */
+    /* 2. Transformamos el Sidebar en una barra inferior (tipo App de celular) */
     .sidebar {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        height: 60px;
-        min-height: unset;
-        flex-direction: row;
+        height: 60px; /* Altura fija tipo barra de navegación de celu */
+        min-height: 60px;
+        background-color: #0b205d !important;
+        flex-direction: row; /* Iconos en fila, no en columna */
         justify-content: space-around;
         align-items: center;
-        padding: 0 10px;
-        z-index: 100;
-        border-top: 1px solid rgba(255,255,255,0.08);
-        background-color: #0b205d;
+        padding-top: 0;
+        z-index: 1000; /* Asegura que quede siempre por encima de las tablas */
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* El nav de íconos pasa a fila */
     .side-nav {
-        flex-direction: row;
-        gap: 0;
-        width: 100%;
+        flex-direction: row; /* Los botones se alinean de izquierda a derecha */
         justify-content: space-around;
+        gap: 0; /* Quitamos el espacio vertical exagerado */
     }
 
-    /* Agregamos padding inferior al main para que el contenido no quede
-       tapado por la barra de navegación inferior */
+    .sidebar img.logoa {
+        display: none; /* Ocultamos el logo de la barra inferior para que no ocupe espacio al vicio */
+    }
+
+    /* 3. El contenedor del Dashboard ahora tiene que dejar aire abajo para no taparse con la barra */
     .dashboard-container {
-        padding: 15px 12px 80px 12px;
+        padding: 15px;
+        padding-bottom: 80px; /* Margen vital para que la barra fija no te tape el último partido */
     }
 
-    /* ---- HERO ---- */
-    .hero-section {
-        width: 100%;
-        height: 260px;
-        padding: 20px;
-        border-radius: 10px;
-    }
-    .hero-section:hover {
-        width: 100%;
-        height: 260px;
-    }
-    .hero-section h2 {
-        font-size: 18px;
-    }
-    .hero-section p {
-        font-size: 12px;
-        line-height: 1.5;
+    /* 4. Rompemos las dos columnas de la computadora y las hacemos una sola vertical */
+    .main-grid {
+        grid-template-columns: 1fr; /* Todo pasa a ocupar el 100% del ancho */
+        gap: 15px;
     }
 
-    /* ---- HEADER / TOP BAR ---- */
-    .inicio h2 {
-        display: none; /* Ocultamos el texto "MITRE LEAGUE" en el header, queda solo el logo */
-    }
-    .inicio {
-        width: auto;
-        margin-left: 10px;
-    }
-    .search-container {
-        width: 160px;
+    /* 5. Achicamos un pelín las tipografías y rellenos para que no desborde */
+    .table-container, .recent-results {
+        padding: 15px !important; /* Menos margen interno para ganar espacio en pantalla */
     }
 
-    /* ---- TABLA DE POSICIONES ---- */
-    .table-container,
-    .recent-results {
-        padding: 15px !important;
-        border-radius: 10px;
-    }
-
-    /* Las tablas en móvil tienen scroll horizontal en vez de deformarse */
-    .table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .table-style {
-        min-width: 420px; /* Fuerza un ancho mínimo para que las columnas no se aplasten */
-    }
-
-    .table-style th,
-    .table-style td {
-        padding: 10px 6px !important;
-        font-size: 11px !important;
+    .table-style th, .table-style td {
+        padding: 8px 4px !important; /* Celdas más compactas para que entre el DNI y los PTS */
+        font-size: 11px; /* Bajamos un toque el tamaño de la letra de los equipos */
     }
 
     .title-tabla {
         font-size: 13px;
     }
 
-    /* ---- SELECTORES DE GRUPO ---- */
-    .tabs-sup,
-    .tabs-bas {
-        flex-wrap: wrap; /* Los botones de grupo saltan de línea si no entran */
-        gap: 5px;
+    /* 6. Ajustamos el buscador del Header para pantallas chicas */
+    .search-container {
+        width: 150px; /* Más angosto para que no choque con las notificaciones y el logo */
     }
-
-    .tab-btn {
-        font-size: 11px;
-        padding: 6px 12px;
-    }
-
-    /* ---- TARJETAS DE PARTIDOS ---- */
-    .match-card {
-        padding: 10px 8px;
-    }
-
-    .team-name {
-        font-size: 0.75em;
-        max-width: 100px;     /* Evita que nombres largos rompan el layout */
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .score {
-        font-size: 14px;
-    }
-
-    /* ---- GRID DEL MAIN ---- */
-    .main-grid {
-        gap: 15px;
-    }
-
-    /* ---- BANNER APERTURA (la cajita de bienvenida) ---- */
-    #sec-home > div {
-        padding: 25px 15px 30px !important;
-    }
-    #sec-home h2 {
-        font-size: 20px !important;
-    }
-    #sec-home p {
-        font-size: 11px !important;
-        letter-spacing: 2px !important;
+    
+    .inicio h2 {
+        font-size: 11px; /* Achicamos el texto "MITRE LEAGUE" del top-bar */
     }
 }
-
-
