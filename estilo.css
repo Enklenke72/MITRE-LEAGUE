@@ -586,6 +586,7 @@ font-size: 14px;
         grid-row: 1;
         margin-right: 0 !important;
         display: flex;
+        padding-right: 5px;
         align-items: center;
     }
 
@@ -616,7 +617,7 @@ font-size: 14px;
 
     .main-grid {
         grid-template-columns: 1fr !important;
-        width: 100% !important;
+        max-width: 100% !important;
         gap: 20px;
     }
 
@@ -639,6 +640,7 @@ font-size: 14px;
         box-sizing: border-box;
         margin: 10px 0 !important;
         padding: 20px 15px !important;
+        font-size: 10px;
     }
 
     /* 4. SCROLL LATERAL SEGURO PARA TABLAS */
