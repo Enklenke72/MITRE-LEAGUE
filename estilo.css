@@ -548,8 +548,77 @@ font-size: 14px;
     background: rgba(255, 255, 255, 0.05) !important;
 }*/
 
+/* ==========================================================================
+   ⚡ SECCIÓN RESPONSIVE: MÓVILES (Pantallas menores a 768px)
+   ========================================================================== */
 @media (max-width: 768px) {
-    /* ... (todo lo que ya pegaste antes) ... */
+    
+    /* 1. Ajustamos la estructura principal */
+    .showman {
+        flex-direction: column; /* La barra lateral ahora se va a mover abajo o arriba, no al costado */
+    }
+
+    /* 2. Transformamos el Sidebar en una barra inferior (tipo App de celular) */
+    .sidebar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 60px; /* Altura fija tipo barra de navegación de celu */
+        min-height: 60px;
+        background-color: #0b205d !important;
+        flex-direction: row; /* Iconos en fila, no en columna */
+        justify-content: space-around;
+        align-items: center;
+        padding-top: 0;
+        z-index: 1000; /* Asegura que quede siempre por encima de las tablas */
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .side-nav {
+        flex-direction: row; /* Los botones se alinean de izquierda a derecha */
+        justify-content: space-around;
+        gap: 0; /* Quitamos el espacio vertical exagerado */
+    }
+
+    .sidebar img.logoa {
+        display: none; /* Ocultamos el logo de la barra inferior para que no ocupe espacio al vicio */
+    }
+
+    /* 3. El contenedor del Dashboard ahora tiene que dejar aire abajo para no taparse con la barra */
+    .dashboard-container {
+        padding: 15px;
+        padding-bottom: 80px; /* Margen vital para que la barra fija no te tape el último partido */
+    }
+
+    /* 4. Rompemos las dos columnas de la computadora y las hacemos una sola vertical */
+    .main-grid {
+        grid-template-columns: 1fr; /* Todo pasa a ocupar el 100% del ancho */
+        gap: 15px;
+    }
+
+    /* 5. Achicamos un pelín las tipografías y rellenos para que no desborde */
+    .table-container, .recent-results {
+        padding: 15px !important; /* Menos margen interno para ganar espacio en pantalla */
+    }
+
+    .table-style th, .table-style td {
+        padding: 8px 4px !important; /* Celdas más compactas para que entre el DNI y los PTS */
+        font-size: 11px; /* Bajamos un toque el tamaño de la letra de los equipos */
+    }
+
+    .title-tabla {
+        font-size: 13px;
+    }
+
+    /* 6. Ajustamos el buscador del Header para pantallas chicas */
+    .search-container {
+        width: 150px; /* Más angosto para que no choque con las notificaciones y el logo */
+    }
+    
+    .inicio h2 {
+        font-size: 11px; /* Achicamos el texto "MITRE LEAGUE" del top-bar */
+    }/* ... (todo lo que ya pegaste antes) ... */
 
     /* 1. EL RESET GLOBAL: Obligamos a la pantalla a no desbordar hacia los costados */
     html, body {
