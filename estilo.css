@@ -13,7 +13,12 @@
     font-family: Oswald;
     src: url(./Recursos/Fuente/Oswald/Oswald-VariableFont_wght.ttf);
 }
+
+
+
+
 body {
+    background-color: #051030 !important;
     /*background-color: rgba(22, 42, 30, 0.845);*/
     display: flex;
     flex-direction: column;
@@ -22,6 +27,15 @@ body {
     min-height: 100vh;
     min-width: 100%;
 }
+
+
+/* ⚡ CLASE MÁGICA PARA OCULTAR PANTALLAS (SPA) ⚡ */
+.seccion-oculta {
+    display: none !important;
+}
+
+
+
 .top-bar, .inicio, .search, .search-box{
     display: flex;
     flex-direction: row;
@@ -32,11 +46,13 @@ body {
 }
 .top-bar{
     position: sticky;
+    top: 0;          /* 👈 CLAVE: Clava la barra en el borde superior de la pantalla */
+    z-index: 9998;
 }
 .inicio{
     width: 10%;
     height: 50px;
-    margin-left: 15px;
+    margin-left: 9px;
 } 
 .inicio h2{
     margin-left: -3px;
@@ -48,8 +64,8 @@ body {
 .showman {
     display: flex;
     flex-direction: row;
-    flex: 1; /* ¡Esta es la clave! */
-    width: 100%;
+    flex: 1; 
+    width: 100% !important; /* Asegura que se expanda al máximo en monitores */
 }
 
 .search{
@@ -80,17 +96,29 @@ font-size: 14px;
     align-items: center;
     /*height: 100vh;
     position: fixed;*/
-    min-height: calc(100vh - 60px);
     padding-top: 20px;
     flex-shrink: 0;
+    /* ⚡ NUEVOS SUPERPODERES STICKY PARA PC ⚡ */
+    position: sticky;
+    top: 60px;                    /* Se clava justo abajo de la top-bar (que mide 60px) */
+    height: calc(100vh - 60px);
 }
 .dashboard-container {
-    flex-grow: 1; /* Esto hace que el main "crezca" y ocupe el resto del espacio disponible */
-    padding: 20px; /* Un poco de aire para que no pegue contra el borde */
+    flex-grow: 1; 
+    /* 👈 Aumentamos el padding superior a 40px para que el título baje y no se solape con la barra */
+    padding: 0px 20px 60px 20px; 
     background-color: #051030;
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
+}
+
+/* ⚡ NUEVO: Fuerza a todas las secciones gigantes a centrarse perfectamente en la pantalla */
+.dashboard-container > section,
+.dashboard-container > div {
+    margin-left: auto !important;
+    margin-right: auto !important;
 }
 .main-grid {
     display: grid;
@@ -108,9 +136,18 @@ font-size: 14px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     text-align: left !important; /* Alinea todo el bloque a la izquierda */
     width: 100%;
-    max-width: 850px;
+    max-width: 600px;
+}
+.recent-results{
+    font-size: 10px;
+    font-weight: bold;
+    font-family: 'Michroma', sans-serif;
 
 }
+.recent-results h2{
+    margin-top: 10.45px;
+}
+
 .title-tabla{
     font-family: 'Michroma', sans-serif;
     font-size: 15px;
@@ -146,9 +183,13 @@ font-size: 14px;
 
 .table-wrapper {
     border-radius: 12px;
-    overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.05);
     background: transparent !important;
+   
+
+    overflow-x: auto !important; /* Permite deslizar las estadísticas de la tabla */
+    -webkit-overflow-scrolling: touch;
+
 }
 
 
@@ -214,7 +255,7 @@ font-size: 14px;
     flex-direction: column;
     align-items: center;
     width: 100%;
-    gap: 45px;
+    gap: 10px;
 }
 .sidebar img{
     width: 40px;
@@ -269,11 +310,7 @@ font-size: 14px;
 .hero-section h2 {
     margin-bottom: 0px;
 }
-.hero-section:hover{
-    width: 82%;
-    height: 420px;
-    transition-duration: 100ms;
-}
+
 
 
 
@@ -291,10 +328,10 @@ font-size: 14px;
 .basic-section-margin{
     margin-top: 35px;
 }
-.group-selector p {
+.group-selector > p {
     color: #8fa3d9; /* Un azul claro para los títulos */
     font-size: 12px;
-    margin-bottom: 8px;
+    margin-top: -8px;
     text-transform: uppercase;
 }
 
@@ -306,8 +343,15 @@ font-size: 14px;
     display: flex;          /* Alinea los botones en una sola fila continua */
     background-color: #051030; /* El fondo oscuro idéntico a tu dashboard */         /* Separación sutil interna para el efecto cápsula */
     border-radius: 4px;     /* Bordes redondeados de la barra completa */
-    width: max-content;     /* Se ajusta exactamente al tamaño de los botones */
+    width: max-content;   /* Se ajusta exactamente al tamaño de los botones */
     border: 1px solid rgba(255, 255, 255, 0.05); /* Borde sutil general */
+}
+.tabs-bas{
+    display: flex;          /* Alinea los botones en una sola fila continua */
+    background-color: #051030; /* El fondo oscuro idéntico a tu dashboard */         /* Separación sutil interna para el efecto cápsula */
+    border-radius: 4px;     /* Bordes redondeados de la barra completa */
+    width: max-content;   /* Se ajusta exactamente al tamaño de los botones */
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 .tab-btn {
     background-color: transparent; /* Fondo transparente para que tome el de la barra */
@@ -436,7 +480,7 @@ font-size: 14px;
     /* CAMBIAZO CLAVE: Forzamos a que los elementos se apilen uno abajo del otro */
     flex-direction: column;
 }
-.group-name-sup{
+.group-name-sup, .group-name-bas{
     margin: 5px 0px;
 }
 .group-name {
@@ -452,8 +496,11 @@ font-size: 14px;
     color: #8fa3d9; /* El color clarito que venías usando */
     font-size: 12px;
     letter-spacing: 1px;
+    margin-top: 4px;
     display: block;
     /* box-sizing: border-box; */
+    text-transform: uppercase
+
 }
 
 
@@ -551,13 +598,26 @@ font-size: 14px;
 /* ==========================================================================
    ⚡ SECCIÓN RESPONSIVE COMPLETA: MÓVILES (Versión Ajustada)
    ========================================================================== */
-@media (max-width: 431px) {
+@media (max-width: 768px) {
     
     html, body {
-        max-width: 100% !important;
-        /* overflow-x: hidden !important; */
+        max-width: 100vw !important;
+        overflow-x: hidden !important; /* 👈 Le quitamos los comentarios para activar el escudo */
         margin: 0;
         padding: 0;
+    }.tabs-sup {
+        display: flex !important;
+        flex-direction: row !important;
+        width: 100% !important;
+        max-width: 100% !important; /* Se clava en el ancho del celu */
+        overflow-x: auto !important; /* El scroll horizontal nace y muere ACÁ */
+        overflow-y: hidden !important; /* Evita que se mueva hacia arriba o abajo */
+        white-space: nowrap !important; /* Obliga a los botones a quedarse en fila india */
+        gap: 8px !important;
+        padding:2px !important; /* Espacio abajo para que no se pegue al scroll */
+        box-sizing: border-box !important;
+        -webkit-overflow-scrolling: touch; /* Deslizado suave con el pulgar */
+        scrollbar-width: none;
     }
 
     /* 1. SEPARACIÓN DEL HEADER: Volvemos a hacer fila para que entren el logo y los iconos arriba */
@@ -591,7 +651,7 @@ font-size: 14px;
     }
 
     .notifications img {
-        width: 22px; /* Tamaño cómodo para el dedo en el celu */
+        width: 24px; /* Tamaño cómodo para el dedo en el celu */
     }
 
     /* El buscador pasa a una segunda fila solito, abajo del título y la campana */
@@ -599,42 +659,47 @@ font-size: 14px;
         grid-column: 1 / span 2; /* Ocupa todo el ancho de lado a lado */
         width: 100% !important;
         max-width: 100% !important;
-        margin: 5px 0 0 0 !important;
+        margin: 5px 0 0 5px !important;
         box-sizing: border-box;
     }
 
     /* 2. REPARACIÓN DE LAS CAJAS (Evita que se corten el contenido) */
-    .showman {
-        flex-direction: column !important;
-    }
-
+    
     .dashboard-container {
-        padding: 10px !important;
-        padding-bottom: 90px !important; /* Espacio sagrado para que la barra inferior no tape nada */
+        /* padding: 10px !important; */
+        margin-top: -10px;
+        padding-top: 0px;
+         padding-bottom: 90px !important;/* Espacio sagrado para que la barra inferior no tape nada */
         width: 100% !important;
         box-sizing: border-box;
     }
+    
 
     .main-grid {
         grid-template-columns: 1fr !important;
+        gap: 10px;
         max-width: 100% !important;
-        gap: 20px;
-    }
+        margin-top: 20px;
 
+
+        
+   
+    }
     /* Forzamos a que los contenedores de las tablas y partidos muestren TODO su contenido */
-    .table-container, .recent-results, #sec-goleadores section {
-        width: 100% !important;
+    .recent-results, #sec-goleadores section {
+        width: 90%;
+        margin: auto;
         max-width: 100% !important;
-        height: auto !important; /* 👈 CLAVE: Elimina cualquier alto fijo que las corte */
+        height: auto ; /* 👈 CLAVE: Elimina cualquier alto fijo que las corte */
         min-height: min-content !important;
-        overflow: visible !important; /* Permite que la caja se estire hacia abajo libremente */
+        overflow-x: visible !important; /* Permite que la caja se estire hacia abajo libremente */
         padding: 15px !important;
         box-sizing: border-box;
     }
 
     /* 3. HERO SECTION */
     .hero-section {
-        width: 100% !important;
+        width: auto ;
         height: auto !important;
         min-height: 220px !important;
         box-sizing: border-box;
@@ -645,19 +710,17 @@ font-size: 14px;
 
     /* 4. REPARACIÓN DIRECTA DE LA CAJA DE TABLAS */
     .table-container {
-        width: 100% !important;
+        width: 90% !important;
         max-width: 100% !important;
         padding: 15px !important;
         box-sizing: border-box;
-        
+        margin:auto;
         /* El truco mágico: si la tabla adentro es muy ancha, la caja permite scroll horizontal */
         overflow-x: auto !important; 
         -webkit-overflow-scrolling: touch; /* Hace que el deslizado en iPhone/Android sea fluido */
     }
-
     /* Forzamos a la tabla interna a mantener una estructura legible */
-    .table-container table {
-        min-width: 500px !important; /* Le da el ancho necesario a las columnas para que respiren */
+    .table-container table { /* Le da el ancho necesario a las columnas para que respiren */
         width: 100% !important;
     }
 
@@ -667,22 +730,40 @@ font-size: 14px;
         text-align: center;
     }
 
-    /* 5. BARRA DE NAVEGACIÓN FIJA INFERIOR */
+    /* 3. LA BARRA LATERAL PASA A SER LA BARRA INFERIOR BLINDADA */
     .sidebar {
         position: fixed !important;
-        bottom: 0 !important;
+        top: auto !important;
+        bottom: 0px !important;
         left: 0 !important;
+        right: 0 !important; /* 👈 Asegura que se estire de punta a punta */
         width: 100% !important;
-        height: 60px !important;
-        min-height: 60px !important;
+        height: 70px !important; /* 👈 Le damos 10px más de aire para los textos nuevos */
+        margin: 0 !important; /* 👈 Mata cualquier margen fantasma que la levante */
         flex-direction: row !important;
         justify-content: space-around !important;
         align-items: center !important;
-        padding: 0 !important;
+        /* El "env(safe-area-inset-bottom)" evita que la rayita de los iPhone tape los botones */
+        padding: 0 5px env(safe-area-inset-bottom) 5px !important; 
         z-index: 9999 !important;
         background-color: #0b205d !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-bottom: none !important; /* 👈 Escudo extra */
+        border-radius: 0 !important;
+        transform: translateY(0) !important; /* 👈 La fuerza a quedarse en el eje 0 */
     }
+    
+.tab-btn {
+    background-color: transparent; /* Fondo transparente para que tome el de la barra */
+    color: #8fa3d9;         /* Color gris/azul apagado de la imagen para los inactivos */
+    border: none;  
+    font-family: 'Audiowide', sans-serif;
+    font-size: 12px;
+    border-radius: 4px;     /* Redondeado interno leve para cada botón */
+    
+    transition: all 0.2s ease;
+    margin: 0;              /* Eliminamos cualquier margen para que se peguen */
+}
 
     .side-nav {
         flex-direction: row !important;
@@ -693,5 +774,2404 @@ font-size: 14px;
 
     .sidebar img.logoa {
         display: none !important;
+    }.header-sectionRight {
+        grid-column: 2;
+        grid-row: 1;
+        margin-right: 0 !important;
+        display: flex !important;
+        gap: 12px !important; /* Espacio cómodo para tocar con el dedo en el celu */
+        align-items: center;
+    }.ig-icon {
+        width: 24px;  /* Un cachito más grande en el celu para que sea fácil de tocar */
+        height: 24px;
+    }
+    
+    .main-footer {
+        margin-top: 30px;
+        padding-bottom: 20px; /* Evita que la barra fija inferior te tape tu nombre */
+        font-size: 10px;
+        padding-bottom: 90px !important;
     }
 }
+
+@media (hover: hover) and (pointer: fine){
+.ig-link:hover .ig-icon {
+    opacity: 1 !important;
+    fill: #e1306c!important; /* Opcional: se vuelve tu celeste neón insignia al hacer hover */
+    transform: scale(1.1);
+}
+}
+/* --- ESTILOS GENERALES (Agrega esto en la parte común de tu CSS) --- */
+.header-sectionRight {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Crea una separación prolija entre la campana y el logo de IG */
+}
+.ig-icon {
+    width: 22px;       /* Le damos el tamaño justo */
+    height: 22px;
+    fill: #ffffff !important; /* 👈 ¡ESTA ES LA MAGIA! Esto lo pinta de blanco puro */
+    opacity: 0.8;      /* Lo dejamos un toque traslúcido para que juegue con tu diseño */
+    transition: all 0.2s ease;
+}
+
+
+/* El diseño de tu Footer de autor */
+.main-footer {
+    width: 100%;
+    margin-top: 40px;
+    padding: 20px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: center;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    color: #8fa3d9;
+}
+.autor-firma {
+    color: #5ce1e6; /* Tu color neón insignia */
+    text-shadow: 0 0 8px rgba(92, 225, 230, 0.4);
+    font-weight: bold;
+}
+/* ============================================================
+   SIDEBAR + SCROLL — VERSIÓN BLINDADA
+   ============================================================ */
+
+/* ─────────────────────────────────────────────
+   DESKTOP (≥ 601px)
+   ───────────────────────────────────────────── */
+@media (min-width: 800px) {
+
+    /* 1. TOP BAR: visible al inicio */
+    .top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999; /* Máxima prioridad inicial */
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+    }
+
+    /* 2. AL SCROLLEAR: top-bar desaparece */
+    body.scrolled .top-bar {
+        transform: translateY(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* 3. SIDEBAR: Magia del espacio dinámico */
+    .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        width: 70px;
+        flex-direction: column;
+        justify-content: flex-start;
+        flex-shrink: 0;
+        padding-top: 60px; /* 👈 HUECO CLAVE: Espacio para que encaje la top-bar al principio */
+        overflow: hidden;
+        transition: padding-top 0.4s ease, width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.scrolled .sidebar {
+        padding-top: 0; /* Al scrollear, elimina el hueco y sube todo */
+    }
+
+    .sidebar:hover {
+        width: 210px;
+    }
+
+    /* --- BOTONES PRINCIPALES DEL NAV --- */
+    .nav-item {
+        justify-content: flex-start;
+        padding-left: 12px;  /* Centra el icono dentro del círculo */
+        gap: 15px;
+        width: 50px;         /* 👈 Vuelve a ser un cuadrado base */
+        height: 50px;
+        margin: 8px 10px;    /* 👈 Le da "aire" arriba, abajo y a los costados */
+        border-radius: 25px; /* 👈 MAGIA: Lo convierte en un círculo perfecto (la mitad de 50) */
+        box-sizing: border-box;
+        transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease;
+        overflow: hidden;    /* Oculta el texto hasta que se expanda */
+    }
+
+    /* Al pasar el mouse por la barra, el botón se estira con forma de píldora */
+    .sidebar:hover .nav-item {
+        width: calc(100% - 20px);
+    }
+
+    .nav-item:hover { 
+        background-color: rgba(255, 255, 255, 0.05); 
+    }
+}
+/* ─────────────────────────────────────────────
+   LOGO SECTION (Oculto 100% hasta scrollear)
+   ───────────────────────────────────────────── */
+.sidebar-logo-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    width: 100%;
+    box-sizing: border-box;
+
+    /* ESTADO INICIAL: Totalmente colapsado e invisible */
+    max-height: 0;
+    padding: 0 15px;
+    opacity: 0;
+    border-bottom: 1px solid transparent;
+    pointer-events: none;
+    transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.4s ease, border-color 0.4s ease;
+}
+
+/* AL SCROLLEAR: Aparece el logo */
+body.scrolled .sidebar-logo-section {
+    max-height: 80px;
+    padding: 15px 15px;
+    opacity: 1;
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    pointer-events: all;
+}
+
+.sidebar-logo-section .logoa {
+    width: 38px;
+    flex-shrink: 0;
+    margin-top: 0 !important;
+    margin-left: -7px;
+}
+
+.sidebar-logo-text {
+    font-size: 14px;
+    color: #fff;
+    font-family: Michroma;
+    margin-top: 5px;
+    font-weight: bold;
+}
+.sidebar:hover .sidebar-logo-text { opacity: 1; transform: translateX(0); }
+
+/* ─────────────────────────────────────────────
+   TEXTOS DEL NAV (Labels en Hover)
+   ───────────────────────────────────────────── */
+.nav-label {
+    font-family: 'Audiowide', sans-serif;
+    font-size: 10px;
+    color: #8fa3d9;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+.sidebar:hover .nav-label { opacity: 1; transform: translateX(0); }
+.nav-item.active .nav-label { color: #5ce1e6; }
+
+/* ─────────────────────────────────────────────
+   SECCIÓN INFERIOR (IG, Búsqueda, Notificaciones)
+   ───────────────────────────────────────────── */
+.sidebar-bottom {
+    margin-top: auto; /* 👈 MAGIA: Obliga a esta caja a irse al fondo de la pantalla */
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+
+    /* ESTADO INICIAL: Totalmente colapsado */
+    max-height: 0;
+    padding: 0;
+    opacity: 0;
+    border-top: 1px solid transparent;
+    pointer-events: none;
+    transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.4s ease, border-color 0.4s ease;
+}
+
+/* AL SCROLLEAR: Se expande en la parte baja */
+body.scrolled .sidebar-bottom {
+    max-height: 250px;
+    opacity: 1;
+    padding: 10px 0 15px 0;
+    border-top-color: rgba(255, 255, 255, 0.07);
+    pointer-events: all;
+}
+
+/* --- BOTONES DE ABAJO (Buscar, IG, Notificaciones) --- */
+    .sidebar-bottom-item {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding-left: 13px;
+        gap: 15px;
+        width: 50px;         /* 👈 Mismo tratamiento redondo */
+        height: 50px;
+        margin: 6px 10px;    /* 👈 Espaciado prolijo */
+        border-radius: 25px; /* 👈 Círculo perfecto */
+        cursor: pointer;
+        text-decoration: none;
+        box-sizing: border-box;
+        transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .sidebar:hover .sidebar-bottom-item {
+        width: calc(100% - 20px);
+    }
+
+    .sidebar-bottom-item:hover { 
+        background-color: rgba(255, 255, 255, 0.05); 
+    }
+.sidebar-bottom-label {
+    font-family: 'Audiowide', sans-serif;
+    font-size: 10px;
+    color: #8fa3d9;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.sidebar:hover .sidebar-bottom-label { opacity: 1; transform: translateX(0); }
+
+/* Buscador y Lupa */
+.sidebar-search-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #1e3a8a;
+    color: white;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 10px;
+    outline: none;
+    width: 0;
+    opacity: 0;
+    transition: width 0.3s ease, opacity 0.3s ease;
+}
+.sidebar-search-input::placeholder { color: #bbb; }
+.sidebar:hover .sidebar-search-input { width: 115px; opacity: 1; }
+
+/* Icono IG Hover */
+.ig-icon-sidebar {
+    width: 22px; height: 22px; fill: #8fa3d9; transition: fill 0.2s ease; flex-shrink: 0;
+}
+.sidebar-bottom-item:hover .ig-icon-sidebar { fill: #e1306c; }
+
+/* ==========================================================================
+   📱 SECCIÓN RESPONSIVE COMPLETA: MÓVILES Y TABLETS
+   ========================================================================== */
+@media (max-width: 768px) {
+    
+    /* 1. EL HEADER FIJO ARRIBA */
+    .top-bar {
+        display: flex !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9999 !important;
+        justify-content: space-between !important;
+        padding: 0 10px !important; /* Le sacamos los márgenes gigantes a los costados */
+    }
+
+    /* 1. Achicamos un toque la zona del logo */
+    .inicio {
+        width: 10% !important;
+        margin-left: 0 !important;
+        margin-right: 60px;
+        gap: 5px !important;
+    }
+    .inicio .logoa {
+        width: 35px !important;
+        margin-top: 0 !important;
+    }
+    .inicio h2 {
+        font-size: 11px !important;
+    }
+
+    /* 2. El Buscador se vuelve un "elástico" */
+    .search-container {
+        width: 100% !important;
+        max-width: 130px !important; /* 👈 MAGIA: Le ponemos un tope para que no empuje a los íconos */
+        margin: 0 auto !important;
+        padding: 0 8px !important;
+        flex-grow: 1 !important; /* Hace que ocupe solo el espacio que sobra en el medio */
+    }
+    .search-input {
+        width: 100% !important;
+        font-size: 10px !important;
+    }
+
+    /* 3. Apretamos la sección derecha (Instagram y Notificaciones) */
+    .header-sectionRight {
+        margin-right: 0 !important;
+        gap: 12px !important; /* Menos espacio entre la campana y el logo de IG */
+    }
+    .header-sectionRight .ig-icon, 
+    .notifications img {
+        width: 22px !important;
+        height: 22px !important;
+    }
+    .showman {
+        margin-top: 60px !important;
+    }
+
+    /* 2. LIMPIEZA EXTREMA: Ocultamos el logo y la sección de abajo, PERO SALVAMOS LOS TEXTOS */
+    .sidebar-logo-section, 
+    .sidebar-bottom {
+        display: none !important;
+    }
+
+    /* 🌟 Hacemos aparecer las etiquetas de texto en el celular */
+    .nav-label {
+        display: block !important;
+        font-size: 9px !important;
+        opacity: 1 !important;
+        transform: none !important;
+        margin-top: 3px;
+        color: #8fa3d9;
+    }
+
+    /* 5. EL BOTÓN DEL NAV: Ahora es cuadradito y apila ícono + texto */
+    .nav-item {
+        width: 65px !important; 
+        height: 55px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex-direction: column !important; /* Apila de arriba hacia abajo */
+        justify-content: center !important;
+        border-radius: 8px !important; /* Chau círculo perfecto */
+        background-color: transparent !important;
+        gap: 0 !important;
+    }
+    
+    .nav-item img {
+        width: 22px !important;
+        height: 22px !important;
+    }
+
+    /* Cuando el botón está activo, el texto se ilumina */
+    .nav-item.active .nav-label {
+        color: #5ce1e6 !important;
+        font-weight: bold;
+    }
+
+    /* 3. LA BARRA LATERAL PASA A SER LA BARRA INFERIOR */
+    .sidebar {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 60px !important;
+        flex-direction: row !important; /* Los pone en fila horizontal */
+        justify-content: space-around !important;
+        align-items: center !important;
+        padding: 0 !important;
+        z-index: 9999 !important;
+        background-color: #0b205d !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        overflow: visible !important;
+    }
+
+    /* 4. EL CONTENEDOR DE LOS ÍCONOS EN FILA */
+    .side-nav {
+        display: flex !important;
+        flex-direction: row !important;
+        width: 100% !important;
+        justify-content: space-around !important;
+        gap: 0 !important;
+    }
+
+    /* 5. CADA ÍCONO VUELVE A SER UN CÍRCULO PERFECTO */
+    .nav-item {
+        width: 50px !important;
+        height: 50px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        justify-content: center !important;
+        border-radius: 50% !important;
+        background-color: transparent !important;
+    }
+
+    /* 6. COLCHÓN DE AIRE PARA EL CONTENIDO */
+    .dashboard-container {
+        padding-bottom: 90px !important; /* Evita que la barra te tape el contenido final */
+    }
+}
+
+/* ============================================================
+   SPONSORS — CARRUSEL CALESITA (COVERFLOW)
+   Reemplazá el bloque de sponsors en estilo.css con esto
+   ============================================================ */
+
+.sponsors-section {
+    padding: 10px 0 30px 0;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sponsors-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.sponsors-header h3 {
+    color: #8fa3d9;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* ─── WRAPPER: contiene todo y hace el clip de los costados ─── */
+.sponsors-wrapper {
+    position: relative;
+    width: 100%;
+    overflow-x: clip; /* 👈 LA MAGIA: Solo corta los costados, deja crecer hacia abajo */
+    overflow-y: visible;
+    padding: 20px 0;
+    box-sizing: border-box;
+}
+
+/* ─── FLECHAS ─── */
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    background: rgba(11, 32, 93, 0.9);
+    border: 1px solid #3b82f6;
+    color: #5ce1e6;
+    font-size: 18px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+    flex-shrink: 0;
+}
+.carousel-btn:hover {
+    background: #3b82f6;
+    color: #fff;
+    box-shadow: 0 0 14px rgba(92, 225, 230, 0.5);
+}
+.prev-btn { left: 6px; }
+.next-btn { right: 6px; }
+
+/* ─── PISTA: contenedor relativo de altura fija ─── */
+.sponsors-track {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    /* Chau height fijo. Ahora la caja crece sola. */
+}
+
+
+/* ─── TARJETA BASE ─── */
+/* Todas las tarjetas están en el DOM siempre, solo cambia su transform */
+/* ─── TARJETA BASE ─── */
+.sponsor-card-full {
+    grid-area: 1 / 1; /* MAGIA 1: Apila todas las tarjetas en el mismo cuadrado invisible */
+    position: relative !important; /* Chau position absolute */
+    margin: 0 auto; /* Centra la tarjeta horizontalmente */
+    width: 70%;
+    height: 100%; /* MAGIA 2: Obliga a TODAS las tarjetas a medir lo mismo que la más alta */
+    
+    display: flex !important;   
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(30,58,138,0.3) 0%, rgba(11,32,93,0.8) 100%);
+    border: 1px solid rgba(92, 225, 230, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow: hidden;
+
+    /* Estado inicial: fuera de escena a la derecha */
+    transform: translateX(130%) scale(0.75);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity   0.5s ease,
+                border-color 0.3s ease,
+                box-shadow   0.3s ease;
+    will-change: transform, opacity;
+}
+
+/* ─── POSICIONES DE LA CALESITA ─── */
+
+/* Centro: el sponsor activo, grande y completamente visible */
+.sponsor-card-full.pos-center {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+    pointer-events: all;
+    z-index: 5;
+    border-color: rgba(92, 225, 230, 0.45);
+    box-shadow: 0 0 30px rgba(92, 225, 230, 0.12);
+}
+
+/* Izquierda: sponsor anterior, asoma por la izquierda */
+/* translateX(-90%) mueve la card 90% de su propio ancho hacia la izq
+   → muestra ~20% de la card asomando por el borde izquierdo */
+.sponsor-card-full.pos-left {
+    transform: translateX(-90%) scale(0.82);
+    opacity: 0.55;
+    z-index: 3;
+    pointer-events: none;
+    border-color: rgba(92, 225, 230, 0.1);
+}
+
+/* Derecha: sponsor siguiente, asoma por la derecha */
+.sponsor-card-full.pos-right {
+    transform: translateX(90%) scale(0.82);
+    opacity: 0.55;
+    z-index: 3;
+    pointer-events: none;
+    border-color: rgba(92, 225, 230, 0.1);
+}
+
+/* Más lejos: completamente ocultos */
+.sponsor-card-full.pos-far-left {
+    transform: translateX(-160%) scale(0.6);
+    opacity: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+.sponsor-card-full.pos-far-right {
+    transform: translateX(160%) scale(0.6);
+    opacity: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* ─── CONTENIDO DE LAS TARJETAS ─── */
+.sponsor-logo {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.1));
+    flex-shrink: 0;
+}
+
+.sponsor-info {
+    text-align: right;
+    max-width: 63%;
+}
+
+.sponsor-info h4 {
+    font-family: 'Michroma', sans-serif;
+    font-size: 15px;
+    color: #fff;
+    margin: 0 0 5px 0;
+}
+
+.sponsor-support {
+    display: block;
+    color: #60a5fa;
+    font-size: 9px;
+    font-family: 'Audiowide', sans-serif;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+}
+
+.sponsor-info p {
+    font-family: 'Audiowide', sans-serif;
+    font-size: 10px;
+    color: #cbd5e1;
+    margin: 0 0 10px 0;
+    line-height: 1.5;
+}
+
+.sponsor-perk {
+    display: inline-block;
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-family: 'Audiowide', sans-serif;
+    margin-bottom: 12px;
+}
+
+.sponsor-link-btn {
+    background: rgba(92, 225, 230, 0.1);
+    border: 1px solid #5ce1e6;
+    color: #5ce1e6;
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 10px;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+.sponsor-link-btn:hover {
+    background: #5ce1e6;
+    color: #051030;
+    box-shadow: 0 0 12px rgba(92, 225, 230, 0.5);
+}
+
+.sponsor-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: #5ce1e6;
+    color: #051030;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 8px;
+    padding: 4px 10px;
+    border-bottom-right-radius: 8px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+/* ─── INDICADORES DE PUNTOS (dots) ─── */
+.sponsor-dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.sponsor-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #1e3a8a;
+    border: 1px solid #3b82f6;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.sponsor-dot.active {
+    background-color: #5ce1e6;
+    transform: scale(1.3);
+}
+
+/* ─── MODO GRILLA (Mostrar todos) ─── */
+/* ─── MODO GRILLA (Mostrar todos) ─── */
+/* ─── MODO GRILLA (Mostrar todos) ─── */
+.sponsors-wrapper.grid-mode .sponsors-track {
+    display: flex; /* Rompe la calesita y los pone en lista vertical */
+    flex-direction: column;
+    gap: 15px;
+}
+
+.sponsors-wrapper.grid-mode .sponsor-card-full {
+    width: 100% !important; /* En PC ocupa todo el ancho */
+    height: auto !important; /* Libera la altura */
+    
+    /* 👈 ACÁ ESTÁ LA MAGIA QUE FALTABA: Resetea todo el efecto 3D */
+    transform: none !important; 
+    opacity: 1 !important; 
+    pointer-events: all !important; 
+    z-index: 1 !important;
+}
+.sponsors-wrapper.grid-mode .carousel-btn {
+    display: none;
+}
+
+/* ─── RESPONSIVE MÓVIL ─── */
+@media (max-width: 600px) {
+    .sponsors-track {
+        /* Se elimina la altura gigante que teníamos antes */
+        height: auto; 
+    }
+
+    .sponsor-card-full {
+        margin: 0 auto; /* Centrado automático */
+        width: 90%;
+        flex-direction: column;
+        text-align: center;
+        padding: 20px 15px 15px; 
+        gap: 10px;
+    }
+
+    .sponsor-card-full .sponsor-logo {
+        width: 110px !important;
+        height: 110px !important;
+    }
+
+    .sponsor-info {
+        text-align: center;
+        max-width: 100%;
+    }
+
+    .sponsor-card-full.pos-left {
+        transform: translateX(-96%) scale(0.85);
+    }
+
+    .sponsor-card-full.pos-right {
+        transform: translateX(96%) scale(0.85);
+    }
+
+    .carousel-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+
+    /* Ancho en celulares cuando tocás Mostrar Todos */
+    .sponsors-wrapper.grid-mode .sponsor-card-full {
+        width: 90% !important; 
+    }
+}
+/* --- CAJA DE BENEFICIO OCULTA --- */
+.beneficio-secreto {
+    display: none; /* Oculto por defecto */
+    background: rgba(74, 222, 128, 0.05);
+    border: 1px dashed rgba(74, 222, 128, 0.4);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 15px;
+    animation: fadeInBeneficio 0.3s ease;
+}
+
+.beneficio-secreto.visible {
+    display: block; /* Se muestra al hacer clic */
+}
+
+.beneficio-secreto p {
+    color: #4ade80 !important;
+    font-size: 10px !important;
+    margin: 0 !important;
+}
+
+.link-video-futuro {
+    display: inline-block;
+    margin-top: 10px;
+    color: #fff;
+    text-decoration: underline;
+    font-size: 9px;
+}
+
+.btn-beneficio {
+    cursor: pointer;
+}
+
+
+
+@keyframes fadeInBeneficio {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ==========================================================================
+   📸 SECCIÓN MULTIMEDIA (GALERÍA)
+   ========================================================================== */
+.galeria-grid {
+    display: grid;
+    /* Esto hace que las tarjetas se adapten solas al tamaño de la pantalla */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    width: 100%;
+}
+
+.foto-card {
+    position: relative;
+    height: 170px;
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    display: flex;
+    align-items: flex-end; /* Tira el texto para abajo */
+    border: 1px solid rgba(92, 225, 230, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.foto-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 24px rgba(92, 225, 230, 0.25);
+    border-color: #5ce1e6;
+}
+
+/* La foto de fondo */
+.foto-bg {
+    position: absolute;
+    top: 0; left: 0; 
+    width: 100%; height: 100%;
+    background-size: cover;
+    background-position: center;
+    /* Empieza oscura y en blanco y negro */
+    filter: brightness(0.4) grayscale(80%);
+    transition: filter 0.4s ease, transform 0.5s ease;
+    z-index: 1;
+}
+
+/* El efecto al pasar el mouse */
+.foto-card:hover .foto-bg {
+    filter: brightness(0.8) grayscale(0%);
+    transform: scale(1.05); /* Efecto Zoom */
+}
+
+/* El texto de la tarjeta */
+.foto-content {
+    position: relative;
+    z-index: 2;
+    padding: 15px;
+    width: 100%;
+    /* Un degradado oscuro para que la letra blanca se lea siempre perfecta */
+    background: linear-gradient(to top, rgba(5,16,48, 1) 0%, transparent 100%);
+}
+
+.foto-content h4 {
+    color: #fff;
+    font-family: 'Michroma', sans-serif;
+    margin: 0 0 5px 0;
+    font-size: 15px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+.foto-content p {
+    color: #5ce1e6;
+    font-family: 'Audiowide', sans-serif;
+    margin: 0;
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+/* ==========================================================================
+   ⚖️ TRIBUNAL DE DISCIPLINA (FORMATO ACTA OFICIAL)
+   ========================================================================== */
+.acta-card {
+    background: linear-gradient(135deg, rgba(30, 58, 138, 0.1) 0%, rgba(11, 32, 93, 0.6) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.4); /* Borde rojo sangre */
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 25px;
+    font-family: 'Audiowide', sans-serif;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.acta-header {
+    background-color: rgba(136, 19, 55, 0.7); /* Rojo oscuro casi bordó */
+    padding: 15px;
+    text-align: center;
+    border-bottom: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.acta-header h4 {
+    color: #fff;
+    font-family: 'Michroma', sans-serif;
+    margin: 0 0 5px 0;
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.acta-header span {
+    color: #fca5a5;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.acta-body {
+    padding: 20px;
+}
+
+.acta-seccion {
+    margin-bottom: 25px;
+}
+.acta-seccion:last-child {
+    margin-bottom: 0;
+}
+
+/* Títulos de las subsecciones */
+.acta-titulo-rojo, .acta-titulo-amarillo {
+    font-size: 13px;
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 8px;
+    font-family: 'Michroma', sans-serif;
+}
+
+.acta-titulo-rojo {
+    color: #ef4444;
+    border-bottom: 1px dashed rgba(239, 68, 68, 0.3);
+}
+
+.acta-titulo-amarillo {
+    color: #facc15;
+    border-bottom: 1px dashed rgba(250, 204, 21, 0.3);
+}
+
+/* Las cajitas de texto de cada sanción */
+.acta-lista {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.acta-lista li {
+    color: #e2e8f0;
+    font-size: 11px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 12px 15px;
+    border-left: 3px solid #ef4444; /* Línea roja a la izquierda */
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+.acta-lista li:hover {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.acta-lista li strong {
+    color: #fff;
+    font-size: 12px;
+}
+
+/* Variante de color para las novedades */
+.lista-novedades li {
+    border-left-color: #facc15; /* Línea amarilla a la izquierda */
+}
+
+.acta-motivo {
+    color: #cbd5e1;
+    display: inline-block;
+    margin-top: 6px;
+}
+
+/* ==========================================================================
+   🛠️ FIX 1: SOLAPAMIENTO DE LA BARRA LATERAL
+   ========================================================================== */
+@media (min-width: 601px) {
+    body .showman {
+        margin-left: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+}
+
+/* ==========================================================================
+   🛠️ FIX 2: SPONSORS CORTADOS AL VER BENEFICIO
+   ========================================================================== */
+#sponsors-track {
+    min-height: 280px !important; /* Altura mínima decente */
+    height: auto !important;      /* Permite estirarse como chicle */
+    overflow: visible !important; /* 👈 MAGIA: Deja de cortar lo que sobresale */
+}
+.sponsor-card-full {
+    height: auto !important;      
+    min-height: 250px !important;
+    padding-bottom: 25px !important; /* Aire extra abajo para que respire la caja del beneficio */
+}
+
+/* ==========================================================================
+   📰 HERO SECTION: MODO COVERFLOW 3D (Estilo Sponsors)
+   ========================================================================== */
+.hero-card-3d {
+    position: absolute !important;
+    top: 0 !important; 
+    left: 10% !important;
+    width: 80% !important; 
+    height: 100% !important;
+    border-radius: 15px; 
+    overflow: hidden;
+    display: flex; 
+    flex-direction: column; 
+    justify-content: flex-end;
+    
+    /* Estado Oculto */
+    transform: translateX(130%) scale(0.75) !important;
+    opacity: 0 !important; 
+    pointer-events: none !important; 
+    z-index: 1 !important;
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.5s ease, box-shadow 0.3s ease !important;
+}
+
+.hero-card-bg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background-size: cover; background-position: center; z-index: 1;
+}
+
+.hero-card-content {
+    position: relative; z-index: 2; padding: 25px; color: white;
+    font-family: 'Oswald', sans-serif;
+}
+.hero-card-content h2 { margin: 0 0 5px 0; font-size: 24px; text-transform: uppercase; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); }
+.hero-card-content p { margin: 0; font-family: 'Audiowide', sans-serif; font-size: 11px; color: #cbd5e1; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
+
+/* ── POSICIONES 3D DEL HERO ── */
+.hero-card-3d.hero-center { 
+    cursor: pointer;
+    transform: translateX(0) scale(1) !important; 
+    opacity: 1 !important; 
+    pointer-events: all !important; 
+    z-index: 5 !important; 
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.85), 0 0 25px rgba(92, 225, 230, 0.35) !important;
+    border: 1px solid rgba(92, 225, 230, 0.5) !important;
+}
+.hero-card-3d.hero-left {transform: translateX(-93%) scale(0.82) !important; /* 👈 4. DESPLAZAMIENTO Y ESCALA */
+    opacity: 0.25 !important;                           /* 👈 Opacas para destacar el centro */
+     z-index: 3 !important; }
+.hero-card-3d.hero-right { transform: translateX(88%) scale(0.85) !important; opacity: 0.55 !important; z-index: 3 !important; }
+.hero-card-3d.hero-far-left { transform: translateX(-160%) scale(0.6) !important; opacity: 0 !important; }
+.hero-card-3d.hero-far-right { transform: translateX(160%) scale(0.6) !important; opacity: 0 !important; }
+
+/* Puntitos del Hero */
+.hero-dot-3d { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); cursor: pointer; transition: 0.3s ease; }
+.hero-dot-3d.active { background: rgba(255, 255, 255, 0.8); transform: scale(1.3); }
+
+@media (max-width: 600px) {
+    .hero-card-3d { left: 0 !important;
+        width: 100% !important; }
+    .hero-card-3d.hero-left { transform: translateX(-96%) scale(0.85) !important; }
+    .hero-card-3d.hero-right { transform: translateX(96%) scale(0.85) !important; }
+    #hero-track-3d { min-height: 250px !important; }
+}
+/* ==========================================================================
+   🏆 ÁRBOL DE PLAYOFFS
+   ========================================================================== */
+.bracket-scroll-container {
+    display: flex;
+    gap: 30px;
+    padding: 10px 15px 30px 15px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* Suavidad en celulares */
+    align-items: center; /* Centra las columnas verticalmente */
+}
+
+/* Oculta la barra de scroll fea en Chrome/Safari */
+.bracket-scroll-container::-webkit-scrollbar { display: none; }
+.bracket-scroll-container { scrollbar-width: none; }
+
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    min-width: 180px; /* Ancho fijo para cada columna */
+}
+
+.round-title {
+    color: #8fa3d9;
+    font-family: 'Michroma', sans-serif;
+    font-size: 11px;
+    text-align: center;
+    margin: 0 0 15px 0;
+    letter-spacing: 2px;
+}
+
+/* La tarjeta del partido */
+.bracket-match {
+    display: flex;
+    flex-direction: column;
+    background: rgba(11, 32, 93, 0.6);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    position: relative;
+}
+
+/* Separación especial para que las llaves calcen visualmente */
+.match-spaced { margin-top: 45px; }
+.match-final { margin-top: 20px; border-color: #5ce1e6; box-shadow: 0 0 15px rgba(92, 225, 230, 0.3); }
+
+/* Los equipos adentro de la llave */
+.team-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 12px;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    color: #cbd5e1;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.team-row:last-child { border-bottom: none; }
+
+.team-score {
+    font-family: 'Michroma', sans-serif;
+    color: #8fa3d9;
+    font-weight: bold;
+}
+
+/* Resalta al ganador */
+.team-row.winner {
+    background: rgba(74, 222, 128, 0.1);
+    color: #fff;
+}
+.team-row.winner .team-score {
+    color: #4ade80; /* Verde victoria */
+}
+
+/* La cajita del campeón */
+.champion-box {
+    text-align: center;
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(250, 204, 21, 0.15);
+    border: 1px dashed #facc15;
+    color: #facc15;
+    border-radius: 8px;
+    font-family: 'Michroma', sans-serif;
+    font-size: 12px;
+    text-shadow: 0 0 8px rgba(250, 204, 21, 0.5);
+}
+
+
+/* ============================================================
+   😴 CORRECCIÓN FINAL DEFINITIVA: BARRA, HERO 3D Y SPONSORS
+   ============================================================ */
+
+/* 1. BARRA SUPERIOR (Cubre de punta a punta) */
+body .top-bar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    transition: transform 0.4s ease, opacity 0.35s ease !important;
+}
+
+/* 2. BARRA LATERAL (Ubicación y centrado de pantalla) */
+@media (min-width: 601px) {
+    body aside.sidebar {
+        position: fixed !important;
+        top: 0px !important;
+        left: 0 !important;
+        height: 100% !important;
+        width: 70px !important;
+        z-index: 9990 !important;
+        transition: top 0.35s ease, height 0.35s ease, width 0.35s ease !important;
+    }
+
+    body.scrolled aside.sidebar {
+        top: 0 !important;
+        height: 100vh !important;
+    }
+
+    body .showman {
+        margin-left: 70px !important;
+        width: calc(100% - 70px) !important;
+        margin-top: 60px !important;
+        box-sizing: border-box !important;
+        transition: margin-top 0.4s ease !important;
+    }
+
+    body.scrolled .showman {
+        margin-top: 0 !important;
+    }
+}
+
+/* 3. HERO SECTION GIGANTE (Con colchón abajo para no pisar texto) */
+#hero-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 1050px !important;
+    height: 480px !important; /* 👈 Altura física asegurada */
+    margin: 10px auto 40px auto !important;
+    overflow: hidden !important; /* Recorta el 20% lateral que asoma */
+    border-radius: 15px !important;
+}
+
+#hero-track-3d {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.hero-card-3d {
+    position: absolute !important;
+    top: 0 !important;
+    left: 12.5% !important;
+    width: 78% !important;
+    height: 100% !important;
+    border-radius: 15px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.5s ease !important;
+}
+
+/* Padding inferior extra en el texto para que NUNCA se corte ni tape con los puntos */
+.hero-card-content {
+    position: relative !important;
+    z-index: 2 !important;
+    padding: 20px 30px 45px 30px !important; /* 👈 45px abajo salva el texto */
+    color: white !important;
+}
+
+.hero-card-content h2 { margin: 0 0 5px 0 !important; font-size: 26px !important; text-transform: uppercase !important; }
+.hero-card-content p { margin: 0 !important; font-family: 'Audiowide', sans-serif !important; font-size: 12px !important; color: #cbd5e1 !important; }
+
+/* Posiciones 3D */
+.hero-card-3d.hero-center {
+    transform: translateX(0) scale(1) !important;
+    opacity: 1 !important;
+    z-index: 5 !important;
+    box-shadow: 0 0 35px rgba(92, 225, 230, 0.3) !important;
+    border: 1px solid rgba(92, 225, 230, 0.5) !important;
+}
+
+.hero-card-3d.hero-left {
+    transform: translateX(-15%) scale(0.85) !important; /* Solo asoma un 20% */
+    opacity: 0.15 !important;
+    z-index: 3 !important;
+}
+
+.hero-card-3d.hero-right {
+    transform: translateX(15%) scale(0.85) !important; /* Solo asoma un 20% */
+    opacity: 0.15 !important;
+    z-index: 3 !important;
+}
+
+/* Flechas y Puntos del Hero */
+.hero-btn-nav {
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 30 !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    background: transparent !important;           /* Chau azul neón */
+    border: none !important;                      /* Chau borde marcado */
+    color: rgba(255, 255, 255, 0.35) !important;
+    font-size: 18px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.hero-btn-nav:hover {
+    background: rgba(255, 255, 255, 0.12) !important; /* Circulo gris suave al pasar el mouse */
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+.hero-btn-nav.prev { left: 48px !important; }
+.hero-btn-nav.next { right: 10px !important; }
+
+.hero-dots-container {
+    position: absolute !important;
+    bottom: 12px !important;
+    left: 0 !important;
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    z-index: 30 !important;
+}
+
+/* 4. SPONSORS SEPARADOS (Sin encimarse con el Hero) */
+.sponsors-section {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 900px !important;
+    margin-top: 10px !important;
+}
+.dashboard-container #home div{
+    padding-top: 40px !important;
+    transition: padding-top 0.3s ease; /* Hace que el cambio de padding sea suave */
+}
+
+body.scrolled .dashboard-container #home div {
+    padding: 80px 0 40px !important;
+}
+
+/* ============================================================
+   🌅 FIX REPARADOR SIDEBAR: HOVER + AJUSTE DE ALTURA (ZOOM 100%)
+   ============================================================ */
+@media (min-width: 601px) {
+
+    /* 1. RESTAURAR HOVER EXPANDIBLE */
+    body aside.sidebar:hover {
+        width: 210px !important;
+    }
+
+    body aside.sidebar:hover .nav-label,
+    body aside.sidebar:hover .sidebar-logo-text,
+    body aside.sidebar:hover .sidebar-bottom-label {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+    }
+
+    body aside.sidebar:hover .sidebar-search-input {
+        width: 115px !important;
+        opacity: 1 !important;
+    }
+
+    body aside.sidebar:hover .nav-item,
+    body aside.sidebar:hover .sidebar-bottom-item {
+        width: calc(100% - 20px) !important;
+    }
+
+    /* 2. SOLUCIÓN AL CORTE INFERIOR (Compactamos 6px por botón) */
+    .sidebar {
+        padding-top: 60px;
+    }
+    
+    .nav-item {
+        height: 44px !important; /* Pasa de 50px a 44px */
+        margin: 4px 10px !important; /* Pasa de 8px a 4px de margen */
+    }
+
+    .sidebar-bottom-item {
+        height: 44px !important;
+        margin: 3px 10px !important;
+    }
+}
+   /* ============================================================
+   📱 FIX CENTRADO PERFECTO EN CELULARES
+   ============================================================ */
+@media (max-width: 600px) {
+    #hero-wrapper {
+        height: 420px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    #hero-track-3d {
+        height: 380px !important;
+    }
+
+    /* Ancho 84% + Left 8% = Centrado simétrico de lado a lado */
+    .hero-card-3d {
+        width: 84% !important;
+        left: 8% !important; 
+        cursor: pointer; /* Indico visualmente que es clickeable */
+    }
+
+    .hero-card-3d.hero-left {
+        transform: translateX(-92%) scale(0.85) !important;
+    }
+
+    .hero-card-3d.hero-right {
+        transform: translateX(92%) scale(0.85) !important;
+    }
+
+    /* Flechas pegadas prolijamente a las orillas */
+    .hero-btn-nav.prev { left: 4px !important; }
+    .hero-btn-nav.next { right: 4px !important; }
+}
+
+
+/* ============================================================
+   🔍 MODAL CINE: FONDO TRASLÚCIDO + TEXTO SUPERPUESTO
+   ============================================================ */
+
+/* El fondo negro traslúcido flotante sobre TODA la pantalla */
+.modal-noticia-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.8) !important; /* Fondo negro con baja opacidad */
+    backdrop-filter: blur(5px) !important;    /* Leve desenfoque de fondo */
+    z-index: 99999 !important;               /* Por encima de cualquier barra */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    transition: opacity 0.3s ease, visibility 0.3s ease !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+
+}
+
+/* Regla estricta para ocultar */
+.modal-noticia-overlay.seccion-oculta {
+    display: flex !important; /* Para mantener el flex al hacer transition */
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* La tarjeta que sostiene la foto y el texto */
+.modal-noticia-card {
+    position: relative !important;
+    max-width: 900px !important;
+    width: 100% !important;
+    max-height: 85vh !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9) !important;
+    background: #000 !important; /* Chau fondo azul */
+    animation: modalPopUp 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+@keyframes modalPopUp {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* La foto ajustada para verse COMPLETA (Contain) */
+#modal-noticia-img {
+    width: 100% !important;
+    max-height: 85vh !important;
+    object-fit: contain !important; /* Muestra la foto entera sin cortar */
+    display: block !important;
+}
+
+/* Texto superpuesto sobre la parte inferior de la imagen */
+.modal-noticia-content {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 30px 25px 25px 25px !important;
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 70%, transparent 100%) !important;
+    pointer-events: none !important;
+}
+
+.modal-noticia-content h3 {
+    color: #fff !important;
+    font-family: 'Oswald', sans-serif !important;
+    font-size: 26px !important;
+    margin: 0 0 6px 0 !important;
+    text-transform: uppercase !important;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8) !important;
+}
+
+.modal-noticia-content p {
+    color: #cbd5e1 !important;
+    font-family: 'Audiowide', sans-serif !important;
+    font-size: 13px !important;
+    margin: 0 !important;
+    line-height: 1.5 !important;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8) !important;
+}
+
+/* Botón de cerrar (X) */
+.close-modal-noticia {
+    position: absolute !important;
+    top: 12px !important;
+    right: 18px !important;
+    color: #fff !important;
+    font-size: 32px !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.9) !important;
+    transition: transform 0.2s ease, color 0.2s ease !important;
+}
+
+.close-modal-noticia:hover {
+    color: #ef4444 !important;
+    transform: scale(1.15) !important;
+}
+/* ============================================================
+   📱 MODAL NOTICIA EN MÓVILES: UNIFICADO TIPO TARJETA CINE
+   ============================================================ */
+@media (max-width: 600px) {
+
+    .modal-noticia-card {
+        max-height: 98vh !important;
+        /* Tarjeta unificada: Fondo azul noche traslúcido con borde neón */
+        background: linear-gradient(180deg, #07153d 0%, #040c24 100%) !important;
+        border: 1px solid rgba(92, 225, 230, 0.2) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), 0 0 20px rgba(92, 225, 230, 0.15) !important;
+        border-radius: 16px !important;
+        padding: 1px !important; /* El relleno crea el "marco" que abraza todo */
+        justify-content: flex-start !important;
+        overflow-y: auto !important;
+    }
+
+    /* La imagen completa integrada arriba */
+    #modal-noticia-img {
+        max-height: 60vh !important;
+        border-radius: 10px !important;
+        margin-bottom: 12px !important;
+        background: #020718 !important;
+    }
+
+    /* Texto integrado dentro del mismo bloque */
+    .modal-noticia-content {
+        position: relative !important;
+        bottom: auto !important;
+        left: auto !important;
+        right: auto !important;
+        background: transparent !important;
+        padding: 5px 8px 10px 8px !important;
+        text-align: center !important;
+    }
+
+    .modal-noticia-content h3 {
+        font-size: 19px !important;
+        margin: 0 0 8px 0 !important;
+        line-height: 1.2 !important;
+        text-shadow: 0 0 10px rgba(92, 225, 230, 0.3) !important;
+    }
+
+    .modal-noticia-content p {
+        font-size: 12px !important;
+        color: #cbd5e1 !important;
+        font-style: Michroma !important;
+        line-height: 1.5 !important;
+        margin: 0 !important;
+    }
+
+    /* Botón flotante para cerrar sobre la esquina de la tarjeta */
+    .close-modal-noticia {
+        top: 8px !important;
+        right: 12px !important;
+        background: rgba(5, 16, 48, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 22px !important;
+    }
+}
+
+/* ============================================================
+   🔗 BOTÓN DE ACCIÓN DINÁMICO EN NOTICIAS
+   ============================================================ */
+    .hero-inline-link {
+    color: #5ce1e6 !important;       /* Celeste neón para diferenciarlo del texto común */
+    background: transparent !important;/* Cero fondo */
+    text-decoration: none !important;
+    font-weight: bold !important;
+    margin-left: 6px !important;
+    display: inline !important;       /* Fluye natural al final del renglón */
+    transition: all 0.2s ease !important;
+    pointer-events: auto !important;  /* Habilita el clic directo */
+}
+
+/* Hover exclusivamente para computadoras */
+@media (hover: hover) and (pointer: fine) {
+    .hero-inline-link:hover {
+        color: #ffffff !important;
+        text-shadow: 0 0 10px #5ce1e6 !important; /* Destello brillante celeste */
+        text-decoration: underline !important;
+    }
+}
+
+.btn-noticia-action {
+    display: inline-block !important;
+    margin-top: 10px !important;
+    padding: 8px 16px !important;
+    background: rgba(92, 225, 230, 0.15) !important;
+    border: 1px solid #5ce1e6 !important;
+    color: #5ce1e6 !important;
+    border-radius: 20px !important;
+    font-family: 'Audiowide', sans-serif !important;
+    font-size: 11px !important;
+    text-decoration: none !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 0 10px rgba(92, 225, 230, 0.2) !important;
+    pointer-events: auto !important; /* Habilita el clic dentro del modal */
+}
+
+.btn-noticia-action:hover {
+    background: #5ce1e6 !important;
+    color: #051030 !important;
+    box-shadow: 0 0 18px rgba(92, 225, 230, 0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+
+/* ============================================================
+   📜 ESTILOS ACORDEÓN DE REGLAMENTO
+   ============================================================ */
+.reglamento-acordeon-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.acordeon-item {
+    background: rgba(11, 32, 93, 0.5);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+}
+
+.acordeon-item.active {
+    border-color: #5ce1e6;
+    box-shadow: 0 0 15px rgba(92, 225, 230, 0.15);
+}
+
+.acordeon-header {
+    width: 100%;
+    padding: 15px 20px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-family: 'Michroma', sans-serif;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s ease;
+}
+
+.acordeon-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.acordeon-icon {
+    font-size: 18px;
+    color: #5ce1e6;
+    font-weight: bold;
+    transition: transform 0.3s ease;
+}
+
+.acordeon-item.active .acordeon-icon {
+    transform: rotate(45deg); /* El + se convierte en una X */
+    color: #ef4444;
+}
+
+.acordeon-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0, 1, 0, 1);
+    background: rgba(4, 12, 36, 0.6);
+    padding: 0 20px;
+}
+
+.acordeon-item.active .acordeon-content {
+    max-height: 1000px; /* Expande la caja */
+    transition: max-height 0.4s ease-in-out;
+    padding: 15px 20px 20px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.acordeon-content ul {
+    margin: 0;
+    padding-left: 15px;
+    color: #cbd5e1;
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    line-height: 1.8;
+}
+
+.acordeon-content li strong {
+    color: #5ce1e6;
+}
+
+
+/* ============================================================
+   📐 FIX PADDING SUPERIOR EN SECCIONES DE PESTAÑAS
+   ============================================================ */
+.dashboard-container section {
+    padding-top: 20px !important;
+}
+
+/* Cuando se scrolleé y se guarde la barra, mantiene distancia prolija */
+body.scrolled .dashboard-container section {
+    padding-top: 30px !important;
+}
+
+/* Ajuste específico para que las tablas y el grid no se metan abajo de la barra */
+.main-grid, #pantalla-tablas, #pantalla-fixture {
+    margin-top: 20px !important;
+}
+
+
+/* Estado Expandido (Posiciones): 1200px */
+.dashboard-container.vista-ancha, .main-grid.vista-ancha {
+    max-width: 1100px !important;
+    width: 100%;
+}
+
+/* Agregá esto al final de estilo.css */
+.posiciones-grid-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 20px !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+}
+
+/* Fuerza que la columna izquierda ocupe todo el espacio que sobra */
+.posiciones-grid-layout > div:first-child {
+    flex: 1 1 65% !important;
+    min-width: 0 !important;
+}
+
+/* Fuerza que la columna de goleadores tome un ancho fijo a la derecha */
+.columna-goleadores {
+    flex: 0 0 280px !important;
+    width: 280px !important;
+    
+    
+}
+
+
+/* 🛠️ FIX DEFINITIVO DE LA VISTA DE POSICIONES */
+
+/* 1. Hace que la grilla ocupe el 100% del ancho de la pantalla y no deje la columna vacía a la derecha */
+.main-grid.vista-ancha {
+    display: block !important;
+    width: 100% !important;
+}
+
+/* 2. Hace que la tarjeta contenedora de las tablas use todo el espacio libre */
+.main-grid.vista-ancha #pantalla-tablas {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+/* 3. Mantiene la tabla de posiciones a la izquierda y goleadores a la derecha */
+.posiciones-grid-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 20px !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+}
+
+/* Ancho proporcional: 68% para la tabla principal, 30% para goleadores */
+.posiciones-grid-layout > div:first-child {
+    flex: 1 1 68% !important;
+    min-width: 0 !important;
+}
+
+.columna-goleadores {
+    flex: 0 0 280px !important;
+    width: 280px !important;
+}
+
+/* 🔓 LIBERAR ANCHO TOTAL EN VISTA ANCHA */
+.dashboard-container.vista-ancha,
+.main-grid.vista-ancha {
+    max-width: 100% !important; /* O si preferís un tope amplio en monitores: 1300px !important */
+    width: 100% !important;
+}
+
+/* Desbloquea la tarjeta contenedora para que no se quede en 850px */
+.main-grid.vista-ancha #pantalla-tablas {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+/* 1. ESTADO NORMAL (Home y demás pestañas): Freno en 900px */
+.main-grid {
+    max-width: 900px !important;
+    width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    transition: max-width 0.3s ease !important;
+}
+
+/* 2. ESTADO EXPANDIDO (Únicamente al entrar a Posiciones): Estira al 100% */
+.dashboard-container.vista-ancha,
+.main-grid.vista-ancha {
+    max-width: 100% !important; /* O 1300px si querés dejar un margen en monitores gigantes */
+}
+.main-grid.vista-ancha .borde-con-vistaAncha {
+
+    border-right: 1px solid rgba(92, 225, 230, 0.25) !important;
+    padding-right: 20px !important;
+
+    
+}
+.main-grid.vista-ancha #pantalla-tablas {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+.seccion-tabla-anual{
+    margin-top: 20px;
+}
+
+.close-panel {
+    color: #f43f5e;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* 🏆 ESTILOS BRACKET SOFASCORE */
+.bracket-scroll-container {
+    display: flex !important;
+    gap: 25px !important;
+    padding: 15px 10px 25px 10px !important;
+    overflow-x: auto !important;
+    scroll-behavior: smooth !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+.bracket-round {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+    min-width: 210px !important;
+    justify-content: center !important;
+}
+
+.bracket-match {
+    background: rgba(11, 32, 93, 0.7) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    transition: all 0.3s ease !important;
+}
+
+.bracket-match.match-spaced {
+    border-color: #5ce1e6 !important;
+    box-shadow: 0 0 15px rgba(92, 225, 230, 0.2) !important;
+}
+
+.bracket-round.activa .round-title {
+    text-shadow: 0 0 10px rgba(92, 225, 230, 0.5) !important;
+}
+
+/* 🔀 ESTILOS ENCABEZADO TÍTULOS TOGGLE (CARRUSEL) */
+.encabezado-carrusel-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 5px !important;
+    flex-wrap: wrap !important;
+    gap: 15px !important;
+}
+
+.titulos-toggle-container {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    position: relative !important;
+}
+
+.titulo-toggle {
+    font-family: 'Michroma', sans-serif !important;
+    font-size: 18px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.5s ease, 
+                color 0.5s ease, 
+                text-shadow 0.5s ease !important;
+    user-select: none !important;
+    display: inline-block !important;
+    will-change: transform, opacity !important;
+}
+/*  */
+
+/* Estado Activo: Blanco brillante */
+.titulo-toggle.active {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.3) !important;
+}
+
+/*   */
+
+/* Estado Inactivo: Opaco (grisáceo / azulado) */
+.titulo-toggle.opaco {
+    color: #8fa3d9 !important;
+    opacity: 0.28 !important;
+}
+
+.titulo-toggle.opaco:hover {
+    opacity: 0.75 !important;
+}
+
+/* 🎨 BOTÓN TRIBUNAL REPOTENCIADO */
+.tab-btn-tribunal {
+    background: rgba(244,63,94,0.15) !important;
+    border: 1px solid #f43f5e !important;
+    color: rgba(255, 76, 76, 0.95) !important;
+    font-size: 11px !important;
+    padding: 8px 16px !important;
+    border-radius: 20px !important;
+    cursor: pointer !important;
+    font-weight: bold !important;
+    font-family: 'Michroma', sans-serif !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 0 10px rgba(244,63,94,0.2) !important;
+}
+
+.tab-btn-tribunal:hover {
+    background: rgba(244,63,94,0.3) !important;
+    box-shadow: 0 0 15px rgba(244,63,94,0.5) !important;
+}
+
+/* 🎠 ANIMACIÓN TIPO CARRUSEL ENTRE VISTAS */
+.vista-carrusel-slide {
+    transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+    opacity: 1 !important;
+    transform: translateX(0) !important;
+}
+
+.vista-carrusel-slide.seccion-oculta {
+    display: none !important;
+    opacity: 0 !important;
+    transform: translateX(20px) !important;
+}
+@media (max-width:768px) {
+        .titulo-toggle {
+    font-family: 'Michroma', sans-serif !important;
+    font-size: 12px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.5s ease, 
+                color 0.5s ease, 
+                text-shadow 0.5s ease !important;
+    user-select: none !important;
+    display: inline-block !important;
+    will-change: transform, opacity !important;
+}
+.group-selector > p{
+    margin-left: 2px;
+}
+.group-category {
+    font-family: 'Audiowide', sans-serif;
+    color: #8fa3d9;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-top: 0px;
+    display: block;
+    /* box-sizing: border-box; */
+    text-transform: uppercase;
+}
+
+
+}
+/* 🏆 ESTILOS BRACKET SOFASCORE AVANZADO */
+.bracket-scroll-container {
+    display: flex !important;
+    gap: 30px !important;
+    padding: 15px 10px 30px 10px !important;
+    overflow-x: auto !important;
+    scroll-behavior: smooth !important;
+    -webkit-overflow-scrolling: touch !important;
+    align-items: center !important;
+    cursor: grab;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+.bracket-round {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+    min-width: 210px !important;
+    justify-content: space-around !important;
+}
+
+.bracket-match {
+    background: rgba(11, 32, 93, 0.75) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    position: relative !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+}
+
+.bracket-match:hover {
+    border-color: rgba(92, 225, 230, 0.6) !important;
+    box-shadow: 0 0 15px rgba(92, 225, 230, 0.2) !important;
+}
+
+/* Detalles de series (Ida / Vuelta / Penales) */
+.match-series-info {
+    background: rgba(4, 12, 36, 0.8) !important;
+    color: #8fa3d9 !important;
+    font-size: 9px !important;
+    font-family: 'Audiowide', sans-serif !important;
+    text-align: center !important;
+    padding: 3px 6px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.match-badge-penales {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    background: #f43f5e !important;
+    color: white !important;
+    font-size: 8px !important;
+    font-family: 'Audiowide', sans-serif !important;
+    padding: 2px 6px !important;
+    border-bottom-left-radius: 6px !important;
+    font-weight: bold !important;
+}
+
+/* Espaciados entre rondas para alineación visual */
+.match-spaced { margin-top: 25px !important; margin-bottom: 25px !important; }
+.match-spaced-semis { margin-top: 60px !important; }
+.match-final { border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250, 204, 21, 0.25) !important; }
+
+/* 🎛️ CONTROLES Y SWITCH DE VISTA COMPACTA */
+.playoffs-controls-bar {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    margin: 10px 0 15px 0 !important;
+}
+
+
+
+
+/* ⚽ FILA DE MARCADORES: IDA | VUELTA | GLOBAL */
+.team-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+}
+
+.scores-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.score-num {
+    font-family: 'Michroma', sans-serif !important;
+    font-size: 11px !important;
+}
+
+/* Partidos de Ida / Vuelta: Color secundario discreto */
+.score-leg {
+    color: #64748b !important;
+}
+
+/* Marcador Global: Resalta en neón o verde para el ganador */
+.score-global {
+    color: #94a3b8 !important;
+    font-weight: bold !important;
+}
+
+.team-row.winner .score-global {
+    color: #4ade80 !important; /* Verde victoria para el global */
+}
+
+.score-penal {
+    color: #f43f5e !important;
+    font-size: 9px !important;
+}
+
+
+.btn-ronda-nav.active{
+    padding: 3px 5px !important;
+}
+
+/* ⚽ TARJETA DE PARTIDO DESPLEGABLE RESTRUCTURADA */
+.match-card-desplegable {
+    background: rgba(11, 32, 93, 0.6) !important;
+    border: 1px solid rgba(30, 58, 138, 0.8) !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+    padding: 12px 16px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+.match-card-desplegable:hover {
+    border-color: rgba(92, 225, 230, 0.5) !important;
+    background: rgba(11, 32, 93, 0.85) !important;
+}
+
+.match-card-desplegable.desplegado {
+    border-color: rgba(92, 225, 230, .75) !important;
+    background: rgba(5, 16, 48, 0.95) !important;
+}
+
+/* Grilla de 3 Columnas */
+.match-header-grid {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.col-team {
+    display: flex !important;
+    align-items: center !important;
+}
+
+.col-local {
+    justify-content: flex-start !important;
+}
+
+.col-visita {
+    justify-content: flex-end !important;
+    gap: 8px !important; /* Mantiene la flechita pegada al nombre */
+}
+
+.col-center {
+    text-align: center !important;
+    padding: 0 10px !important;
+}
+
+.score-main {
+    font-family: 'Michroma', sans-serif !important;
+    font-size: 16px !important;
+    color: #5ce1e6 !important;
+    font-weight: bold !important;
+    display: block !important;
+}
+
+.vs-badge {
+    font-family: 'Michroma', sans-serif !important;
+    font-size: 13px !important;
+    color: #f43f5e !important;
+    font-weight: bold !important;
+}
+
+.match-meta-info {
+    font-family: 'Audiowide', sans-serif !important;
+    font-size: 9px !important;
+    color: #8fa3d9 !important;
+    margin-top: 3px !important;
+    white-space: nowrap !important;
+}
+
+.arrow-indicator {
+    color: #5ce1e6 !important;
+    font-size: 9px !important;
+    transition: transform 0.2s ease !important;
+}
+
+/* 📐 LÍNEA DIVISORIA VERTICAL Y DETALLES */
+.drawer-divider-top {
+    border-top: 1px dashed rgba(92, 225, 230, 0.2) !important;
+    margin: 12px 0 !important;
+}
+
+.split-details-container {
+    display: flex !important;
+    align-items: stretch !important;
+    font-family: 'Audiowide', sans-serif !important;
+    font-size: 11px !important;
+    color: #e2e8f0 !important;
+}
+
+.split-col {
+    flex: 1 !important;
+    padding: 0 10px !important;
+}
+
+.col-left {
+    text-align: right !important; /* Alineado hacia el centro */
+}
+
+.col-right {
+    text-align: left !important; /* Alineado hacia el centro */
+}
+
+/* Línea divisoria al medio */
+.split-vertical-line {
+    width: 1px !important;
+    background: rgba(92, 225, 230, 0.3) !important;
+    margin: 0 5px !important;
+}
+
+/* Banner de MVP Abajo */
+.mvp-banner {
+    margin-top: 12px !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    color: #facc15 !important;
+    font-family: 'Audiowide', sans-serif !important;
+    background: rgba(250, 204, 21, 0.08) !important;
+    border: 1px solid rgba(250, 204, 21, 0.2) !important;
+    padding: 5px 10px !important;
+    border-radius: 6px !important;
+}
+
+/* 🔎 BUSCADOR GLOBAL DESPLEGABLE */
+.search-container {
+    position: relative !important;
+}
+
+.search-dropdown {
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+    width: 100% !important;
+    min-width: 260px !important;
+    background: rgba(5, 16, 48, 0.95) !important;
+    border: 1px solid #5ce1e6 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(92, 225, 230, 0.2) !important;
+    backdrop-filter: blur(10px) !important;
+    z-index: 1000 !important;
+    max-height: 320px !important;
+    overflow-y: auto !important;
+    padding: 8px 0 !important;
+}
+
+.search-result-item {
+    padding: 10px 14px !important;
+    border-bottom: 1px solid rgba(30, 58, 138, 0.4) !important;
+    transition: background 0.2s ease !important;
+}
+
+.search-result-item:last-child {
+    border-bottom: none !important;
+}
+
+.search-result-item:hover {
+    background: rgba(30, 58, 138, 0.5) !important;
+}
+
+.search-item-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 6px !important;
+}
+
+.search-item-name {
+    font-family: 'Audiowide', sans-serif !important;
+    font-size: 12px !important;
+    color: #ffffff !important;
+}
+
+.search-item-badge {
+    font-size: 9px !important;
+    font-family: 'Audiowide', sans-serif !important;
+    color: #5ce1e6 !important;
+    background: rgba(92, 225, 230, 0.1) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+}
+
+.search-item-actions {
+    display: flex !important;
+    gap: 6px !important;
+    margin-top: 6px !important;
+}
+
+.search-action-btn {
+    font-family: 'Audiowide', sans-serif !important;
+    font-size: 9px !important;
+    padding: 4px 8px !important;
+    border-radius: 5px !important;
+    border: 1px solid rgba(92, 225, 230, 0.3) !important;
+    background: rgba(11, 32, 93, 0.6) !important;
+    color: #8fa3d9 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.search-action-btn:hover {
+    border-color: #5ce1e6 !important;
+    color: #ffffff !important;
+    background: #1e3a8a !important;
+}
+
+.btn-fecha-select {
+    padding: 5px !important;
+}
+
+
+
+/* 💡 EFECTO DE DESTALLO EN NEÓN AL BUSCAR EQUIPO */
+/* 💡 EFECTO DE DESTILLO Y TITILEO NEÓN EN LA FILA BUSCADA */
+/* 💡 EFECTO TITILEO Y DESTELLO NEÓN REPARADO */
+/* 💡 EFECTO TITILEO Y DESTELLO NEÓN REPARADO */
+
+@keyframes titileoNeon {
+    0%, 50%, 100% {
+        background-color: rgba(92, 225, 230, 0.85);
+        color: #ffffff;
+        
+    }
+    25%, 75% {
+        background-color: transparent;
+        color: #ffffff;
+        box-shadow: none;
+    }
+}
+
+/* Se aplica sobre el <tr> desde el JS; el selector apunta a sus celdas
+   con especificidad alta para superar las reglas de tabla existentes */
+tr.fila-resaltada td {
+    animation: titileoNeon 0.4s ease-in-out 1;  /* 3 parpadeos */
+    animation-fill-mode: forwards;
+}
+
+/* ============================================================
+   ANIMACIONES DE BÚSQUEDA — TITILEO NEÓN CORREGIDO
+   (Reemplaza el bloque roto de titileoNeon que tenía !important
+   dentro de @keyframes, lo cual es CSS inválido)
+   ============================================================ */
+ 
+/* 1. TITILEO EN FILA DE TABLA (tr.fila-resaltada) */
+
+/* 2. TITILEO EN MATCH-CARD (partido en el fixture) */
+@keyframes titileoNeonCard {
+    0%, 50%, 100% {
+        background-color: rgba(92, 225, 230, 0.85);
+        color: #ffffff;
+    }
+    25%, 75% {
+        background-color: rgba(255, 255, 255, 0.03);
+        border-left-color:  #3b82f6;
+        border-right-color: #3b82f6;
+        box-shadow: none;
+    }
+}
+ 
+.match-card.match-card-resaltada {
+    animation: titileoNeonCard 0.4s ease-in-out 1;
+}
+
+/* 💡 DESTELLO NEÓN PARA LA TARJETA DEL PARTIDO ENCONTRADO */
+@keyframes destelloTarjeta {
+    0%, 100% {
+        border-color: rgba(30, 58, 138, 0.8) !important;
+        box-shadow: none !important;
+    }
+    25%, 75% {
+        border-color: #5ce1e6 !important;
+        box-shadow: 0 0 25px #5ce1e6, inset 0 0 10px rgba(92, 225, 230, 0.3) !important;
+        background: rgba(11, 32, 93, 0.95) !important;
+    }
+}
+
+.match-card-desplegable.match-card-resaltada {
+    animation: destelloTarjeta 1.8s ease-in-out !important;
+}
+
+
+
+
+
+
+
+/* ─────────────────────────────────────────────
+   FOOTER
+   ───────────────────────────────────────────── */
+.main-footer {
+    margin-top: 50px;
+    padding: 25px 20px;
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: 'Audiowide', sans-serif;
+    font-size: 11px;
+    color: #475569;
+    width: 100%;
+}
+.main-footer p { margin: 4px 0; }
+.autor-firma { color: #5ce1e6; font-size: 12px;}
