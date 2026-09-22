@@ -1,0 +1,165 @@
+
+=== FASE 0: arranque limpio con la semilla real (data.js sin tocar) ===
+PASS Abrir admin con localStorage vacío NO debería guardar los partidos del torneo anterior  → {"partidosGuardados":0}
+PASS Crear el primer equipo del torneo nuevo debería dejar 1 solo equipo guardado  → {"equiposGuardados":1,"ejemplos":["Equipo Nuevo"]}
+  info: web pública con localStorage vacío y semilla real muestra 0 filas en la tabla del Grupo A (equipos del torneo anterior).
+
+=== FASE 1: grupos, equipos y jugadores (data.js vaciado, como pide 11.1 punto 8) ===
+PASS Gestor de grupos deja Superior A-B-C y Básico A  → {"superior":["A","B","C"],"basico":["A"]}
+PASS Se crearon 12 equipos Superior y 4 Básico  → {"sup":12,"bas":4}
+PASS Ids de equipo únicos
+PASS Cada equipo quedó en su grupo
+PASS Nombre de equipo repetido (mayúsculas/espacios) se rechaza  → "Ya existe un equipo con ese nombre."
+PASS Se cargaron 92 jugadores  → 92
+PASS Jugador con dorsal 0 guardado como número 0  → 0
+PASS Fichas de emergencia guardadas  → 23
+PASS Dorsal repetido en el equipo se rechaza  → "El número 5 ya lo tiene otro jugador de este equipo (los goles se cargan por número de camiseta)."
+PASS Tras un alta rechazada, el botón OK/Debe de ficha de la tabla sigue guardando  → {"antes":"no","despues":"si"}
+  (form form-jugador inválido para el navegador: jugador-dorsal)
+PASS Dorsal vacío se rechaza  → "El número de camiseta es obligatorio y va de 0 a 99."
+  (form form-jugador inválido para el navegador: jugador-dorsal)
+PASS Dorsal 100 se rechaza  → "El número de camiseta es obligatorio y va de 0 a 99."
+  (form form-jugador inválido para el navegador: jugador-dni)
+PASS Jugador sin DNI se rechaza (formulario de Planteles; el navegador lo frena si el campo es required)  → {"alerta":"¡Sin DNI añadido a 5to 2da!","guardadoSinValidarJS":true,"required":true}
+PASS DNI de otro equipo (escrito con puntos) pide confirmar traslado y al cancelar no mueve nada  → "Ignacio López (DNI 45009864) está inscripto en 7mo 3ra y todavía no jugó ningún partido con ese equipo. ¿Pasarlo a 7mo 2da? Se lo saca de 7mo 3ra."
+PASS Traslado aceptado: sale de 7mo 3ra y entra a 7mo 2da con #33  → {"dorsal":33,"ficha":"no"}
+PASS Tabla de Planteles muestra #0 para el dorsal 0  → "#0"
+PASS Al editar un jugador con dorsal 0 el campo muestra 0  → "0"
+PASS Editar jugador #0 (solo cambiar Instagram) se guarda sin error  → {"alerta":["¡Ficha de Mateo Pérez actualizada correctamente!"],"instagram":"arquero_cero","dorsal":0}
+PASS Botón OK/Debe de ficha en Planteles alterna la ficha  → {"antes":"si","despues":"no"}
+PASS Modal de emergencia (SOS) muestra el dorsal 0  → "(#0)"
+
+=== FASE 2: fixture (3 fechas, 3 grupos Superior + 1 Básico, sin resultados) ===
+PASS Se crearon 24 partidos  → 24
+PASS Todos pendientes, con ids de equipo, día y arancel  → 0
+PASS Partido con "horario a confirmar" guarda horario vacío  → 1
+PASS Ids de partido únicos
+PASS Equipo contra sí mismo se rechaza  → "¡Un equipo no puede jugar contra sí mismo!"
+
+=== FECHA 1: lista de buena fe + pagos + carga de resultados ===
+PASS F1: tildar jugadores marca solo al equipo "Se presentó"
+PASS F1: todos los partidos quedaron jugados  → []
+PASS F1: marcadores guardados como se cargaron  → []
+
+=== FECHA 2: lista de buena fe + pagos + carga de resultados ===
+PASS F2: tildar jugadores marca solo al equipo "Se presentó"
+PASS F2: todos los partidos quedaron jugados  → []
+PASS F2: marcadores guardados como se cargaron  → []
+
+=== FECHA 3: lista de buena fe + pagos + carga de resultados ===
+PASS F3: tildar jugadores marca solo al equipo "Se presentó"
+PASS F3: todos los partidos quedaron jugados  → []
+PASS F3: marcadores guardados como se cargaron  → []
+
+=== CASOS ESPECIALES DE CARGA ===
+PASS Goleadores con dorsal 0 repetido se agrupan: "(#0)" x2 y "(#5)" x1  → [{"nombre":"Mateo Pérez (#0)","cantidad":2},{"nombre":"Benjamín Ruiz (#5)","cantidad":1}]
+PASS Dos amarillas al mismo dorsal = dos entradas con su DNI  → ["45000274","45000274"]
+PASS Roja guardada con el DNI del jugador  → ["45001370"]
+PASS Al editar, goleadores y tarjetas se rellenan  → {"gol":"0, 0, 5","am":"5, 5","roja":"9"}
+PASS Guardar la edición sin cambios no duplica ni borra goles del #0  → 2
+PASS Editar 2-1 → 3-1 con un goleador más: contador correcto  → {"g7":3,"esperado":3}
+FAIL Goleador con dorsal inexistente (88): ¿avisa o queda registrado?  → {"golesLocal":2,"goleadoresRegistrados":1,"ultimaAlerta":"sin aviso"}
+PASS Tarjeta con dorsal inexistente se rechaza y no guarda nada  → "No hay ningún jugador con el número 77 en 4to 1ra (campo de tarjetas)."
+PASS Re-guardar el partido deja los goleadores iguales
+
+=== TESORERÍA: Art. 17 Bis, saldo a favor, deuda, suspensiones y planillas ===
+PASS Ausencia sin aviso + rival pagó 100% → 3-0 automático  → {"jugado":true,"auto":true,"g":[3,0]}
+PASS Sanción automática −2 al ausente que no pagó el 50%  → [["7mo 3ra",2,null]]
+PASS Tarjeta del ausente muestra chip −2 PTS
+PASS Pagó el 50% → quita levantada con fecha  → {"id":1789975000710,"acta":2,"fecha":2,"ciclo":"superior","equipo":"7mo 3ra","equipoId":1789974997200,"jugador":"","tipo":"Quita de Puntos","puntosRestados":0,"motivo":"Fecha 2 (vs 5to 1ra): no se presentó y no abonó el 50% del derecho de partido (Art. 17 Bis).","origenAuto":true,"claveTeso":"F2_1789974998550_visita_7mo 3ra","puntosOriginales":2,"levantada":true,"fechaLevantada":"21/09/2026"}
+PASS Saldo a favor de F1 ($10.000) se aplica en F2 y queda cancelado  → "Saldo a favor aplicado: -$10,000."
+PASS 6to 2da pagó $20.000 en F2 → F3 muestra "Arrastra deuda $10.000 (F2)"  → "Arrastra deuda de $10,000 (F2)"
+PASS Tesorería F3: el partido sin horario dice "A confirmar"  → [" FECHA 3 — Cancha 1 (A confirmar) Árbitro: Árbitro 1 Imprimir planilla "," FECHA 3 — Cancha 1 (14:20 hs) Árbitro: Árbitro 4 Imprimir planilla "]
+PASS Con 3 tildados aparece "Faltan 1 para poder jugar (mínimo 4)"  → "Faltan 1 para poder jugar (mínimo 4)"
+PASS Suspensión guardada con jugadorId (DNI) y "Nombre (#9)"  → {"jugador":"Lucas Romero (#9)","acta":"1","tipoActa":"string"}
+PASS F1 (fecha del acta): no figura suspendido
+PASS F2: figura "SUSPENDIDO · Acta 1 · 2 fechas"  → "SUSPENDIDO · Acta 1 · 2 fechas"
+PASS F3: sigue suspendido (2da fecha)
+PASS Suspendido y tildado → fila en rojo
+PASS Imprimir planillas F2 genera 8 hojas (una por partido)  → {"hojas":8,"prints":1}
+PASS Planilla impresa marca al suspendido en la celda Firma
+PASS Planilla: 10 filas por equipo, sin columna Goles ni RESULTADO
+PASS Planilla impresa muestra el N° 0  → "0"
+PASS Alta en cancha con #0: queda en el plantel, ficha pendiente y tildado  → {"dorsal":0,"ficha":"no"}
+PASS Alta en cancha con DNI de un jugador que ya jugó en otro equipo se rechaza  → "Ese DNI ya está inscripto en 4to 1ra y ya jugó con ese equipo, por eso no puede jugar en otro."
+PASS Botón FALTA→OK de la lista de buena fe guarda la ficha  → "si"
+PASS Caja por Fecha: suma de movimientos = suma de pagos cargados  → {"totalCaja":1415000,"totalTeso":1415000}
+  info: Tesorería > total recaudado en partidos (tarjeta del Coordinador) = $1,415,000 | esperado $1,415,000
+PASS Rol Staff oculta elementos .solo-admin (cosmético)
+PASS Aviso publicado  → 1
+
+=== PLAYOFFS ===
+PASS Config del bracket guardada  → {"superior":{"rondaInicial":"cuartos","slots":4},"basico":{"rondaInicial":"semis","slots":2}}
+PASS Armador muestra solo las rondas vigentes del ciclo elegido  → ["semis","final"]
+PASS Se armaron 6 cruces  → 6
+PASS Pisar una llave ocupada pide confirmación y al cancelar no cambia
+PASS Ganador de Llave 1 avanza a Semis Llave 1 (local); el empate sin penales no avanza a nadie  → {"id":1789975002305,"ciclo":"superior","ronda":"semis","slot":1,"local":"6to 3ra","visitante":null}
+PASS Al editar un partido de playoff se ven los penales
+PASS Semis Llave 1 = G1 vs G2 (G2 ganó por penales)  → {"id":1789975002305,"ciclo":"superior","ronda":"semis","slot":1,"local":"6to 3ra","visitante":"4to 1ra"}
+PASS Semis Llave 2 = G3 vs G4  → {"id":1789975002343,"ciclo":"superior","ronda":"semis","slot":2,"local":"5to 1ra","visitante":"5to 2da"}
+PASS Final Superior armada sola  → {"id":1789975002371,"ciclo":"superior","ronda":"final","slot":1,"local":"6to 3ra","visitante":"5to 1ra"}
+PASS Final Básico armada sola  → {"id":1789975002413,"ciclo":"basico","ronda":"final","slot":1,"local":"3ro 1ra","visitante":"1ro 1ra"}
+PASS 10 partidos de playoff jugados  → 10
+PASS Playoffs publicados
+PASS Filtro de fechas del cronograma en orden cronológico (Cuartos antes que la Final)  → ["Todas las Fechas","Fecha 1","Fecha 2","Fecha 3","Cuartos de Final","Semifinal","Gran Final"]
+PASS Tesorería lista las fases en orden cronológico  → ["FECHA 1","FECHA 2","FECHA 3","CUARTOS DE FINAL","SEMIFINAL","GRAN FINAL"]
+
+=== WEB PÚBLICA (index.html) ===
+PASS Tabla Grupo A: orden, PTS y PJ correctos (PTS→DIF→GF, quita manual y 3-0 incluidos)  → {"web":["6to 3ra 7pts 3pj","4to 1ra 6pts 3pj","5to 2da 4pts 3pj","7mo 1ra 0pts 3pj"],"esperado":["6to 3ra 7pts 3pj","4to 1ra 6pts 3pj","5to 2da 4pts 3pj","7mo 1ra 0pts 3pj"]}
+PASS Grupo A: top 3 resaltado
+PASS Tabla Grupo B: orden, PTS y PJ correctos (PTS→DIF→GF, quita manual y 3-0 incluidos)  → {"web":["4to 2da 7pts 3pj","5to 3ra 4pts 3pj","7mo 2da 4pts 3pj","6to 1ra 0pts 3pj"],"esperado":["4to 2da 7pts 3pj","5to 3ra 4pts 3pj","7mo 2da 4pts 3pj","6to 1ra 0pts 3pj"]}
+PASS Grupo B: top 3 resaltado
+PASS Tabla Grupo C: orden, PTS y PJ correctos (PTS→DIF→GF, quita manual y 3-0 incluidos)  → {"web":["4to 3ra 7pts 3pj","5to 1ra 6pts 3pj","6to 2da 2pts 3pj","7mo 3ra 1pts 3pj"],"esperado":["4to 3ra 7pts 3pj","5to 1ra 6pts 3pj","6to 2da 2pts 3pj","7mo 3ra 1pts 3pj"]}
+PASS Grupo C: top 3 resaltado
+PASS Mejor 4° resaltado en su grupo  → {"esperado":"7mo 3ra","grupo":"C"}
+PASS Tabla Básico correcta  → {"web":["3ro 1ra 5","2do 2da 3","1ro 1ra 3","3ro 2da 2"],"esperado":["3ro 1ra 5","2do 2da 3","1ro 1ra 3","3ro 2da 2"]}
+PASS Goleadores Superior: el máximo coincide con lo cargado  → {"web":[{"n":"Ignacio López","e":"5to 2da","g":3},{"n":"Máximo Álvarez","e":"6to 3ra","g":3},{"n":"Valentín Sánchez","e":"4to 2da","g":3}],"esperadoMax":3,"candidatos":["Ignacio López","Máximo Álvarez","Valentín Sánchez"]}
+PASS Cada goleador del top 10 tiene la cantidad esperada  → []
+PASS Modal 4to 1ra: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal público muestra el dorsal #0  → "#0"
+  info: fechas en el modal de 4to 1ra: FECHA 1 | FECHA 2 | FECHA 3 | CUARTOS | SEMIFINAL
+PASS Desplegable del modal (F1) abre y muestra goleadores "(#0) (2)"  → "Mateo Pérez (#0) (2)Benjamín Ruiz (#5) Benjamín Ruiz (#5) (2) Lucas Romero (#9) Franco Fernández (#7) Lucas Romero (#9)"
+PASS Desplegable del modal muestra las tarjetas del partido (2 amarillas #5, amarilla #7 rival, roja #9 rival)  → {"am":["Benjamín Ruiz (#5) (2)","Franco Fernández (#7)"],"ro":["Lucas Romero (#9)"]}
+PASS Modal: playoffs en orden y con nombre de ronda  → ["FECHA 1","FECHA 2","FECHA 3","CUARTOS","SEMIFINAL"]
+PASS Modal 5to 2da: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 4to 2da: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 5to 1ra: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 5to 1ra muestra el 3-0 automático
+PASS Modal 7mo 3ra: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 7mo 3ra: banner "Quita levantada" en la F2
+PASS Modal 7mo 2da: PJ / goles / amarillas / rojas por jugador  → []
+PASS Fixture Fecha 1: 8 partidos  → 8
+PASS Fixture Fecha 1: marcador y goleadores en cada desplegable  → []
+PASS Fixture Fecha 2: 8 partidos  → 8
+PASS Fixture Fecha 2: marcador y goleadores en cada desplegable  → []
+PASS Fixture Fecha 3: 8 partidos  → 8
+PASS Fixture Fecha 3: marcador y goleadores en cada desplegable  → []
+PASS Fixture público: botones generados según las fechas existentes (1, 2, 3)  → ["1","2","3"]
+  info: playoffs en el fixture público: sin decidir (no se cuenta como falla).
+  info: "Últimos partidos" muestra: ULTIMOS PARTIDOS — FECHA 3 —
+PASS Tribunal público: sin botones de acta duplicados  → ["Acta N° 1","Acta N° 2","Acta N° 3"]
+PASS Tribunal Acta 1: "2 fechas de suspensión" del #9  → " RESOLUCIONES OFICIALES — ACTA N° 1 5to 2da — Lucas Romero (#9) Sanción Disciplinaria (2 fechas de suspensión) \"Roja directa por juego brusco (F1).\" "
+  info: actas en el Tribunal: Acta N° 1, Acta N° 2, Acta N° 3 | tipos de acta guardados: number:2, string:1, string:2, string:3
+PASS Bracket Superior: campeón correcto  → {"web":"5to 1ra","esperado":"5to 1ra"}
+PASS Bracket Superior arranca en Cuartos  → ["CUARTOS","SEMIS","FINAL"]
+PASS Bracket: botón Octavos oculto y la pestaña activa es Cuartos  → {"octavosVisible":false,"activa":"cuartos"}
+PASS Bracket muestra los penales de los 2 partidos definidos por penales  → 4
+PASS Bracket completo sin casilleros "A definir"  → 0
+PASS Bracket Básico: campeón correcto (final por penales)  → {"web":"3ro 1ra","esperado":"3ro 1ra"}
+PASS Campanita muestra el aviso publicado
+PASS La campanita no mezcla los avisos de ejemplo cuando ya hay avisos reales  → " Fecha 4 suspendida por lluvia Se reprograma para el sábado siguiente. Hace un momento "
+PASS Buscador encuentra "7mo 3ra"  → ["7mo 3ra"]
+PASS Sin errores de JavaScript en toda la simulación  → 0
+
+=== CASOS BORDE (al final, para no alterar lo anterior) ===
+PASS Inscripciones: 6 jugadores x $3.500 = $21.000  → "$21,000"
+PASS Inscripción pagada: AL DÍA y movimiento en la Caja
+PASS Baja de jugador después de pasar por otra pestaña: se borra de verdad  → {"alerta":"La ficha de Ignacio López fue eliminada.","sigueGuardado":false}
+PASS Cambiar el dorsal de un goleador (7→17) y re-guardar su partido conserva los 3 goles del partido  → {"campoRelleno":"17, 17, 9","goleadoresGuardados":[{"nombre":"Valentín Sánchez (#17)","cantidad":2},{"nombre":"Bautista Flores (#9)","cantidad":1}],"golesDelJugador":3}
+PASS Corregir el DNI de un jugador que ya jugó conserva sus asistencias (PJ)  → {"antes":3,"despues":3}
+  info: alerta al guardar Quita sin cantidad: Falta la cantidad: indicá cuántos puntos se restan.
+PASS Suspensión sin cantidad de fechas se rechaza  → {"alerta":"Falta la cantidad: indicá cuántas fechas dura la suspensión.","guardada":false}
+PASS Quita de puntos con cantidad vacía no guarda NaN (rompería la tabla)
+Veces que Editar partido dejó Local/Visitante vacíos (bug): 0
+
+RESUMEN: 129 PASS, 1 FAIL. Alertas: 199. Confirms: 8.

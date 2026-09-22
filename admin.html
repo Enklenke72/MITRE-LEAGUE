@@ -6,391 +6,656 @@
     <title>Panel Staff - Mitre League</title>
     <link rel="stylesheet" href="estilo.css">
     <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
-    <style>
-        @font-face {
-            font-family: Michroma;
-            src: url(./Recursos/Fuente/Michroma/Michroma-Regular.ttf);
-        }
-        @font-face {
-            font-family: Audiowide;
-            src: url(./Recursos/Fuente/Audiowide/Audiowide-Regular.ttf);
-        }
-
-        body {
-            background-color: #051030;
-            min-height: 100vh;
-            padding: 20px;
-            font-family: 'Audiowide', sans-serif;
-            color: white;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .staff-header {
-            text-align: center;
-            margin-bottom: 25px;
-            width: 100%;
-            max-width: 1000px;
-        }
-
-        .staff-title {
-            font-family: 'Michroma', sans-serif;
-            font-size: 24px;
-            color: #5ce1e6;
-            margin: 0;
-            text-shadow: 0 0 12px rgba(92, 225, 230, 0.4);
-        }
-
-        .staff-subtitle {
-            color: #8fa3d9;
-            font-size: 12px;
-            margin-top: 6px;
-            letter-spacing: 2px;
-        }
-
-        .staff-nav {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 30px;
-            width: 100%;
-            max-width: 1000px;
-        }
-
-        .staff-tab-btn {
-            background: rgba(11, 32, 93, 0.6);
-            border: 1px solid rgba(92, 225, 230, 0.3);
-            color: #8fa3d9;
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-family: 'Audiowide', sans-serif;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-        }
-
-        .staff-tab-btn:hover,
-        .staff-tab-btn.active {
-            background: #5ce1e6;
-            color: #051030;
-            border-color: #5ce1e6;
-            box-shadow: 0 0 12px rgba(92, 225, 230, 0.4);
-            font-weight: bold;
-        }
-
-        .staff-section-container {
-            width: 100%;
-            max-width: 1000px;
-        }
-
-        .staff-modulo {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        @media (max-width: 800px) {
-            .staff-modulo {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .admin-card-panel {
-            background-color: #0b205d;
-            padding: 22px;
-            border-radius: 12px;
-            box-shadow: 0px 0px 20px rgba(5, 16, 48, 0.8);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            margin-bottom: 14px;
-            text-align: left;
-        }
-
-        .form-group label {
-            color: #8fa3d9;
-            font-size: 11px;
-            text-transform: uppercase;
-        }
-
-        .form-group input, 
-        .form-group select,
-        .form-group textarea {
-            background-color: #051030;
-            border: 1px solid #1e3a8a;
-            border-radius: 6px;
-            padding: 10px;
-            color: white;
-            font-family: 'Audiowide', sans-serif;
-            outline: none;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .btn-submit-admin {
-            width: 100%;
-            padding: 12px;
-            border-radius: 6px;
-            background: #1e3a8a;
-            color: #5ce1e6;
-            border: 1px solid #5ce1e6;
-            font-family: 'Audiowide', sans-serif;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-submit-admin:hover {
-            background: #5ce1e6;
-            color: #051030;
-        }
-
-        .seccion-oculta-staff {
-            display: none !important;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-            font-size: 12px;
-        }
-        th {
-            background-color: #1e3a8a;
-            color: #5ce1e6;
-            padding: 8px;
-            text-align: left;
-        }
-        td {
-            padding: 8px;
-            border-bottom: 1px solid #15285e;
-        }
-    </style>
 </head>
-<body>
+<body class="staff-page">
 
     <header class="staff-header">
         <h1 class="staff-title">MITRE LEAGUE — STAFF CONTROL</h1>
         <p class="staff-subtitle">Panel de Operaciones en Campo y Administración Central</p>
+        <!-- Selector de Rol (Simulación de Permisos) -->
+    <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+        <span style="font-size: 11px; color: #869bd8;">Modo de Vista:</span>
+        <select id="selector-rol-usuario" style="background: #0a1d54; color: #2edae3; border: 1px solid #2edae3; padding: 6px 12px; border-radius: 3px; font-family: 'Oswald', sans-serif; font-size: 11px; outline: none; cursor: pointer;">
+            <option value="admin">Administrador (Acceso Total + Tesorería)</option>
+            <option value="staff">Staff / Planillero (Carga de Partidos, Sanciones y Pagos)</option>
+        </select>
+    </div>
+
+    <div class="buscador-global-staff">
+        <input type="text" id="input-buscador-global" placeholder="Buscar jugador por nombre, DNI o dorsal...">
+        <div id="resultados-buscador-global" class="resultados-buscador-dropdown seccion-oculta"></div>
+    </div>
     </header>
 
     <!-- PESTAÑAS STAFF -->
     <nav class="staff-nav">
-        <button class="staff-tab-btn active" data-target="sec-jornada">⚽ Carga de Partidos</button>
-        <button class="staff-tab-btn" data-target="sec-planteles">👥 Equipos y Planteles</button>
-        <button class="staff-tab-btn" data-target="sec-prensa">📰 Prensa & Fotos</button>
-        <button class="staff-tab-btn" data-target="sec-tribunal">⚖️ Tribunal & Sanciones</button>
-        <button class="staff-tab-btn" data-target="sec-tesoreria">💰 Tesorería & Aranceles</button>
+        <button class="staff-tab-btn active" data-target="sec-resumen">Resumen</button>
+        <button class="staff-tab-btn" data-target="sec-jornada">Carga de Partidos</button>
+        <button class="staff-tab-btn" data-target="sec-planteles">Equipos y Planteles</button>
+        <button class="staff-tab-btn" data-target="sec-prensa">Prensa & Fotos</button>
+        <button class="staff-tab-btn" data-target="sec-tribunal">Tribunal & Sanciones</button>
+        <button class="staff-tab-btn" data-target="sec-tesoreria">Tesorería & Aranceles</button>
+        <button class="staff-tab-btn" data-target="sec-alertas">Avisos</button>
+        <button class="staff-tab-btn" data-target="sec-avisos-staff">Avisos Internos</button>
         <a href="index.html" class="staff-tab-btn" style="text-decoration: none; border-color: #e11d48; color: #f43f5e;">← Volver a la Web</a>
     </nav>
 
+<!--
+    
+-->
+
+
+
+
+
+
+
     <main class="staff-section-container">
 
-        <!-- 1️⃣ MÓDULO: CARGA DE PARTIDOS (MODO JORNADA) -->
-        <div id="sec-jornada" class="staff-modulo">
-            <section class="admin-card-panel">
-                <h3 style="color:#5ce1e6; margin-top:0;">⚡ Registrar / Editar Resultado</h3>
-                <form id="form-partido">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Fecha / Fase</label>
-                            <select id="partido-fecha" required>
-                                <option value="1">Fecha 1</option>
-                                <option value="2">Fecha 2</option>
-                                <option value="3">Fecha 3</option>
-                                <option value="4">Fecha 4</option>
-                                <option value="5">Fecha 5</option>
-                                <option value="6">Fecha 6</option>
-                                <option value="16">16vos de Final</option>
-                                <option value="8">8vos de Final</option>
-                                <option value="4">Cuartos de Final</option>
-                                <option value="2">Semifinal</option>
-                                <option value="100">Gran Final</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Ciclo</label>
-                            <select id="partido-ciclo" required>
-                                <option value="superior">Superior</option>
-                                <option value="basico">Básico</option>
-                            </select>
-                        </div>
-                    </div>
+        <!-- MÓDULO: RESUMEN GENERAL (DASHBOARD DEL STAFF) -->
+        <div id="sec-resumen" class="staff-modulo">
+            <section class="admin-card-panel" style="grid-column: 1 / -1;">
+                <h3 style="color:#2edae3; margin-top:0;">Resumen General del Torneo</h3>
+                <div id="grid-resumen-metricas" class="grid-resumen-staff"></div>
+            </section>
 
-                    <div class="form-group">
-                        <label>Grupo / Instancia</label>
-                        <select id="partido-grupo-select" required></select>
-                    </div>
+            <section class="admin-card-panel" style="border-color: #f2c00e;">
+                <h3 style="color:#f2c00e; margin-top:0;">Próximo Partido</h3>
+                <div id="resumen-proximo-partido"></div>
+            </section>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Equipo Local</label>
-                            <select id="partido-local" required></select>
-                        </div>
-                        <div class="form-group">
-                            <label>Goles Local</label>
-                            <input type="number" id="goles-local" min="0" placeholder="0">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Equipo Visitante</label>
-                            <select id="partido-visitante" required></select>
-                        </div>
-                        <div class="form-group">
-                            <label>Goles Visitante</label>
-                            <input type="number" id="goles-visitante" min="0" placeholder="0">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Horario de Juego</label>
-                            <input type="text" id="partido-horario" value="14:20" placeholder="Ej: 14:20">
-                        </div>
-                        <div class="form-group">
-                            <label>Cancha</label>
-                            <select id="partido-cancha">
-                                <option value="Cancha 1">Cancha 1</option>
-                                <option value="Cancha 2">Cancha 2</option>
-                                <option value="Cancha 3">Cancha 3</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-submit-admin">💾 GUARDAR RESULTADO</button>
-                </form>
+            <section class="admin-card-panel" style="border-color: #f43f5e;">
+                <h3 style="color:#f43f5e; margin-top:0;">Últimas Sanciones</h3>
+                <div id="resumen-ultimas-sanciones"></div>
             </section>
 
             <section class="admin-card-panel">
-                <h3 style="color:#60a5fa; margin-top:0;">📋 Cronograma de la Fecha (Por Horario)</h3>
-                
-                <div class="tabs-fechas-admin" style="display: flex; gap: 5px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 5px;">
-                    <button class="tab-btn-admin active" data-fecha-filtro="todas" style="background:#1e293b; color:white; border:1px solid #334155; padding:5px 8px; border-radius:4px; font-size:10px;">Todas</button>
-                    <button class="tab-btn-admin" data-fecha-filtro="1" style="background:#051030; color:#8fa3d9; border:1px solid #1e3a8a; padding:5px 8px; border-radius:4px; font-size:10px;">F1</button>
-                    <button class="tab-btn-admin" data-fecha-filtro="2" style="background:#051030; color:#8fa3d9; border:1px solid #1e3a8a; padding:5px 8px; border-radius:4px; font-size:10px;">F2</button>
-                    <button class="tab-btn-admin" data-fecha-filtro="3" style="background:#051030; color:#8fa3d9; border:1px solid #1e3a8a; padding:5px 8px; border-radius:4px; font-size:10px;">F3</button>
-                    <button class="tab-btn-admin" data-fecha-filtro="4" style="background:#051030; color:#8fa3d9; border:1px solid #1e3a8a; padding:5px 8px; border-radius:4px; font-size:10px;">F4</button>
-                    <button class="tab-btn-admin" data-fecha-filtro="5" style="background:#051030; color:#8fa3d9; border:1px solid #1e3a8a; padding:5px 8px; border-radius:4px; font-size:10px;">F5</button>
-                    <button class="tab-btn-admin" data-fecha-filtro="6" style="background:#051030; color:#8fa3d9; border:1px solid #1e3a8a; padding:5px 8px; border-radius:4px; font-size:10px;">F6</button>
-                </div>
+                <h3 style="color:#4284f2; margin-top:0;">Últimos Avisos</h3>
+                <div id="resumen-ultimos-avisos"></div>
+            </section>
 
-                <div id="lista-partidos-admin"></div>
+            <section class="admin-card-panel solo-admin" style="border-color: #f2c00e;">
+                <h3 style="color:#f2c00e; margin-top:0;">Equipos con Pagos Pendientes</h3>
+                <p style="font-size:10px; color:#869bd8; margin-top:-6px;">Cantidad de equipos con saldo pendiente — el detalle y los montos están en Tesorería.</p>
+                <div id="resumen-pagos-pendientes"></div>
+            </section>
+
+            <section class="admin-card-panel" style="border-color: #2edae3;">
+                <h3 style="color:#2edae3; margin-top:0;">Espacio de Almacenamiento</h3>
+                <p style="font-size:10px; color:#869bd8; margin-top:-6px;">El navegador guarda todo el torneo en un espacio de ~5 MB. Las fotos que subís se comprimen solas, pero conviene mirar esto cada tanto.</p>
+                <div id="storage-uso-admin"></div>
+            </section>
+
+            <section class="admin-card-panel" style="grid-column: 1 / -1;">
+                <h3 style="color:#a855f7; margin-top:0;">Accesos Rápidos</h3>
+                <div class="accesos-rapidos-staff">
+                    <button type="button" class="btn-acceso-rapido" data-target="sec-jornada">Cargar Partido</button>
+                    <button type="button" class="btn-acceso-rapido" data-target="sec-planteles">Agregar Jugador</button>
+                    <button type="button" class="btn-acceso-rapido" data-target="sec-tribunal">Emitir Sanción</button>
+                    <button type="button" class="btn-acceso-rapido" data-target="sec-alertas">Publicar Aviso</button>
+                </div>
             </section>
         </div>
 
-        <!-- 2️⃣ MÓDULO: PLANTELES Y EQUIPOS (CENTRALIZADO) -->
-        <div id="sec-planteles" class="staff-modulo seccion-oculta-staff">
-            <section class="admin-card-panel" style="border-color: #a855f7;">
-                <h3 style="color:#a855f7; margin-top:0;">🏆 Registrar Nuevo Equipo</h3>
-                <form id="form-nuevo-equipo">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Nombre del Curso</label>
-                            <input type="text" id="nuevo-equipo-nombre" placeholder="Ej: 4to 1ra" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Ciclo</label>
-                            <select id="nuevo-equipo-ciclo" required>
-                                <option value="superior">Superior</option>
-                                <option value="basico">Básico</option>
-                            </select>
-                        </div>
-                    </div>
+        <!-- 1⃣ MÓDULO: CARGA DE PARTIDOS (CON ÁRBITROS Y GOLES POR DORSAL) -->
+<!-- 1⃣ MÓDULO: CARGA DE PARTIDOS Y PLAYOFFS (CON SUB-PESTAÑAS) -->
+<!-- 1⃣ MÓDULO: CARGA DE PARTIDOS Y PLAYOFFS -->
+<div id="sec-jornada" class="staff-modulo seccion-oculta-staff">
+    
+    <!-- SUB-PESTAÑAS -->
+    <div class="sub-tabs-planteles" style="grid-column: 1 / -1; margin-bottom: 15px;">
+        <button type="button" class="btn-sub-plantel active" id="btn-sub-jornada-partidos">Cargar Fechas y Resultados</button>
+        <button type="button" class="btn-sub-plantel" id="btn-sub-jornada-playoffs">Armador de Cruces (Sorteo)</button>
+    </div>
+
+    <!-- SUB-VISTA 1: CARGA DE PARTIDOS -->
+    <div id="sub-vista-jornada-partidos" class="staff-dos-columnas">
+        
+        <section class="admin-card-panel">
+            <h3 style="color:#2edae3; margin-top:0;">Registrar / Editar Partido</h3>
+            <form id="form-partido">
+                <div class="form-row">
                     <div class="form-group">
-                        <label>Grupo Inicial</label>
-                        <select id="nuevo-equipo-grupo" required>
-                            <option value="A">Grupo A</option>
-                            <option value="B">Grupo B</option>
-                            <option value="C">Grupo C</option>
-                            <option value="D">Grupo D</option>
-                            <option value="E">Grupo E</option>
-                            <option value="Unico">Tabla Única</option>
+                        <label>Fecha / Fase</label>
+                        <select id="partido-fecha" required>
+                            <option value="1">Fecha 1</option>
+                            <option value="2">Fecha 2</option>
+                            <option value="3">Fecha 3</option>
+                            <option value="4">Fecha 4</option>
+                            <option value="5">Fecha 5</option>
+                            <option value="6">Fecha 6</option>
+                            <option value="7">Fecha 7</option>
+                            <option value="108">8vos de Final</option>
+                            <option value="104">Cuartos de Final</option>
+                            <option value="102">Semifinal</option>
+                            <option value="100">Gran Final</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn-submit-admin" style="background:#6b21a8; border-color:#a855f7;">💾 Guardar Equipo</button>
-                </form>
-
-                <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 20px 0;">
-
-                <h3 style="color:#5ce1e6; margin-top:0;">👤 Añadir Jugador al Plantel</h3>
-                <form id="form-jugador">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Ciclo</label>
-                            <select id="plantel-ciclo">
-                                <option value="superior">Superior</option>
-                                <option value="basico">Básico</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Equipo Destino</label>
-                            <select id="plantel-equipo-select"></select>
-                        </div>
-                    </div>
                     <div class="form-group">
-                        <label>Nombre y Apellido</label>
-                        <input type="text" id="jugador-nombre" placeholder="Ej: Santino Gaitan" required>
+                        <label>Ciclo</label>
+                        <select id="partido-ciclo" required>
+                            <option value="superior">Superior</option>
+                            <option value="basico">Básico</option>
+                        </select>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>DNI</label>
-                            <input type="text" id="jugador-dni" placeholder="Ej: 51.125.891" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Dorsal (Camiseta)</label>
-                            <input type="number" id="jugador-dorsal" min="1" max="99" placeholder="4" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Instagram (Sin @)</label>
-                        <input type="text" id="jugador-instagram" placeholder="santigaitan_">
-                    </div>
-                    <button type="submit" class="btn-submit-admin">➕ Agregar Jugador</button>
-                </form>
-            </section>
-
-            <section class="admin-card-panel">
-                <h3 id="titulo-lista-plantel" style="color:#60a5fa; margin-top:0;">Lista de Buena Fe</h3>
-                <div style="overflow-x:auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>N°</th>
-                                <th>Jugador</th>
-                                <th>DNI</th>
-                                <th>Instagram</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-jugadores-body"></tbody>
-                    </table>
                 </div>
-            </section>
-        </div>
 
-        <!-- 📸 MÓDULO: PRENSA, NOTICIAS Y FOTOS (RESTAURADO COMPLETO) -->
+                <!-- SELECTOR DE CRUCE SORTEADO (Aparece solo en Playoffs) -->
+                <div class="form-group" id="group-cruce-playoff-directo" style="display: none; background: rgba(242, 192, 14,0.08); padding: 8px; border-radius: 3px; border: 1px dashed rgba(242, 192, 14,0.3);">
+                    <label style="color:#f2c00e;">Cargar Cruce Sorteado Directo</label>
+                    <select id="partido-cruce-playoff-select">
+                        <option value="">Seleccionar cruce armado...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="group-instancia-regular">
+                    <label>Grupo / Instancia</label>
+                    <select id="partido-grupo-select" required></select>
+                </div>
+
+                <!-- EQUIPO LOCAL Y GOLES -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Equipo Local</label>
+                        <select id="partido-local" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Goles Local</label>
+                        <input type="number" id="goles-local" min="0" placeholder="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color:#2edae3;">Dorsales Goleadores Local (Separados por coma)</label>
+                    <input type="text" id="dorsales-goles-local" placeholder="Ej: 10, 10, 7">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label style="color:#f2c00e;">Amarillas Local (dorsales, con coma)</label>
+                        <input type="text" id="dorsales-amarillas-local" placeholder="Ej: 4, 8">
+                    </div>
+                    <div class="form-group">
+                        <label style="color:#f43f5e;">Rojas Local (dorsales, con coma)</label>
+                        <input type="text" id="dorsales-rojas-local" placeholder="Ej: 5">
+                    </div>
+                </div>
+
+                <!-- EQUIPO VISITANTE Y GOLES -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Equipo Visitante</label>
+                        <select id="partido-visitante" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Goles Visitante</label>
+                        <input type="number" id="goles-visitante" min="0" placeholder="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="color:#2edae3;">Dorsales Goleadores Visitante (Separados por coma)</label>
+                    <input type="text" id="dorsales-goles-visitante" placeholder="Ej: 9, 11">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label style="color:#f2c00e;">Amarillas Visitante (dorsales, con coma)</label>
+                        <input type="text" id="dorsales-amarillas-visitante" placeholder="Ej: 3">
+                    </div>
+                    <div class="form-group">
+                        <label style="color:#f43f5e;">Rojas Visitante (dorsales, con coma)</label>
+                        <input type="text" id="dorsales-rojas-visitante" placeholder="Ej: 10">
+                    </div>
+                </div>
+
+                <!-- PENALES (En Playoffs) -->
+                <div class="form-row" id="row-penales-partido" style="display: none; background: rgba(244,63,94,0.08); padding: 8px; border-radius: 3px; border: 1px dashed rgba(244,63,94,0.3); margin-bottom: 12px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="color:#f43f5e;">Penales Local (Desempate)</label>
+                        <input type="number" id="penales-local" min="0" placeholder="0">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="color:#f43f5e;">Penales Visitante (Desempate)</label>
+                        <input type="number" id="penales-visitante" min="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label style="color:#f2c00e;">Arancel Exigido x Equipo ($)</label>
+                        <input type="number" id="partido-arancel-monto" value="30000" step="500" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Día del Partido (Calendario)</label>
+                        <input type="date" id="partido-dia">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Horario de Juego</label>
+                        <input type="text" id="partido-horario" value="14:20" placeholder="Ej: 14:20">
+                        <label class="check-inline-admin">
+                            <input type="checkbox" id="partido-horario-confirmar"> Horario a confirmar
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Cancha</label>
+                        <select id="partido-cancha">
+                            <option value="Cancha 1">Cancha 1</option>
+                            <option value="Cancha 2">Cancha 2</option>
+                            <option value="Cancha 3">Cancha 3</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="color:#f2c00e;">Árbitro Asignado</label>
+                    <input type="text" id="partido-arbitro-nombre" placeholder="Ej: Carlos Gómez">
+                </div>
+
+                <button type="submit" id="btn-submit-partido" class="btn-submit-admin" style="margin-top:10px;">GUARDAR Y COMPUTAR PARTIDO</button>
+            </form>
+        </section>
+
+        <!-- COLUMNA DERECHA: CRONOGRAMA CON SELECTOR DE FECHAS RECUPERADO -->
+        <section class="admin-card-panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <h3 style="color:#4284f2; margin:0;">Cronograma de Partidos</h3>
+                <select id="filtro-fecha-cronograma-admin" style="background:#040c26; color:#2edae3; border:1px solid #1a3274; border-radius:3px; padding:4px 8px; font-family:'Oswald'; font-size:11px;">
+                    <!-- Dinámico por JS -->
+                </select>
+            </div>
+            <div id="lista-partidos-admin" style="max-height: 600px; overflow-y: auto;"></div>
+        </section>
+    </div>
+
+    <!-- SUB-VISTA 2: ARMADOR DE PLAYOFFS -->
+    <div id="sub-vista-jornada-playoffs" class="seccion-oculta-staff staff-dos-columnas">
+
+        <section class="admin-card-panel" style="border-color: #f2c00e; grid-column: 1 / -1;">
+            <div style="background: rgba(4, 12, 38,0.8); padding: 12px; border-radius: 4px; border: 1px solid #f2c00e; margin-bottom: 18px; text-align: center;">
+                <span style="font-size: 11px; color: #f2c00e; font-weight: bold; display: block; margin-bottom: 6px;">
+                    ESTADO EN LA WEB PÚBLICA (INDEX)
+                </span>
+                <button type="button" id="btn-toggle-publicar-playoffs" style="background: #991b1b; border: 1px solid #f43f5e; color: white; padding: 8px 14px; border-radius: 8px; font-family: 'Oswald'; font-size: 11px; cursor: pointer; transition: all 0.25s ease;">
+                    Ocultos (Mostrando Cartel de Espera)
+                </button>
+            </div>
+
+            <h3 style="color:#f2c00e; margin-top:0;">Configurar Bracket por Ciclo</h3>
+            <p style="color:#869bd8; font-size:10px; margin-top:-6px;">
+                La cantidad de equipos que clasifican a playoffs cambia en cada torneo. Definí acá en qué ronda arranca cada ciclo y cuántas llaves tiene esa ronda inicial — el resto del árbol (rondas siguientes hasta la Final) se calcula solo. Si un ciclo no se corre este torneo, simplemente no lo configures.
+            </p>
+            <form id="form-config-bracket">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ciclo</label>
+                        <select id="config-bracket-ciclo">
+                            <option value="superior">Superior</option>
+                            <option value="basico">Básico</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ronda Inicial</label>
+                        <select id="config-bracket-ronda-inicial">
+                            <option value="octavos">Octavos de Final</option>
+                            <option value="cuartos">Cuartos de Final</option>
+                            <option value="semis">Semifinal</option>
+                            <option value="final">Final</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Llaves en la Ronda Inicial</label>
+                        <input type="number" id="config-bracket-slots" min="1" max="16" value="8">
+                    </div>
+                    <div class="form-group" style="justify-content:flex-end;">
+                        <button type="submit" class="btn-submit-admin" style="background:#1a3274;">Guardar Configuración</button>
+                    </div>
+                </div>
+            </form>
+            <div id="resumen-config-bracket" style="font-size:10px; color:#869bd8; margin-top:8px;"></div>
+        </section>
+
+        <section class="admin-card-panel" style="border-color: #f2c00e;">
+            <h3 style="color:#f2c00e; margin-top:0;">Armador de Cruces de Playoffs (Sorteo)</h3>
+            <form id="form-armar-playoff">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ciclo</label>
+                        <select id="playoff-ciclo-select">
+                            <option value="superior">Superior</option>
+                            <option value="basico">Básico</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ronda Target</label>
+                        <select id="playoff-ronda-select"></select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Llave (Slot)</label>
+                        <select id="playoff-slot-select"></select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Equipo A (Sorteado)</label>
+                        <select id="playoff-equipo-1"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Equipo B (Sorteado)</label>
+                        <select id="playoff-equipo-2"></select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit-admin" style="background:#854d0e; border-color:#f2c00e; color:white; margin-top:10px;">
+                    PUBLICAR CRUCE EN EL ÁRBOL
+                </button>
+            </form>
+        </section>
+
+        <section class="admin-card-panel">
+            <h3 style="color:#f2c00e; margin-top:0;">Cruces de Playoffs Armados</h3>
+            <div id="lista-cruces-playoffs-admin"></div>
+        </section>
+    </div>
+
+</div>
+
+
+
+        <!-- 2⃣ MÓDULO: PLANTELES Y EQUIPOS (CENTRALIZADO) -->
+        <!-- 2⃣ MÓDULO: PLANTELES Y EQUIPOS -->
+<div id="sec-planteles" class="staff-modulo seccion-oculta-staff">
+    
+    <!-- SUB-PESTAÑAS DE PLANTELES -->
+    <div class="sub-tabs-planteles">
+        <button type="button" class="btn-sub-plantel active" id="btn-sub-plantel-jugadores">Planteles y Jugadores</button>
+        <button type="button" class="btn-sub-plantel" id="btn-sub-plantel-admin">Crear / Mover Equipos y Grupos</button>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- VISTA 1: CARGA DE JUGADORES Y LISTA DE BUENA FE -->
+    <!-- ==================================================== -->
+    <div id="sub-vista-plantel-jugadores" class="staff-dos-columnas">
+        
+        <!-- FORMULARIO DE ALTA / EDICIÓN -->
+        <section class="admin-card-panel" style="border-color: #2edae3;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 id="titulo-form-jugador" style="color:#2edae3; margin:0;">Añadir Jugador</h3>
+                <button type="button" id="btn-cancelar-edicion-jugador" class="seccion-oculta-staff" style="background:#475569; color:#fff; border:none; padding:4px 8px; border-radius:2px; font-size:10px; cursor:pointer;">Cancelar Edición</button>
+            </div>
+
+            <form id="form-jugador">
+    <div class="form-row">
+        <div class="form-group">
+            <label>Ciclo</label>
+            <select id="plantel-ciclo">
+                <option value="superior">Superior</option>
+                <option value="basico">Básico</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Equipo Destino</label>
+            <select id="plantel-equipo-select"></select>
+        </div>
+    </div>
+
+    <div style="text-align: right; margin-top: -8px; margin-bottom: 8px;">
+        <button type="button" id="btn-eliminar-equipo-completo" style="background: rgba(244,63,94,0.15); border: 1px solid #f43f5e; color: #f43f5e; padding: 3px 6px; border-radius: 2px; font-family: 'Oswald'; font-size: 9px; cursor: pointer;">
+            Eliminar este Equipo del Torneo
+        </button>
+    </div>
+
+    <div class="form-group">
+        <label>Nombre y Apellido</label>
+        <input type="text" id="jugador-nombre" placeholder="Ej: Santino Gaitan" required>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>DNI</label>
+            <input type="text" id="jugador-dni" placeholder="Ej: 51.125.891" required>
+        </div>
+        <div class="form-group">
+            <label>Dorsal (Camiseta)</label>
+            <input type="number" id="jugador-dorsal" min="0" max="99" placeholder="4" required>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Instagram (Sin @)</label>
+            <input type="text" id="jugador-instagram" placeholder="santigaitan_">
+        </div>
+        <div class="form-group">
+            <label>Foto Jugador (URL)</label>
+            <input type="text" id="jugador-foto" placeholder="Recursos/search.svg">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>O subir la foto del jugador (se comprime sola)</label>
+        <input type="file" id="jugador-foto-file" accept="image/*">
+        <div id="jugador-foto-preview-wrap" class="foto-upload-preview seccion-oculta-staff">
+            <img id="jugador-foto-preview" alt="Vista previa de la foto del jugador">
+            <span id="jugador-foto-peso"></span>
+            <button type="button" id="btn-quitar-foto-jugador">Quitar</button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label style="color:#4ade80;">¿Ficha Médica Entregada?</label>
+        <select id="jugador-ficha-medica">
+            <option value="no">Pendiente / No Entregada</option>
+            <option value="si">Entregada y Firmada</option>
+        </select>
+    </div>
+
+    <!-- ACORDEÓN COMPACTO DE SALUD Y CONTACTOS -->
+    <details style="border-top: 1px dashed rgba(46, 218, 227,0.3); margin-top: 8px; padding-top: 8px; cursor: pointer;">
+        <summary style="color:#f2c00e; font-size:10px; font-family:'Michroma'; outline:none; user-select:none;">
+            Datos de Salud y Contactos de Emergencia ▾
+        </summary>
+        
+        <div style="margin-top: 10px; cursor: default;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha de Nacimiento</label>
+                    <input type="date" id="jugador-nacimiento">
+                </div>
+                <div class="form-group">
+                    <label>Celular Jugador</label>
+                    <input type="text" id="jugador-celular" placeholder="Ej: 11 2345-6789">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Concurrir a (Sanatorio)</label>
+                    <input type="text" id="jugador-concurrir" placeholder="Ej: Hospital Thompson">
+                </div>
+                <div class="form-group">
+                    <label>Dirección Sanatorio</label>
+                    <input type="text" id="jugador-concurrir-dir" placeholder="Ej: Av. Balbín 3200">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Médico de Cabecera</label>
+                    <input type="text" id="jugador-medico" placeholder="Ej: Dr. Gómez">
+                </div>
+                <div class="form-group">
+                    <label>Dirección / Tel. Médico</label>
+                    <input type="text" id="jugador-medico-dir" placeholder="Ej: Calle 52 N° 123">
+                </div>
+            </div>
+
+            <div class="form-group" style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+                <label style="color:#f43f5e;">Familiar de Contacto Directo</label>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre Familiar</label>
+                        <input type="text" id="jugador-familiar-nombre" placeholder="Ej: María Coria">
+                    </div>
+                    <div class="form-group">
+                        <label>Parentesco</label>
+                        <input type="text" id="jugador-familiar-parentesco" placeholder="Ej: Madre / Padre">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono Directo Familiar</label>
+                    <input type="text" id="jugador-familiar-tel" placeholder="Ej: 11 9876-5432">
+                </div>
+            </div>
+        </div>
+    </details>
+
+    <button type="submit" id="btn-submit-jugador" class="btn-submit-admin" style="margin-top:10px;">AGREGAR JUGADOR</button>
+</form>
+        </section>
+
+        <!-- TABLA LISTA DE BUENA FE -->
+        <section class="admin-card-panel">
+            <h3 id="titulo-lista-plantel" style="color:#4284f2; margin-top:0;">Lista de Buena Fe</h3>
+            <div style="overflow-x:auto;">
+                <table class="tabla-planteles">
+                    <thead>
+                        <tr>
+                            <th style="width: 35px; text-align: center;">N°</th>
+                            <th>Jugador</th>
+                            <th>DNI</th>
+                            <th>Instagram</th>
+                            <th style="text-align: center;">Ficha</th>
+                            <th style="text-align: center;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-jugadores-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- VISTA 2: GESTIÓN DE EQUIPOS Y GRUPOS -->
+    <!-- ==================================================== -->
+    <div id="sub-vista-plantel-admin" class="seccion-oculta-staff staff-dos-columnas">
+
+        <!-- BLOQUE FORMATO DEL TORNEO (GRUPOS vs TABLA ÚNICA) -->
+        <section class="admin-card-panel" style="border-color: #f2c00e; grid-column: 1 / -1;">
+            <h3 style="color:#f2c00e; margin-top:0;">Formato del Torneo por Ciclo</h3>
+            <p style="color:#869bd8; font-size:10px; margin-top:-6px;">
+                Por defecto cada ciclo juega por Fase de Grupos. La pestaña "Tabla Única" de la web pública queda <strong>oculta</strong> mientras el ciclo esté en este modo, aunque hayas movido algún equipo ahí con la herramienta de abajo. Si en algún momento el torneo cambia de formato, activalo acá — la decisión es tuya.
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciclo Superior</label>
+                    <select id="formato-torneo-superior">
+                        <option value="grupos">Fase de Grupos</option>
+                        <option value="unico">Tabla Única</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ciclo Básico</label>
+                    <select id="formato-torneo-basico">
+                        <option value="grupos">Fase de Grupos</option>
+                        <option value="unico">Tabla Única</option>
+                    </select>
+                </div>
+            </div>
+            <button type="button" id="btn-guardar-formato-torneo" class="btn-submit-admin" style="background:#854d0e; border-color:#f2c00e;">
+                Guardar Formato
+            </button>
+        </section>
+
+        <!-- BLOQUE CREAR EQUIPO Y GESTOR DE GRUPOS -->
+        <section class="admin-card-panel" style="border-color: #a855f7;">
+            <h3 style="color:#a855f7; margin-top:0;">Registrar Nuevo Equipo</h3>
+            <form id="form-nuevo-equipo">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre del Curso</label>
+                        <input type="text" id="nuevo-equipo-nombre" placeholder="Ej: 4to 1ra" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Ciclo</label>
+                        <select id="nuevo-equipo-ciclo" required>
+                            <option value="superior">Superior</option>
+                            <option value="basico">Básico</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Grupo Inicial</label>
+                    <select id="nuevo-equipo-grupo" required></select>
+                </div>
+                <button type="submit" class="btn-submit-admin" style="background:#6b21a8; border-color:#a855f7;">Guardar Equipo</button>
+            </form>
+
+            <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 20px 0;">
+
+            <h3 style="color:#f2c00e; margin-top:0;">Gestor de Grupos</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciclo</label>
+                    <select id="gestor-grupos-ciclo">
+                        <option value="superior">Superior</option>
+                        <option value="basico">Básico</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nuevo Grupo</label>
+                    <input type="text" id="nuevo-grupo-nombre" placeholder="Ej: F" maxlength="20">
+                </div>
+            </div>
+            <button type="button" id="btn-agregar-grupo" class="btn-submit-admin" style="background:#854d0e; border-color:#f2c00e;">
+                Agregar Grupo
+            </button>
+            <div id="lista-grupos" style="margin-top:15px; display:flex; flex-direction:column; gap:8px;"></div>
+        </section>
+
+        <!-- BLOQUE MOVER EQUIPOS DE GRUPO -->
+        <section class="admin-card-panel" style="border-color: #23b1f0;">
+            <h3 style="color:#23b1f0; margin-top:0;">Mover / Reasignar Equipo de Grupo</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciclo</label>
+                    <select id="mover-equipo-ciclo">
+                        <option value="superior">Superior</option>
+                        <option value="basico">Básico</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Equipo a Mover</label>
+                    <select id="mover-equipo-select"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Nuevo Grupo Asignado</label>
+                <select id="mover-equipo-nuevo-grupo"></select>
+            </div>
+            <button type="button" id="btn-mover-equipo" class="btn-submit-admin" style="background:#0284c7; border-color:#23b1f0; color:white;">
+                GUARDAR CAMBIO DE GRUPO
+            </button>
+        </section>
+
+    </div>
+</div>
+
+        <!-- MÓDULO: PRENSA, NOTICIAS Y FOTOS (RESTAURADO COMPLETO) -->
         <div id="sec-prensa" class="staff-modulo seccion-oculta-staff">
             
             <!-- FORMULARIO 1: CREAR NOTICIA EN HERO 3D -->
             <section class="admin-card-panel">
-                <h3 style="color:#5ce1e6; margin-top:0;">📰 Publicar Noticia en Hero 3D</h3>
+                <h3 style="color:#2edae3; margin-top:0;">Publicar Noticia en Hero 3D</h3>
                 <form id="form-noticia-admin">
                     <div class="form-group">
                         <label>Título de la Noticia</label>
-                        <input type="text" id="noticia-titulo" placeholder="Ej: 🏆 FINAL DEFINIDA" required>
+                        <input type="text" id="noticia-titulo" placeholder="Ej: FINAL DEFINIDA" required>
                     </div>
                     <div class="form-group">
                         <label>Texto / Resumen</label>
@@ -398,7 +663,16 @@
                     </div>
                     <div class="form-group">
                         <label>Ruta o URL de la Foto</label>
-                        <input type="text" id="noticia-foto" placeholder="Recursos/Fotos/DSC05325.JPG" required>
+                        <input type="text" id="noticia-foto" placeholder="Recursos/Fotos/DSC05325.JPG">
+                    </div>
+                    <div class="form-group">
+                        <label>O subir la foto de la noticia (se comprime sola)</label>
+                        <input type="file" id="noticia-foto-file" accept="image/*">
+                        <div id="noticia-foto-preview-wrap" class="foto-upload-preview seccion-oculta-staff">
+                            <img id="noticia-foto-preview" alt="Vista previa de la foto de la noticia">
+                            <span id="noticia-foto-peso"></span>
+                            <button type="button" id="btn-quitar-foto-noticia">Quitar</button>
+                        </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -407,21 +681,21 @@
                         </div>
                         <div class="form-group">
                             <label>Texto del Link (Opcional)</label>
-                            <input type="text" id="noticia-link-texto" placeholder="VER MÁS ➔">
+                            <input type="text" id="noticia-link-texto" placeholder="VER MÁS">
                         </div>
                     </div>
-                    <button type="submit" class="btn-submit-admin">🚀 PUBLICAR NOTICIA</button>
+                    <button type="submit" class="btn-submit-admin">PUBLICAR NOTICIA</button>
                 </form>
 
                 <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 20px 0;">
 
-                <h3 style="color:#5ce1e6; margin-top:0;">📰 Noticias Publicadas</h3>
+                <h3 style="color:#2edae3; margin-top:0;">Noticias Publicadas</h3>
                 <div id="lista-noticias-admin"></div>
             </section>
 
             <!-- FORMULARIO 2: SUBIDA DE ÁLBUMES DE FOTOS -->
-            <section class="admin-card-panel" style="border-color: #60a5fa;">
-                <h3 style="color:#60a5fa; margin-top:0;">📸 Publicar Álbum de Fotos</h3>
+            <section class="admin-card-panel" style="border-color: #4284f2;">
+                <h3 style="color:#4284f2; margin-top:0;">Publicar Álbum de Fotos</h3>
                 <form id="form-fotos-admin">
                     <div class="form-group">
                         <label>Título del Álbum / Jornada</label>
@@ -435,23 +709,101 @@
                         <label>Link de Google Drive / Mega / Instagram</label>
                         <input type="text" id="foto-album-link" placeholder="https://drive.google.com/drive/folders/..." required>
                     </div>
-                    <button type="submit" class="btn-submit-admin" style="background:#1d4ed8; border-color:#60a5fa; color:white;">
-                        📌 PUBLICAR ÁLBUM EN LA WEB
+                    <button type="submit" class="btn-submit-admin" style="background:#2c68e7; border-color:#4284f2; color:white;">
+                        PUBLICAR ÁLBUM EN LA WEB
                     </button>
                 </form>
 
                 <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 20px 0;">
 
-                <h3 style="color:#60a5fa; margin-top:0;">📁 Álbumes Activos en Galería</h3>
+                <h3 style="color:#4284f2; margin-top:0;">Álbumes Activos en Galería</h3>
                 <div id="lista-fotos-admin"></div>
+            </section>
+
+            <!-- FORMULARIO 3: GESTOR DE SPONSORS -->
+            <section class="admin-card-panel" style="border-color: #a855f7; grid-column: 1 / -1;">
+                <h3 id="titulo-form-sponsor" style="color:#a855f7; margin-top:0;">Añadir Sponsor</h3>
+                <form id="form-sponsor-admin">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nombre del Sponsor</label>
+                            <input type="text" id="sponsor-nombre" placeholder="Ej: Indumentaria Express" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select id="sponsor-categoria">
+                                <option value="">Sin categoría</option>
+                                <option value="Sponsor Oficial">Sponsor Oficial</option>
+                                <option value="Media Partner">Media Partner</option>
+                                <option value="Colaborador">Colaborador</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Descripción del Aporte</label>
+                        <textarea id="sponsor-descripcion" rows="2" placeholder="Ej: Provisión de camisetas de emergencia con entregas rápidas..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Beneficio Exclusivo (se revela al tocar "Ver Beneficio")</label>
+                        <textarea id="sponsor-beneficio" rows="2" placeholder="Ej: 20% de descuento presentando el fixture del día"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Logo / Foto del Sponsor</label>
+                            <input type="file" id="sponsor-logo-file" accept="image/*">
+                        </div>
+                        <div class="form-group">
+                            <label>Color de Fondo de la Tarjeta</label>
+                            <input type="color" id="sponsor-color-fondo" value="#3e3f9b" style="height: 42px; cursor: pointer; padding: 4px;">
+                        </div>
+                    </div>
+
+                    <div id="sponsor-logo-preview-wrap" class="seccion-oculta-staff" style="margin: -6px 0 14px 0;">
+                        <img id="sponsor-logo-preview" style="max-height: 60px; border-radius: 3px; background: #040c26; padding: 4px;">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Instagram (Sin @)</label>
+                            <input type="text" id="sponsor-instagram" placeholder="Ej: indumentariaexpress">
+                        </div>
+                        <div class="form-group">
+                            <label>Teléfono (Si no tiene Instagram)</label>
+                            <input type="text" id="sponsor-telefono" placeholder="Ej: 11 2345-6789">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Enlace Externo (Opcional — sitio web, catálogo, etc.)</label>
+                        <input type="text" id="sponsor-link" placeholder="https://...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ubicación / Link de mapa</label>
+                        <input type="text" id="sponsor-ubicacion" placeholder="Ej: Av. Mitre 1234 o link de Google Maps">
+                    </div>
+
+                    <div style="display:flex; gap:8px;">
+                        <button type="submit" id="btn-submit-sponsor" class="btn-submit-admin" style="background:#6b21a8; border-color:#a855f7;">Guardar Sponsor</button>
+                        <button type="button" id="btn-cancelar-edicion-sponsor" class="seccion-oculta-staff" style="background:#475569; color:#fff; border:none; padding:0 16px; border-radius:3px; font-family:'Oswald'; font-size:11px; cursor:pointer;">Cancelar Edición</button>
+                    </div>
+                </form>
+
+                <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 20px 0;">
+
+                <h3 style="color:#a855f7; margin-top:0;">Sponsors Activos (orden de aparición en el carrusel)</h3>
+                <div id="lista-sponsors-admin"></div>
             </section>
 
         </div>
 
-        <!-- 3️⃣ MÓDULO: TRIBUNAL DE DISCIPLINA -->
+        <!-- 3⃣ MÓDULO: TRIBUNAL DE DISCIPLINA -->
         <div id="sec-tribunal" class="staff-modulo seccion-oculta-staff">
             <section class="admin-card-panel" style="border-color: #f43f5e;">
-                <h3 id="titulo-form-sancion" style="color:#f43f5e; margin-top:0;">⚖️ Emitir Acta / Registrar Sanción</h3>
+                <h3 id="titulo-form-sancion" style="color:#f43f5e; margin-top:0;">Emitir Acta / Registrar Sanción</h3>
                 
                 <form id="form-sancion">
                     <div class="form-row">
@@ -474,21 +826,23 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Jugador Implicado (Opcional)</label>
-                        <input type="text" id="sancion-jugador" placeholder="Ej: Pérez Juan (DNI 45.123.890)">
+                        <label>Jugador Implicado (Opcional, del plantel del equipo)</label>
+                        <select id="sancion-jugador-id">
+                            <option value="">Sin jugador (sanción al equipo)</option>
+                        </select>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>Tipo de Medida</label>
                             <select id="sancion-tipo" required>
-                                <option value="Sanción Disciplinaria">🔴 Suspensión de Fechas (Roja/Azul)</option>
-                                <option value="Quita de Puntos">📉 Quita de Puntos al Equipo</option>
-                                <option value="Advertencia / Acta">⚠️ Advertencia Oficial</option>
+                                <option value="Sanción Disciplinaria">Suspensión de Fechas (Roja/Azul)</option>
+                                <option value="Quita de Puntos">Quita de Puntos al Equipo</option>
+                                <option value="Advertencia / Acta">Advertencia Oficial</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Fechas / Pts Restados</label>
+                            <label>Cantidad (Fechas de suspensión o Puntos a restar, según el Tipo de Medida)</label>
                             <input type="number" id="sancion-puntos" min="0" value="1">
                         </div>
                     </div>
@@ -499,48 +853,242 @@
                     </div>
 
                     <button type="submit" id="btn-submit-sancion" class="btn-submit-admin" style="background:#991b1b; border-color:#f43f5e; color:white;">
-                        🔴 PUBLICAR RESOLUCIÓN TRIBUNAL
+                        PUBLICAR RESOLUCIÓN TRIBUNAL
                     </button>
                 </form>
             </section>
 
             <section class="admin-card-panel">
-                <h3 style="color:#f43f5e; margin-top:0;">📋 Resoluciones y Actas Publicadas</h3>
+                <h3 style="color:#f43f5e; margin-top:0;">Resoluciones y Actas Publicadas</h3>
                 <div id="lista-sanciones-admin"></div>
             </section>
         </div>
 
-        <!-- 5️⃣ MÓDULO: TESORERÍA -->
-        <div id="sec-tesoreria" class="staff-modulo seccion-oculta-staff">
-            <section class="admin-card-panel" style="border-color: #facc15;">
-                <h3 style="color:#facc15; margin-top:0;">💰 Control de Aranceles por Fecha</h3>
-                <p style="color:#8fa3d9; font-size:11px;">Módulo de marcado de pago de mesa y arancel arbitral por partido.</p>
-            </section>
+        <!-- 5⃣ MÓDULO: TESORERÍA Y ARANCELES -->
+<div id="sec-tesoreria" class="staff-modulo seccion-oculta-staff">
+    
+    <!-- SUB-PESTAÑAS PROLIJAS DE NAVEGACIÓN -->
+    <div class="sub-tabs-tesoreria">
+        <button type="button" class="staff-tab-btn active" id="btn-sub-teso-partidos">Aranceles por Partido</button>
+        <button type="button" class="staff-tab-btn" id="btn-sub-teso-inscripciones">Inscripciones por Jugador</button>
+        <button type="button" class="staff-tab-btn solo-admin" id="btn-sub-teso-caja">Caja por Fecha</button>
+    </div>
+
+    <!-- BALANCE CENTRAL DE CAJA (Solo Admin) -->
+    <section class="admin-card-panel solo-admin" style="border-color: #f2c00e;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(242, 192, 14, 0.3); padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 style="color:#f2c00e; margin:0;">BALANCE CENTRAL DE CAJA (EXCLUSIVO ADMIN)</h3>
+            <span style="font-size: 10px; color: #869bd8;">Rol: Administrador</span>
         </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; text-align: center;">
+            <div style="background: rgba(4, 12, 38,0.8); padding: 10px; border-radius: 4px; border: 1px solid #1a3274;">
+                <span style="font-size: 9px; color: #869bd8; display: block;">RECAUDACIÓN INSCRIPCIONES</span>
+                <span id="txt-total-inscripciones" style="font-size: 15px; color: #2edae3; font-family: 'Michroma'; font-weight: bold; margin-top: 4px; display: block;">$0</span>
+            </div>
+            <div style="background: rgba(4, 12, 38,0.8); padding: 10px; border-radius: 4px; border: 1px solid #1a3274;">
+                <span style="font-size: 9px; color: #869bd8; display: block;">RECAUDACIÓN PARTIDOS/FECHAS</span>
+                <span id="txt-total-partidos" style="font-size: 15px; color: #4ade80; font-family: 'Michroma'; font-weight: bold; margin-top: 4px; display: block;">$0</span>
+            </div>
+            <div style="background: rgba(4, 12, 38,0.8); padding: 10px; border-radius: 4px; border: 1px solid #1a3274;">
+                <span style="font-size: 9px; color: #869bd8; display: block;">EGRESOS TOTALES</span>
+                <span id="txt-total-egresos" style="font-size: 15px; color: #f43f5e; font-family: 'Michroma'; font-weight: bold; margin-top: 4px; display: block;">$0</span>
+            </div>
+            <div style="background: rgba(4, 12, 38,0.8); padding: 10px; border-radius: 4px; border: 1px solid #f2c00e;">
+                <span style="font-size: 9px; color: #f2c00e; display: block; font-weight: bold;">SALDO CAJA NETO</span>
+                <span id="txt-saldo-neto" style="font-size: 17px; color: #ffffff; font-family: 'Michroma'; font-weight: bold; margin-top: 4px; display: block;">$0</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- SUB-VISTA A: VISTA DE TARJETAS DE PARTIDOS -->
+    <div id="sub-vista-teso-partidos" style="width: 100%;">
+        <section class="admin-card-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="color:#4284f2; margin:0;">Aranceles y Lista de Buena Fe por Partido</h3>
+                <button type="button" id="btn-imprimir-planillas" class="teso-btn-imprimir">Imprimir planillas (filtro actual)</button>
+                <div class="form-group" style="margin: 0; min-width: 180px;">
+                    <label>Filtrar por Cancha</label>
+                    <select id="filtro-tesoreria-cancha">
+                        <option value="todas">Todas las Canchas</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin: 0; min-width: 180px;">
+                    <label>Filtrar por Fecha</label>
+                    <!-- Dejá el select de fechas de Tesorería así -->
+<select id="filtro-tesoreria-fecha">
+    <option value="todas">Todas las Fechas</option>
+</select>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR DE TARJETAS DE PARTIDOS -->
+            <div id="contenedor-tesoreria-partidos-cards"></div>
+        </section>
+    </div>
+
+    <!-- SUB-VISTA B: INSCRIPCIONES POR CANTIDAD DE JUGADORES -->
+    <div id="sub-vista-teso-inscripciones" class="seccion-oculta-staff" style="width: 100%;">
+        <section class="admin-card-panel">
+            <h3 style="color:#2edae3; margin-top:0;">Inscripciones por Jugador Inscripto</h3>
+            <div class="form-row" style="margin-bottom: 15px;">
+                <div class="form-group">
+                    <label>Valor Inscripción por Jugador ($)</label>
+                    <input type="number" id="monto-inscripcion-individual" value="3000" step="500" class="input-monto-teso" style="max-width: 100% !important; text-align: left !important;">
+                </div>
+                <div class="form-group">
+                    <label>Ciclo a Consultar</label>
+                    <select id="filtro-inscripciones-ciclo">
+                        <option value="superior">Ciclo Superior</option>
+                        <option value="basico">Ciclo Básico</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Equipo</th>
+                            <th style="text-align: center;">Jugadores</th>
+                            <th style="text-align: center;">Exigido ($)</th>
+                            <th style="text-align: center;">Efectivo ($)</th>
+                            <th style="text-align: center;">Transf. ($)</th>
+                            <th style="text-align: center;">Estado Deuda</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-tesoreria-inscripciones"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- SUB-VISTA C: CAJA POR FECHA (Solo Admin — historial de pagos individuales) -->
+    <div id="sub-vista-teso-caja" class="seccion-oculta-staff solo-admin" style="width: 100%;">
+        <section class="admin-card-panel" style="border-color: #f2c00e;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(242, 192, 14, 0.3); padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 style="color:#f2c00e; margin:0;">Caja por Fecha (Historial de Pagos)</h3>
+                <span style="font-size: 10px; color: #869bd8;">Rol: Administrador</span>
+            </div>
+            <p style="font-size:11px; color:#869bd8; margin-top:-8px; margin-bottom:15px;">Cada pago cargado en Aranceles o Inscripciones queda registrado acá con el equipo, el monto, el medio y la hora exacta — útil para rastrear pagos parciales (ej. un equipo paga la mitad de la inscripción hoy y el resto más adelante).</p>
+            <div id="contenedor-caja-por-fecha"></div>
+        </section>
+    </div>
+
+    <!-- EGRESOS (Solo Admin) -->
+    <section class="admin-card-panel solo-admin" style="border-color: #f43f5e;">
+        <h3 style="color:#f43f5e; margin-top:0;">Cargar Egreso (Árbitros, Canchas, Fotografía)</h3>
+        <form id="form-egreso">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Concepto</label>
+                    <select id="egreso-concepto" required>
+                        <option value="arbitros">Pago a Árbitros</option>
+                        <option value="canchas">Alquiler de Canchas</option>
+                        <option value="fotografia">Cobertura Fotográfica / Prensa</option>
+                        <option value="varios">Varios / Insumos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Detalle / Proveedor</label>
+                    <input type="text" id="egreso-detalle" placeholder="Ej: Honorarios Terna Fecha 3" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Monto ($)</label>
+                    <input type="number" id="egreso-monto" min="0" placeholder="15000" required>
+                </div>
+                <div class="form-group">
+                    <label>Medio de Pago</label>
+                    <select id="egreso-medio" required>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-submit-admin" style="background:#991b1b; border-color:#f43f5e; color:white;">
+                REGISTRAR SALIDA DE DINERO
+            </button>
+        </form>
+
+        <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 15px 0;">
+        <div id="lista-egresos-admin"></div>
+    </section>
+
+</div>
+
+
+        <!-- MÓDULO: EMISOR DE ALERTAS Y NOTIFICACIONES -->
+<div id="sec-alertas" class="staff-modulo seccion-oculta-staff">
+    <section class="admin-card-panel" style="border-color: #2edae3;">
+        <h3 style="color:#2edae3; margin-top:0;">Emitir Alerta General</h3>
+        <form id="form-alerta-admin">
+            <div class="form-group">
+                <label>Título de la Alerta</label>
+                <input type="text" id="alerta-titulo" placeholder="Ej: Fecha Suspendida por Lluvia" required>
+            </div>
+            <div class="form-group">
+                <label>Mensaje / Detalle</label>
+                <textarea id="alerta-texto" rows="3" placeholder="Ej: Las canchas no están en condiciones. La Fecha 6 pasa al próximo fin de semana." required></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nivel de Urgencia</label>
+                    <select id="alerta-tipo" required>
+                        <option value="normal">Comunicado Normal</option>
+                        <option value="urgente">Alerta Urgente</option>
+                    </select>
+                </div>
+                <!-- <div class="form-group">
+                    <label>Tiempo / Referencia</label>
+                    <input type="text" id="alerta-tiempo" placeholder="Ej: Hace 5 min" value="Hace un momento">
+                </div> -->
+            </div>
+            <button type="submit" class="btn-submit-admin" style="background:#0891b2; border-color:#2edae3; color:white;">
+                PUBLICAR ALERTA EN LA APP
+            </button>
+        </form>
+    </section>
+
+    <section class="admin-card-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h3 style="color:#2edae3; margin-top:0; margin-bottom:0;">Historial de Avisos Emitidos</h3>
+            <button type="button" id="btn-vaciar-alertas-admin" style="background:#475569; color:#fff; border:none; padding:5px 10px; border-radius:3px; font-family:'Oswald'; font-size:10px; cursor:pointer;">Vaciar Historial</button>
+        </div>
+        <div id="lista-alertas-admin"></div>
+    </section>
+</div>
+
+        <!-- MÓDULO: AVISOS INTERNOS DEL STAFF (generados por el sistema, no es la campanita pública) -->
+<div id="sec-avisos-staff" class="staff-modulo seccion-oculta-staff">
+    <section class="admin-card-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h3 style="color:#2edae3; margin-top:0; margin-bottom:0;">Avisos Internos del Staff</h3>
+            <button type="button" id="btn-vaciar-avisos-staff" style="background:#475569; color:#fff; border:none; padding:5px 10px; border-radius:3px; font-family:'Oswald'; font-size:10px; cursor:pointer;">Vaciar Historial</button>
+        </div>
+        <p style="color:#869bd8; font-size:10px; margin-top:4px; margin-bottom:12px;">Avisos generados automáticamente por el sistema para que el staff los revise y corrija. No los ve el público.</p>
+        <div id="lista-avisos-staff"></div>
+    </section>
+</div>
 
     </main>
 
     <script src="JAVASCRIPT/data.js"></script>
+    <script src="JAVASCRIPT/playoffs.js"></script>
     <script src="JAVASCRIPT/admin.js"></script>
-    <script src="JAVASCRIPT/admin-planteles.js"></script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const tabs = document.querySelectorAll('.staff-tab-btn[data-target]');
-            const modulos = document.querySelectorAll('.staff-modulo');
-
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    modulos.forEach(m => m.classList.add('seccion-oculta-staff'));
-
-                    tab.classList.add('active');
-                    const target = tab.getAttribute('data-target');
-                    const moduloTarget = document.getElementById(target);
-                    if (moduloTarget) moduloTarget.classList.remove('seccion-oculta-staff');
-                });
-            });
-        });
-    </script>
+    <!-- MODAL FLOTANTE DE EMERGENCIA MÉDICA Y CONTACTOS -->
+<div id="modal-emergencia" class="modal-noticia-overlay seccion-oculta">
+    <div class="modal-equipo-card" style="max-width: 480px !important; background: rgba(4, 12, 38,0.98); border: 1px solid #f2c00e; box-shadow: 0 0 30px rgba(0,0,0,0.9);">
+        <span class="close-modal-equipo" id="btn-cerrar-modal-emergencia" style="cursor: pointer;">&times;</span>
+        <h3 style="color:#f2c00e; font-family:'Michroma'; font-size:14px; margin-top:0; border-bottom: 1px dashed rgba(242, 192, 14,0.3); padding-bottom: 8px;" id="emergencia-modal-titulo">
+            Ficha Médica y Contactos
+        </h3>
+        <div id="emergencia-modal-body" style="font-family:'Oswald'; font-size:11px; color:#cbd5e1; line-height:1.6; text-align:left; margin-top: 10px;">
+            <!-- Contenido inyectado por JS -->
+        </div>
+    </div>
+</div>
 </body>
 </html>
