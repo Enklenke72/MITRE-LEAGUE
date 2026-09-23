@@ -2420,16 +2420,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSubTesoPartidos = document.getElementById('btn-sub-teso-partidos');
     const btnSubTesoInscripciones = document.getElementById('btn-sub-teso-inscripciones');
     const btnSubTesoCaja = document.getElementById('btn-sub-teso-caja');
+    const btnSubTesoCalculadora = document.getElementById('btn-sub-teso-calculadora');
     const subVistaTesoPartidos = document.getElementById('sub-vista-teso-partidos');
     const subVistaTesoInscripciones = document.getElementById('sub-vista-teso-inscripciones');
     const subVistaTesoCaja = document.getElementById('sub-vista-teso-caja');
+    const subVistaTesoCalculadora = document.getElementById('sub-vista-teso-calculadora');
     const filtroTesoreriaFecha = document.getElementById('filtro-tesoreria-fecha');
     const filtroTesoreriaCancha = document.getElementById('filtro-tesoreria-cancha');
     const filtroInscripcionesCiclo = document.getElementById('filtro-inscripciones-ciclo');
 
     function ocultarTodasLasSubVistasTeso() {
-        [subVistaTesoPartidos, subVistaTesoInscripciones, subVistaTesoCaja].forEach(v => { if (v) v.classList.add('seccion-oculta-staff'); });
-        [btnSubTesoPartidos, btnSubTesoInscripciones, btnSubTesoCaja].forEach(b => { if (b) b.classList.remove('active'); });
+        [subVistaTesoPartidos, subVistaTesoInscripciones, subVistaTesoCaja, subVistaTesoCalculadora].forEach(v => { if (v) v.classList.add('seccion-oculta-staff'); });
+        [btnSubTesoPartidos, btnSubTesoInscripciones, btnSubTesoCaja, btnSubTesoCalculadora].forEach(b => { if (b) b.classList.remove('active'); });
     }
 
     if (btnSubTesoPartidos && btnSubTesoInscripciones) {
@@ -2454,6 +2456,16 @@ document.addEventListener('DOMContentLoaded', () => {
             btnSubTesoCaja.classList.add('active');
             if (subVistaTesoCaja) subVistaTesoCaja.classList.remove('seccion-oculta-staff');
             renderizarCajaPorFecha();
+        });
+    }
+
+    if (btnSubTesoCalculadora) {
+        btnSubTesoCalculadora.addEventListener('click', () => {
+            ocultarTodasLasSubVistasTeso();
+            btnSubTesoCalculadora.classList.add('active');
+            if (subVistaTesoCalculadora) subVistaTesoCalculadora.classList.remove('seccion-oculta-staff');
+            cargarConfigCalculadoraArancel();
+            calcularArancelRecomendado();
         });
     }
 
@@ -2922,18 +2934,51 @@ document.addEventListener('DOMContentLoaded', () => {
     // Suspensión de un jugador en la fecha de un partido: corre desde la fecha SIGUIENTE a la del acta y dura tantas fechas
     // como indica "puntosRestados" de la sanción "Sanción Disciplinaria" (decidido por Joaquín). Las fechas se cuentan sobre
     // las fechas que existen en el ciclo, en orden cronológico (los playoffs 108/104/102/100 van después de la fecha 7).
+    // Decisión de Joaquín (23/09/2026): una fecha sólo le descuenta suspensión al jugador si su
+    // equipo efectivamente jugó ese partido. Si el partido se suspende o no se juega, la sanción
+    // no corre y se arrastra a la fecha siguiente que sí se dispute.
     function suspensionVigenteDe(jugador, ciclo, fechaPartido) {
         const dni = soloDigitosDni(jugador.dni);
         if (dni === '') return null;
-        const fechas = [...new Set(partidos.filter(p => (p.ciclo || 'superior') === ciclo).map(p => Number(p.fecha)))]
-            .sort((a, b) => ordenCronologicoFecha(a) - ordenCronologicoFecha(b));
-        const posicion = f => fechas.filter(x => ordenCronologicoFecha(x) <= ordenCronologicoFecha(f)).length;
-        const posicionPartido = posicion(Number(fechaPartido));
+        const orden = f => ordenCronologicoFecha(Number(f));
+        const ordenPartido = orden(fechaPartido);
+
         return listaSanciones.find(s => {
             if (s.tipo !== 'Sanción Disciplinaria' || !(s.puntosRestados > 0) || s.levantada) return false;
             if (!s.jugadorId || soloDigitosDni(s.jugadorId) !== dni || (s.ciclo || 'superior') !== ciclo) return false;
-            const primeraFecha = posicion(Number(s.acta)) + 1;
-            return posicionPartido >= primeraFecha && posicionPartido < primeraFecha + Number(s.puntosRestados);
+
+            const ordenActa = orden(s.acta);
+            // La suspensión corre desde la fecha siguiente a la del acta.
+            if (ordenPartido <= ordenActa) return false;
+
+            // De qué lado juega el equipo sancionado en cada partido (null si no es suyo).
+            const nombreEquipo = (s.equipo || '').trim().toLowerCase();
+            const ladoDelEquipo = pp => {
+                if (s.equipoId != null) {
+                    if (pp.localId === s.equipoId) return 'local';
+                    if (pp.visitanteId === s.equipoId) return 'visita';
+                }
+                if (nombreEquipo === '') return null;
+                if ((pp.local || '').trim().toLowerCase() === nombreEquipo) return 'local';
+                if ((pp.visitante || '').trim().toLowerCase() === nombreEquipo) return 'visita';
+                return null;
+            };
+
+            const fechasCumplidas = new Set();
+            partidos.forEach(pp => {
+                if ((pp.ciclo || 'superior') !== ciclo || !pp.jugado) return;
+                const lado = ladoDelEquipo(pp);
+                if (!lado) return;
+                // Decisión de Joaquín (23/09/2026): si el equipo NO se presentó, esa fecha no le descuenta
+                // suspensión, aunque el partido figure jugado por el 3-0 automático del Art. 17 Bis. Si sí se
+                // presentó, el 3-0 sí cuenta: el jugador estuvo y cumplió la fecha.
+                const asistencia = (tesoreriaPartidos[claveTesoreria(pp, lado)] || {}).asistencia || '';
+                if (asistencia === 'sin_aviso' || asistencia === 'con_aviso') return;
+                const o = orden(pp.fecha);
+                if (o > ordenActa && o < ordenPartido) fechasCumplidas.add(Number(pp.fecha));
+            });
+
+            return fechasCumplidas.size < Number(s.puntosRestados);
         }) || null;
     }
 
@@ -3043,6 +3088,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function marcarAsistenciaBF(chk) {
         const p = partidos.find(x => String(x.id) === chk.dataset.pid);
         if (!p) return;
+
+        // Decisión de Joaquín (23/09/2026): un jugador suspendido no puede figurar en la lista de
+        // buena fe de esa fecha. Se bloquea sólo tildarlo: destildar siempre queda habilitado, por
+        // si el Tribunal carga la sanción después de que el staff ya lo había marcado presente.
+        if (chk.checked) {
+            const equipoChk = buscarEquipoBF(chk.dataset.equipo, chk.dataset.ciclo);
+            const jugadorChk = equipoChk && (equipoChk.jugadores || []).find(j => idJugadorBF(j) === chk.dataset.jid);
+            const suspChk = jugadorChk && suspensionVigenteDe(jugadorChk, chk.dataset.ciclo, p.fecha);
+            if (suspChk) {
+                chk.checked = false;
+                alert(`${jugadorChk.nombre} está suspendido en esta fecha (Acta ${suspChk.acta}): no puede jugar ni figurar en la lista de buena fe.`);
+                return;
+            }
+        }
+
         const campo = campoAsistentes(chk.dataset.lado);
         const resto = (p[campo] || []).filter(x => x !== chk.dataset.jid);
         p[campo] = chk.checked ? [...resto, chk.dataset.jid] : resto;
@@ -3541,6 +3601,166 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.getElementById('txt-total-egresos')) document.getElementById('txt-total-egresos').textContent = `-$${egresosTotal.toLocaleString()}`;
         if (document.getElementById('txt-saldo-neto')) document.getElementById('txt-saldo-neto').textContent = `$${neto.toLocaleString()}`;
     }
+
+    // ============================================================
+    // 7 bis. CALCULADORA DE ARANCEL RECOMENDADO (Solo Admin)
+    // Herramienta de planificación, no de registro: estima cuánto cobrarle
+    // a cada equipo ANTES de una jornada, para cubrir los egresos previstos
+    // de esa fecha puntual aunque falte un % de equipos, más un margen.
+    // No usa `liga_egresos` (esa lista es un histórico acumulado de todo el
+    // torneo, sin fecha por gasto, para el Balance Central de Caja) ni
+    // toca `liga_tesoreria_partidos_v2`: el arancel de cada partido lo
+    // sigue cargando el admin a mano en "Aranceles por Partido". Guarda su
+    // configuración aparte en `liga_calculadora_arancel`.
+    // ============================================================
+    let configCalculadoraArancel = JSON.parse(localStorage.getItem('liga_calculadora_arancel')) || {};
+
+    const CAMPOS_CALC_EGRESOS = ['calc-egreso-canchas', 'calc-egreso-arbitros', 'calc-egreso-pelotas', 'calc-egreso-premios', 'calc-egreso-otros'];
+    const elCalcCiclo = document.getElementById('calc-ciclo');
+    const elCalcCantidadEquipos = document.getElementById('calc-cantidad-equipos');
+    const elCalcRiesgoPct = document.getElementById('calc-riesgo-pct');
+    const elCalcMargenTipo = document.getElementById('calc-margen-tipo');
+    const elCalcMargenValor = document.getElementById('calc-margen-valor');
+    const elCalcMargenValorLabel = document.getElementById('calc-margen-valor-label');
+    const elCalcResultado = document.getElementById('calc-resultado-arancel');
+
+    function equiposCargadosPorCicloCalc(ciclo) {
+        if (ciclo === 'basico') return poolBasico.length;
+        if (ciclo === 'ambos') return poolSuperior.length + poolBasico.length;
+        return poolSuperior.length; // 'superior' por defecto
+    }
+
+    function autocompletarCantidadEquiposCalc() {
+        if (!elCalcCiclo || !elCalcCantidadEquipos) return;
+        const cantidad = equiposCargadosPorCicloCalc(elCalcCiclo.value);
+        elCalcCantidadEquipos.value = cantidad > 0 ? cantidad : 1;
+    }
+
+    function actualizarLabelMargenCalc() {
+        if (!elCalcMargenTipo || !elCalcMargenValorLabel) return;
+        elCalcMargenValorLabel.textContent = elCalcMargenTipo.value === 'fijo'
+            ? 'Ganancia deseada para la jornada ($)'
+            : 'Ganancia (%)';
+    }
+
+    function guardarConfigCalculadoraArancel() {
+        if (!elCalcCiclo) return;
+        const config = {
+            rubros: {},
+            ciclo: elCalcCiclo.value,
+            cantidadEquipos: parseFloat(elCalcCantidadEquipos.value) || 0,
+            riesgoPct: parseFloat(elCalcRiesgoPct.value) || 0,
+            margenTipo: elCalcMargenTipo.value,
+            margenValor: parseFloat(elCalcMargenValor.value) || 0
+        };
+        CAMPOS_CALC_EGRESOS.forEach(id => {
+            const el = document.getElementById(id);
+            config.rubros[id] = el ? (parseFloat(el.value) || 0) : 0;
+        });
+        configCalculadoraArancel = config;
+        localStorage.setItem('liga_calculadora_arancel', JSON.stringify(config));
+    }
+
+    // Rellena el formulario con la última configuración guardada. Si nunca se guardó una
+    // cantidad de equipos, se autocompleta con los equipos realmente cargados en el ciclo.
+    function cargarConfigCalculadoraArancel() {
+        const c = configCalculadoraArancel;
+        if (!elCalcCiclo) return;
+        if (c && c.rubros) {
+            CAMPOS_CALC_EGRESOS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && c.rubros[id] != null) el.value = c.rubros[id];
+            });
+        }
+        if (c && c.ciclo) elCalcCiclo.value = c.ciclo;
+        if (c && c.cantidadEquipos) {
+            elCalcCantidadEquipos.value = c.cantidadEquipos;
+        } else {
+            autocompletarCantidadEquiposCalc();
+        }
+        if (c && c.riesgoPct != null) elCalcRiesgoPct.value = c.riesgoPct;
+        if (c && c.margenTipo) elCalcMargenTipo.value = c.margenTipo;
+        if (c && c.margenValor != null) elCalcMargenValor.value = c.margenValor;
+        actualizarLabelMargenCalc();
+    }
+
+    // Fórmula: (egresos + ganancia) / (1 − riesgo%) / cantidad de equipos.
+    // Dividir por (1 − riesgo%) sube el arancel lo suficiente para que, aunque ese % de
+    // equipos no pague, lo recaudado entre los que sí pagan siga cubriendo egresos + ganancia.
+    function calcularArancelRecomendado() {
+        if (!elCalcResultado) return;
+
+        let egresosTotalJornada = 0;
+        CAMPOS_CALC_EGRESOS.forEach(id => {
+            const el = document.getElementById(id);
+            egresosTotalJornada += el ? (parseFloat(el.value) || 0) : 0;
+        });
+
+        const cantidadEquipos = Math.max(0, parseFloat(elCalcCantidadEquipos.value) || 0);
+        const riesgoPct = Math.min(90, Math.max(0, parseFloat(elCalcRiesgoPct.value) || 0));
+        const margenTipo = elCalcMargenTipo ? elCalcMargenTipo.value : 'porcentaje';
+        const margenValorIngresado = Math.max(0, parseFloat(elCalcMargenValor.value) || 0);
+
+        if (cantidadEquipos <= 0) {
+            elCalcResultado.innerHTML = '<p style="color:#f43f5e; text-align:center; font-size:12px;">Cargá la cantidad de equipos que juegan esa jornada para calcular.</p>';
+            return;
+        }
+
+        const margen = margenTipo === 'fijo' ? margenValorIngresado : egresosTotalJornada * (margenValorIngresado / 100);
+        const totalACubrir = egresosTotalJornada + margen;
+        const fraccionPaga = (100 - riesgoPct) / 100;
+        const totalARecaudarConRiesgo = fraccionPaga > 0 ? (totalACubrir / fraccionPaga) : totalACubrir;
+        const arancelPorEquipo = totalARecaudarConRiesgo / cantidadEquipos;
+        const arancelRedondeado = Math.ceil(arancelPorEquipo / 500) * 500;
+
+        const equiposQuePaganEnElPeorCaso = cantidadEquipos * fraccionPaga;
+        const recaudacionPeorCaso = arancelRedondeado * equiposQuePaganEnElPeorCaso;
+        const recaudacionSiPaganTodos = arancelRedondeado * cantidadEquipos;
+        const gananciaSiPaganTodos = recaudacionSiPaganTodos - egresosTotalJornada;
+
+        elCalcResultado.innerHTML = `
+            <div class="calc-arancel-card">
+                <div class="calc-arancel-linea"><span>Egresos estimados de la jornada</span><span>$${egresosTotalJornada.toLocaleString()}</span></div>
+                <div class="calc-arancel-linea"><span>+ Ganancia deseada${margenTipo === 'fijo' ? '' : ` (${margenValorIngresado}% sobre egresos)`}</span><span>$${Math.round(margen).toLocaleString()}</span></div>
+                <div class="calc-arancel-linea calc-total"><span>= Total a cubrir</span><span>$${Math.round(totalACubrir).toLocaleString()}</span></div>
+                <div class="calc-arancel-linea"><span>÷ (100% − ${riesgoPct}% de riesgo de ausencias)</span><span>$${Math.round(totalARecaudarConRiesgo).toLocaleString()}</span></div>
+                <div class="calc-arancel-linea"><span>÷ ${cantidadEquipos} equipo${cantidadEquipos === 1 ? '' : 's'}</span><span>$${Math.round(arancelPorEquipo).toLocaleString()}</span></div>
+            </div>
+            <div class="calc-arancel-resultado">
+                <span style="font-size:11px; color:#d8b4fe; text-transform:uppercase; letter-spacing:1px;">Arancel recomendado por equipo</span>
+                <span class="calc-monto">$${arancelRedondeado.toLocaleString()}</span>
+                <span style="font-size:10px; color:#a9bce8; display:block; margin-top:4px;">(redondeado a $500)</span>
+            </div>
+            <p class="calc-arancel-nota">
+                Si falta el ${riesgoPct}% de los equipos (${(cantidadEquipos - equiposQuePaganEnElPeorCaso).toFixed(1)} de ${cantidadEquipos}) y el resto paga este arancel, se recaudan $${Math.round(recaudacionPeorCaso).toLocaleString()} — igual cubre egresos + ganancia.<br>
+                Si juegan y pagan los ${cantidadEquipos} equipos, se recaudan $${recaudacionSiPaganTodos.toLocaleString()} y la ganancia real sube a $${Math.round(gananciaSiPaganTodos).toLocaleString()}.
+            </p>
+        `;
+    }
+
+    if (elCalcCiclo) {
+        elCalcCiclo.addEventListener('change', () => {
+            autocompletarCantidadEquiposCalc();
+            guardarConfigCalculadoraArancel();
+            calcularArancelRecomendado();
+        });
+    }
+    if (elCalcMargenTipo) {
+        elCalcMargenTipo.addEventListener('change', () => {
+            actualizarLabelMargenCalc();
+            guardarConfigCalculadoraArancel();
+            calcularArancelRecomendado();
+        });
+    }
+    [...CAMPOS_CALC_EGRESOS, 'calc-cantidad-equipos', 'calc-riesgo-pct', 'calc-margen-valor'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', () => {
+                guardarConfigCalculadoraArancel();
+                calcularArancelRecomendado();
+            });
+        }
+    });
 
     // ============================================================
     // 8. MÓDULO AVISOS Y ALERTAS

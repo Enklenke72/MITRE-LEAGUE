@@ -3465,6 +3465,21 @@ body::-webkit-scrollbar-thumb {
     padding: 6px 16px !important;
 }
 
+/* Columnas de foto y dorsal angostas: sin esto, el ancho de "auto layout" de la tabla
+   las infla para acompañar el resto de las columnas y queda un hueco vacío. */
+#tab-modal-jugadores td:first-child,
+#tab-modal-jugadores th:first-child {
+    width: 34px !important;
+    padding-left: 6px !important;
+    padding-right: 2px !important;
+}
+#tab-modal-jugadores td:nth-child(2),
+#tab-modal-jugadores th:nth-child(2) {
+    width: 26px !important;
+    padding-left: 2px !important;
+    padding-right: 4px !important;
+}
+
 /* Avatar del jugador en la tabla */
 .player-avatar-img {
     width: 26px !important;
@@ -3741,6 +3756,56 @@ body.rol-staff .solo-admin {
 /* Vista imprimible de la planilla de buena fe: en pantalla no se ve; al imprimir es lo único que sale */
 .teso-btn-imprimir { min-height: 40px; padding: 0 14px; border: 2px solid #2edae3; border-radius: 4px; background: #0a3a5c; color: #ffffff; font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.5px; cursor: pointer; touch-action: manipulation; }
 .teso-btn-imprimir:focus-visible { outline: 2px solid #f2c00e; outline-offset: 2px; }
+
+/* Calculadora de Arancel Recomendado (Tesorería, solo Admin) */
+.calc-arancel-card {
+    background: rgba(4, 12, 38, 0.8);
+    border: 1px solid #6b21a8;
+    border-radius: 5px;
+    padding: 14px 16px;
+}
+.calc-arancel-linea {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    color: #a9bce8;
+}
+.calc-arancel-linea:last-child { border-bottom: none; }
+.calc-arancel-linea.calc-total {
+    font-family: 'Michroma', sans-serif;
+    font-size: 12px;
+    color: #ffffff;
+    border-top: 1px solid rgba(168, 85, 247, 0.4);
+    margin-top: 4px;
+    padding-top: 12px;
+}
+.calc-arancel-resultado {
+    margin-top: 16px;
+    text-align: center;
+    padding: 18px;
+    border-radius: 5px;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(10, 29, 84, 0.9) 100%);
+    border: 2px dashed #a855f7;
+}
+.calc-arancel-resultado .calc-monto {
+    display: block;
+    font-family: 'Michroma', sans-serif;
+    font-size: 24px;
+    color: #a855f7;
+    margin-top: 6px;
+}
+.calc-arancel-nota {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    color: #869bd8;
+    line-height: 1.5;
+    margin-top: 12px;
+}
 #vista-imprimible { display: none; }
 
 @media print {
@@ -4233,6 +4298,18 @@ body.staff-page {
     margin-bottom: 25px;
     width: 100%;
     max-width: 1000px;
+    min-width: 0; /* flex-item de body.staff-page: sin esto, el <select> sin ancho de abajo empuja todo el panel a lo ancho en celus angostos */
+}
+
+/* Fila "Modo de Vista": el <select> no tiene ancho propio y en celus angostos
+   se pasaba de largo en vez de acomodarse (encontrado a 390px, 23/09/2026) */
+.staff-modo-vista {
+    flex-wrap: wrap;
+    row-gap: 8px;
+}
+
+.staff-modo-vista select {
+    max-width: 100%;
 }
 
 .staff-title {
@@ -4258,6 +4335,7 @@ body.staff-page {
     margin-bottom: 30px;
     width: 100%;
     max-width: 1000px;
+    min-width: 0;
 }
 
 .staff-tab-btn {

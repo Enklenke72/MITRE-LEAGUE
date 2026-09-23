@@ -13,7 +13,7 @@
         <h1 class="staff-title">MITRE LEAGUE — STAFF CONTROL</h1>
         <p class="staff-subtitle">Panel de Operaciones en Campo y Administración Central</p>
         <!-- Selector de Rol (Simulación de Permisos) -->
-    <div style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+    <div class="staff-modo-vista" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
         <span style="font-size: 11px; color: #869bd8;">Modo de Vista:</span>
         <select id="selector-rol-usuario" style="background: #0a1d54; color: #2edae3; border: 1px solid #2edae3; padding: 6px 12px; border-radius: 3px; font-family: 'Oswald', sans-serif; font-size: 11px; outline: none; cursor: pointer;">
             <option value="admin">Administrador (Acceso Total + Tesorería)</option>
@@ -884,6 +884,7 @@
         <button type="button" class="staff-tab-btn active" id="btn-sub-teso-partidos">Aranceles por Partido</button>
         <button type="button" class="staff-tab-btn" id="btn-sub-teso-inscripciones">Inscripciones por Jugador</button>
         <button type="button" class="staff-tab-btn solo-admin" id="btn-sub-teso-caja">Caja por Fecha</button>
+        <button type="button" class="staff-tab-btn solo-admin" id="btn-sub-teso-calculadora">Calculadora de Arancel</button>
     </div>
 
     <!-- BALANCE CENTRAL DE CAJA (Solo Admin) -->
@@ -984,6 +985,81 @@
             </div>
             <p style="font-size:11px; color:#869bd8; margin-top:-8px; margin-bottom:15px;">Cada pago cargado en Aranceles o Inscripciones queda registrado acá con el equipo, el monto, el medio y la hora exacta — útil para rastrear pagos parciales (ej. un equipo paga la mitad de la inscripción hoy y el resto más adelante).</p>
             <div id="contenedor-caja-por-fecha"></div>
+        </section>
+    </div>
+
+    <!-- SUB-VISTA D: CALCULADORA DE ARANCEL RECOMENDADO (Solo Admin) -->
+    <div id="sub-vista-teso-calculadora" class="seccion-oculta-staff solo-admin" style="width: 100%;">
+        <section class="admin-card-panel" style="border-color: #a855f7;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(168, 85, 247, 0.3); padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 style="color:#a855f7; margin:0;">Calculadora de Arancel Recomendado</h3>
+                <span style="font-size: 10px; color: #869bd8;">Rol: Administrador</span>
+            </div>
+            <p style="font-size:11px; color:#869bd8; margin-top:-8px; margin-bottom:15px;">Estimá cuánto cobrarle a cada equipo en una jornada para cubrir los egresos de esa fecha, aunque algunos equipos falten o no paguen, dejando además un margen de ganancia. Es una recomendación: el arancel de cada partido en "Aranceles por Partido" lo seguís cargando vos a mano.</p>
+
+            <h4 style="color:#fff; font-size:12px; margin:15px 0 8px;">1. Egresos estimados de la jornada</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Canchas ($)</label>
+                    <input type="number" id="calc-egreso-canchas" min="0" value="0" class="input-monto-teso" style="max-width:100% !important;">
+                </div>
+                <div class="form-group">
+                    <label>Árbitros ($)</label>
+                    <input type="number" id="calc-egreso-arbitros" min="0" value="0" class="input-monto-teso" style="max-width:100% !important;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pelotas / Insumos ($)</label>
+                    <input type="number" id="calc-egreso-pelotas" min="0" value="0" class="input-monto-teso" style="max-width:100% !important;">
+                </div>
+                <div class="form-group">
+                    <label>Premios ($)</label>
+                    <input type="number" id="calc-egreso-premios" min="0" value="0" class="input-monto-teso" style="max-width:100% !important;">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Otros ($)</label>
+                <input type="number" id="calc-egreso-otros" min="0" value="0" class="input-monto-teso" style="max-width:100% !important;">
+            </div>
+
+            <h4 style="color:#fff; font-size:12px; margin:20px 0 8px;">2. Equipos que juegan esa jornada</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciclo</label>
+                    <select id="calc-ciclo">
+                        <option value="superior">Ciclo Superior</option>
+                        <option value="basico">Ciclo Básico</option>
+                        <option value="ambos">Ambos ciclos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad de equipos</label>
+                    <input type="number" id="calc-cantidad-equipos" min="1" value="1" class="input-monto-teso" style="max-width:100% !important;">
+                </div>
+            </div>
+            <p style="font-size:10px; color:#5b6f9f; margin-top:-8px; margin-bottom:15px;">Se autocompleta con los equipos cargados en el ciclo elegido. Editalo si esa jornada no juegan todos (fecha libre, algún equipo eliminado en playoffs, etc.).</p>
+
+            <h4 style="color:#fff; font-size:12px; margin:20px 0 8px;">3. Riesgo de ausencias y ganancia</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Riesgo de ausencias / no pago (%)</label>
+                    <input type="number" id="calc-riesgo-pct" min="0" max="90" value="15" class="input-monto-teso" style="max-width:100% !important;">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de ganancia</label>
+                    <select id="calc-margen-tipo">
+                        <option value="porcentaje">% sobre los egresos</option>
+                        <option value="fijo">Monto fijo ($) para la jornada</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label id="calc-margen-valor-label">Ganancia (%)</label>
+                <input type="number" id="calc-margen-valor" min="0" value="20" class="input-monto-teso" style="max-width:100% !important;">
+            </div>
+
+            <div id="calc-resultado-arancel" style="margin-top:20px;"></div>
         </section>
     </div>
 

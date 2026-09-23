@@ -461,7 +461,7 @@ async function fase3extra() {
     const avisoDorsal = avisos.filter(a => a.tipo === 'dorsal_invalido_gol');
     check(avisoDorsal.length === 1, 'Se registró un único aviso interno por el dorsal inexistente', avisos.map(a => a.tipo));
     const det = avisoDorsal[0] ? avisoDorsal[0].detalle : '';
-    check(/#88/.test(det) && /4to 3ra/.test(det) && /Fecha 2/.test(det) && /6to 2da/.test(det),
+    check(/#88/.test(det) && /4to 3ra/.test(det) && /FECHA 2/i.test(det) && /6to 2da/.test(det),
         'El aviso trae dorsal, equipo, fecha y rival correctos', det);
     await tab('sec-avisos-staff');
     const panelAvisos = el('lista-avisos-staff');
@@ -557,8 +557,33 @@ async function tesoreriaChecks() {
     check(f1 && !f1.querySelector('.bf-tag-susp'), 'F1 (fecha del acta): no figura suspendido');
     check(f2 && /SUSPENDIDO · Acta 1 · 2 fechas/.test(f2.textContent), 'F2: figura "SUSPENDIDO · Acta 1 · 2 fechas"', f2 && f2.querySelector('.bf-tag-susp')?.textContent);
     check(f3 && /SUSPENDIDO/.test(f3.textContent), 'F3: sigue suspendido (2da fecha)');
-    // El #9 fue tildado en F2 y F3 (staff se equivocó) → fila roja
-    check(f3 && f3.classList.contains('bf-fila-alerta'), 'Suspendido y tildado → fila en rojo');
+    // El #9 quedó tildado en F2 y F3 desde antes de la sanción → fila roja
+    check(f3 && f3.classList.contains('bf-fila-alerta'), 'Suspendido que ya estaba tildado → fila en rojo');
+    // Regla nueva (23/09/2026): destildar a un suspendido se puede; volver a tildarlo no.
+    await abrirTeso(2);
+    const pSusp = P(2, '5to 2da', '7mo 1ra');
+    const chkSusp = () => D().querySelector(`.bf-chk-asist[data-pid="${pSusp.id}"][data-lado="local"][data-jid="${jug('5to 2da', 9).dni}"]`);
+    const c0 = chkSusp();
+    check(c0 && c0.checked, 'F2: el suspendido figura tildado de antes (el acta se cargó después)');
+    c0.checked = false; c0.dispatchEvent(new Event('change', { bubbles: true }));
+    await esperar(2);
+    check(!(P(2, '5to 2da', '7mo 1ra').asistentesLocal || []).includes(jug('5to 2da', 9).dni), 'Destildar a un jugador suspendido sigue permitido');
+    esperado.pj[jug('5to 2da', 9).dni] = (esperado.pj[jug('5to 2da', 9).dni] || 1) - 1;
+    const nAlertas = alertas.length;
+    const c1 = chkSusp();
+    c1.checked = true; c1.dispatchEvent(new Event('change', { bubbles: true }));
+    await esperar(2);
+    const guardadoTrasIntento = (P(2, '5to 2da', '7mo 1ra').asistentesLocal || []).includes(jug('5to 2da', 9).dni);
+    check(!guardadoTrasIntento && !chkSusp().checked && alertas.length > nAlertas && /suspendido/i.test(ultimaAlerta()),
+        'Tildar a un suspendido se bloquea: se destilda solo, avisa y no se guarda', { alerta: ultimaAlerta(), guardado: guardadoTrasIntento });
+    const otro = jug('5to 2da', 10);
+    const chkOtro = D().querySelector(`.bf-chk-asist[data-pid="${pSusp.id}"][data-lado="local"][data-jid="${otro.dni}"]`);
+    const estabaOtro = chkOtro.checked;
+    chkOtro.checked = !estabaOtro; chkOtro.dispatchEvent(new Event('change', { bubbles: true }));
+    await esperar(2);
+    check((P(2, '5to 2da', '7mo 1ra').asistentesLocal || []).includes(otro.dni) !== estabaOtro, 'Un jugador no suspendido se sigue tildando normal');
+    chkOtro.checked = estabaOtro; chkOtro.dispatchEvent(new Event('change', { bubbles: true }));
+    await esperar(2);
     // Planilla impresa F2
     await abrirTeso(2);
     el('btn-imprimir-planillas').click();
@@ -815,11 +840,11 @@ async function publica() {
             c1.click();
             const abierto = !c1.querySelector('.match-details-drawer').classList.contains('seccion-oculta');
             const txt = c1.querySelector('.match-details-drawer').textContent;
-            check(abierto && txt.includes(jug('4to 1ra', 0).nombre + ' (#0)') && /\(2\)/.test(txt), 'Desplegable del modal (F1) abre y muestra goleadores "(#0) (2)"', txt.replace(/\s+/g, ' ').trim());
+            check(abierto && txt.includes(jug('4to 1ra', 0).nombre + ' (#0)') && /x2/.test(txt) && !/\(2\)/.test(txt), 'Desplegable del modal (F1): goleadores con el formato nuevo "(#0) x2"', txt.replace(/\s+/g, ' ').trim());
             const drw = c1.querySelector('.match-details-drawer');
             const am = [...drw.querySelectorAll('.tarjeta-amarilla')].map(x => x.parentElement.textContent.replace(/\s+/g, ' ').trim());
             const ro = [...drw.querySelectorAll('.tarjeta-roja')].map(x => x.parentElement.textContent.replace(/\s+/g, ' ').trim());
-            check(am.some(t => t.includes(jug('4to 1ra', 5).nombre + ' (#5)') && /\(2\)/.test(t)) && am.some(t => t.includes(jug('5to 2da', 7).nombre)) && ro.some(t => t.includes(jug('5to 2da', 9).nombre + ' (#9)')), 'Desplegable del modal muestra las tarjetas del partido (2 amarillas #5, amarilla #7 rival, roja #9 rival)', { am, ro });
+            check(am.some(t => t.includes(jug('4to 1ra', 5).nombre + ' (#5)') && /x2/.test(t)) && am.some(t => t.includes(jug('5to 2da', 7).nombre)) && ro.some(t => t.includes(jug('5to 2da', 9).nombre + ' (#9)')), 'Desplegable del modal muestra las tarjetas del partido (2 amarillas #5, amarilla #7 rival, roja #9 rival)', { am, ro });
             const esperadoOrden = ['FECHA 1', 'FECHA 2', 'FECHA 3'];
             check(titulos.slice(0, 3).join('|') === esperadoOrden.join('|') && titulos.slice(3).every(t => !/10[0-8]/.test(t)) && titulos.indexOf(titulos.find(t => /CUARTOS/i.test(t))) < titulos.indexOf(titulos.find(t => /SEMI/i.test(t))), 'Modal: playoffs en orden y con nombre de ronda', titulos);
         }
@@ -842,7 +867,7 @@ async function publica() {
             card.click();
             const score = card.querySelector('.score-main')?.textContent;
             const cols = card.querySelectorAll('.split-col');
-            const cuenta = el => !el ? -1 : [...el.querySelectorAll('div')].filter(d => !d.querySelector('.tarjeta-ico')).reduce((a, d) => { const m = d.textContent.match(/\((\d+)\)\s*$/); const esGol = /\(#\d+\)/.test(d.textContent); return a + (esGol ? (m && !/\(#\d+\)\s*$/.test(d.textContent) ? +m[1] : 1) : 0); }, 0);
+            const cuenta = el => !el ? -1 : [...el.querySelectorAll('div')].filter(d => !d.querySelector('.tarjeta-ico')).reduce((a, d) => { const m = d.textContent.match(/x(\d+)\s*$/); const esGol = /\(#\d+\)/.test(d.textContent); return a + (esGol ? (m ? +m[1] : 1) : 0); }, 0);
             const gl = r.dl.filter(d => jug(r.L, d)).length, gv = r.dv.filter(d => jug(r.V, d)).length;
             if (score !== `${r.gl} - ${r.gv}` || cuenta(cols[0]) !== gl || cuenta(cols[1]) !== gv || card.querySelector('.match-details-drawer').classList.contains('seccion-oculta'))
                 malos.push({ p: r.L + ' vs ' + r.V, score, golesEnDesplegable: [cuenta(cols[0]), cuenta(cols[1])], esperado: [gl, gv] });
@@ -919,6 +944,18 @@ async function publica() {
 
 
 // ---------------- Sponsors (alta, ubicación, edición, orden, baja) ----------------
+
+// Espera a que la compresión termine (la vista previa recibe el dataURL). Con tiempo virtual un setTimeout fijo no alcanza.
+async function esperarPreview(idPreview, intentos = 200) {
+    for (let i = 0; i < intentos; i++) {
+        const prev = D().getElementById(idPreview);
+        if (prev && String(prev.src || '').indexOf('data:image/') === 0) return true;
+        await esperar(50);
+    }
+    out('  (no se cargó la vista previa ' + idPreview + ')');
+    return false;
+}
+
 let pesoLogoOriginal = 0;
 // Logo "de verdad": una imagen grande y ruidosa (PNG de varios MB), como la que mandaría un sponsor.
 function subirLogo(input) {
@@ -940,7 +977,7 @@ function subirLogo(input) {
             dt.items.add(archivo);
             input.files = dt.files;
             input.dispatchEvent(new Event('change', { bubbles: true }));
-            setTimeout(res, 1500);
+            setTimeout(res, 50);
         }, 'image/png');
     });
 }
@@ -962,7 +999,7 @@ async function altaSponsor(sp) {
     setv('sponsor-telefono', sp.telefono || '', false);
     setv('sponsor-link', sp.link || '', false);
     setv('sponsor-ubicacion', sp.ubicacion || '', false);
-    if (sp.conLogo) await subirLogo(el('sponsor-logo-file'));
+    if (sp.conLogo) { await subirLogo(el('sponsor-logo-file')); await esperarPreview('sponsor-logo-preview'); }
     await enviar('form-sponsor-admin');
     await esperar(3);
 }
@@ -1042,6 +1079,419 @@ async function sponsors() {
     await cargar('index.html');
     const tarjetas2 = [...D().querySelectorAll('#sponsors-track .sponsor-card-full')].map(t => t.querySelector('h4').textContent.trim());
     check(tarjetas2.length === 2 && tarjetas2.indexOf('Radio Local FM') === -1, 'El sponsor eliminado desaparece del carrusel público', tarjetas2);
+}
+
+
+// ---------------- Prensa (noticias y álbumes), egresos, balance, campanita y responsive ----------------
+function subirImagen(input, ancho, alto, espera) {
+    return new Promise(res => {
+        const w = W();
+        const canvas = w.document.createElement('canvas');
+        canvas.width = ancho; canvas.height = alto;
+        const ctx = canvas.getContext('2d');
+        const img = ctx.createImageData(ancho, alto);
+        for (let i = 0; i < img.data.length; i += 4) {
+            img.data[i] = (i * 11) % 255; img.data[i + 1] = (i * 17) % 255; img.data[i + 2] = (i * 23) % 255; img.data[i + 3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
+        canvas.toBlob(blob => {
+            pesoUltimaImagen = blob.size;
+            const archivo = new w.File([blob], 'foto.png', { type: 'image/png' });
+            const dt = new w.DataTransfer();
+            dt.items.add(archivo);
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            setTimeout(res, espera || 50);
+        }, 'image/png');
+    });
+}
+let pesoUltimaImagen = 0;
+
+async function prensa() {
+    out('\n=== PRENSA: noticias con foto, álbumes y galería ===');
+    await cargar('admin.html');
+    await tab('sec-prensa');
+    // Noticia sin foto: se rechaza
+    setv('noticia-titulo', 'Sin foto', false); setv('noticia-texto', 'prueba', false);
+    await enviar('form-noticia-admin');
+    check(/Falta la foto/.test(ultimaAlerta()) && (LS('liga_noticias') || []).length === 0, 'Noticia sin foto se rechaza', ultimaAlerta());
+    // Noticia 1: foto subida como archivo
+    setv('noticia-titulo', 'ARRANCÓ EL CLAUSURA', false);
+    setv('noticia-texto', 'Se jugó la primera fecha con las dos canchas llenas.', false);
+    setv('noticia-link-url', 'https://instagram.com/mitreleague', false);
+    setv('noticia-link-texto', 'VER FOTOS', false);
+    await subirImagen(el('noticia-foto-file'), 1800, 1200);
+    await esperarPreview('noticia-foto-preview');
+    const pesoOriginalNoticia = pesoUltimaImagen;
+    await enviar('form-noticia-admin');
+    // Noticia 2: foto por ruta de texto
+    setv('noticia-titulo', 'GOLEADA EN EL GRUPO B', false);
+    setv('noticia-texto', 'El 4to 2da se llevó el clásico.', false);
+    setv('noticia-foto', 'Recursos/Fotos/DSC05325.JPG', false);
+    await enviar('form-noticia-admin');
+    const noticias = LS('liga_noticias') || [];
+    check(noticias.length === 2, 'Se guardaron las 2 noticias', noticias.map(n => n.titulo));
+    const n1 = noticias[0] || {}, n2 = noticias[1] || {};
+    const pesoN1 = Math.round(String(n1.foto || '').length * 0.75);
+    check(String(n1.foto).indexOf('data:image/jpeg') === 0 && pesoN1 < pesoOriginalNoticia / 3, 'La foto subida se guarda comprimida (JPEG)', { originalKB: Math.round(pesoOriginalNoticia / 1024), guardadaKB: Math.round(pesoN1 / 1024) });
+    check(n2 && n2.foto === 'Recursos/Fotos/DSC05325.JPG' && n1.linkUrl === 'https://instagram.com/mitreleague' && n1.linkTexto === 'VER FOTOS', 'Noticia por ruta de texto y link guardados', { foto: n2.foto, link: n1.linkUrl, texto: n1.linkTexto });
+    check(D().getElementById('lista-noticias-admin').querySelectorAll('button').length >= 2, 'El panel lista las noticias con su botón');
+
+    // Álbumes: uno con portada subida y otro por ruta
+    setv('foto-album-titulo', 'Fecha 1 — Cancha 1', false);
+    await subirImagen(el('foto-album-portada-file'), 1600, 1000);
+    await esperarPreview('foto-album-portada-preview');
+    const pesoOriginalAlbum = pesoUltimaImagen;
+    setv('foto-album-link', 'https://drive.google.com/album1', false);
+    await enviar('form-fotos-admin');
+    setv('foto-album-titulo', 'Fecha 2 — Cancha 2', false);
+    setv('foto-album-portada', 'Recursos/Fotos/DSC05325.JPG', false);
+    setv('foto-album-link', 'https://drive.google.com/album2', false);
+    await enviar('form-fotos-admin');
+    const albumes = LS('liga_fotos_albumes') || [];
+    check(albumes.length === 2, 'Se guardaron los 2 álbumes', albumes.map(a => a.titulo));
+    const pesoAlb = albumes[0] ? Math.round(String(albumes[0].portada).length * 0.75) : 0;
+    check(albumes[0] && String(albumes[0].portada).indexOf('data:image/jpeg') === 0 && pesoAlb < pesoOriginalAlbum / 3, 'La portada subida se guarda comprimida', { originalKB: Math.round(pesoOriginalAlbum / 1024), guardadaKB: Math.round(pesoAlb / 1024) });
+    check(albumes[1] && albumes[1].portada === 'Recursos/Fotos/DSC05325.JPG', 'Álbum con portada por ruta de texto', albumes[1] && albumes[1].portada);
+    setv('foto-album-titulo', 'Sin portada', false);
+    await enviar('form-fotos-admin');
+    check(/Falta la foto de portada/.test(ultimaAlerta()) && (LS('liga_fotos_albumes') || []).length === 2, 'Álbum sin portada se rechaza', ultimaAlerta());
+
+    // Web pública: hero y galería
+    await cargar('index.html');
+    const tarjetasHero = [...D().querySelectorAll('.hero-card-3d')];
+    const dots = [...D().querySelectorAll('.hero-dot-3d')];
+    check(tarjetasHero.length === 2 && dots.length === 2, 'Hero: una tarjeta y un puntito por noticia (sin tarjetas fantasma)', { tarjetas: tarjetasHero.length, puntos: dots.length });
+    const titulosHero = tarjetasHero.map(t => t.querySelector('h2').textContent.trim());
+    check(titulosHero.includes('ARRANCÓ EL CLAUSURA') && titulosHero.includes('GOLEADA EN EL GRUPO B'), 'Hero muestra las noticias cargadas', titulosHero);
+    const fondo = tarjetasHero[0].querySelector('.hero-card-bg').getAttribute('style');
+    check(/data:image\/jpeg/.test(fondo), 'La foto subida se ve como fondo de la tarjeta del hero');
+    const btnNext = D().getElementById('next-hero');
+    check(btnNext && !btnNext.hidden, 'Con 2 noticias, las flechas del hero quedan visibles');
+    btnNext.click();
+    await esperar(3);
+    const centro = D().querySelector('.hero-card-3d.hero-center');
+    check(centro && centro.querySelector('h2').textContent.trim() === titulosHero[1], 'La flecha del hero pasa a la noticia siguiente', centro && centro.querySelector('h2').textContent.trim());
+    // Modal de noticia ampliada
+    D().querySelector('.hero-card-3d.hero-center').click();
+    await esperar(3);
+    const modalN = D().getElementById('modal-noticia');
+    const abiertoN = modalN && !modalN.classList.contains('seccion-oculta');
+    check(abiertoN && D().getElementById('modal-noticia-titulo').textContent.includes(titulosHero[1]), 'Clic en la tarjeta abre el modal de la noticia', D().getElementById('modal-noticia-titulo').textContent);
+    check(D().getElementById('modal-noticia-texto').textContent.length > 10 && D().getElementById('modal-noticia-img').src.length > 10, 'El modal trae texto y foto');
+    const linkModal = D().querySelector('#modal-noticia-link-container a');
+    D().querySelector('.close-modal-noticia').click();
+    check(modalN.classList.contains('seccion-oculta'), 'El modal de la noticia se cierra');
+    // Galería
+    const nav = D().querySelector('.nav-item[href="#pantalla-fotos"]');
+    if (nav) nav.click();
+    await esperar(3);
+    const tarjetasFoto = [...D().querySelectorAll('#galeria-fotos-grid .foto-card')];
+    check(tarjetasFoto.length === 2, 'Galería pública muestra los 2 álbumes', tarjetasFoto.length);
+    const titulosAlb = tarjetasFoto.map(t => t.querySelector('h4').textContent.trim());
+    const portadas = tarjetasFoto.map(t => t.querySelector('.foto-bg').getAttribute('style'));
+    check(titulosAlb.includes('Fecha 1 — Cancha 1') && portadas.some(x => /data:image\/jpeg/.test(x)) && portadas.some(x => /DSC05325/.test(x)), 'Los álbumes muestran su portada (subida y por ruta)', titulosAlb);
+    check(tarjetasFoto.every(t => /drive\.google\.com/.test(t.getAttribute('href'))), 'Cada álbum enlaza a su link', tarjetasFoto.map(t => t.getAttribute('href')));
+}
+
+async function finanzas() {
+    out('\n=== TESORERÍA: egresos y balance general ===');
+    await cargar('admin.html');
+    await tab('sec-tesoreria');
+    el('btn-sub-teso-partidos').click();
+    const teso = LS('liga_tesoreria_partidos_v2') || {};
+    const insc = LS('liga_tesoreria_inscripciones') || {};
+    const totalPartidos = Object.values(teso).reduce((a, v) => a + (v.ef || 0) + (v.tr || 0), 0);
+    const totalInsc = Object.values(insc).reduce((a, v) => a + (v.ef || 0) + (v.tr || 0), 0);
+    setv('egreso-concepto', 'varios', false);
+    setv('egreso-detalle', 'Pelotas y pecheras (corralón)', false);
+    setv('egreso-monto', '85000', false);
+    setv('egreso-medio', 'efectivo', false);
+    await enviar('form-egreso');
+    setv('egreso-concepto', 'arbitros', false);
+    setv('egreso-detalle', 'Terna Fecha 3', false);
+    setv('egreso-monto', '40000', false);
+    await enviar('form-egreso');
+    const egresos = LS('liga_egresos') || [];
+    check(egresos.length === 2 && egresos.reduce((a, e) => a + e.monto, 0) === 125000 && egresos.every(e => e.concepto && e.detalle), 'Se cargaron los 2 egresos ($125.000) con concepto y detalle', egresos.map(e => e.concepto + '/' + e.detalle + ':' + e.monto));
+    check(/Pelotas y pecheras/.test(el('lista-egresos-admin').textContent) && /Terna Fecha 3/.test(el('lista-egresos-admin').textContent), 'El panel lista los dos egresos', el('lista-egresos-admin').textContent.replace(/\s+/g,' ').trim().slice(0,110));
+    const num = t => Number(String(t).replace(/[^0-9-]/g, ''));
+    const balance = {
+        insc: num(el('txt-total-inscripciones').textContent),
+        partidos: num(el('txt-total-partidos').textContent),
+        egresos: num(el('txt-total-egresos').textContent),
+        neto: num(el('txt-saldo-neto').textContent)
+    };
+    check(balance.partidos === totalPartidos && balance.insc === totalInsc && Math.abs(balance.egresos) === 125000 && balance.neto === totalInsc + totalPartidos - 125000,
+        'Balance general: inscripciones + partidos - egresos = saldo neto', { balance, esperado: { insc: totalInsc, partidos: totalPartidos, egresos: 125000, neto: totalInsc + totalPartidos - 125000 } });
+    // Borrar un egreso
+    const btnBorrarEgreso = D().querySelector('#lista-egresos-admin button');
+    if (btnBorrarEgreso) { respuestaConfirm = true; btnBorrarEgreso.click(); await esperar(2); }
+    const egresos2 = LS('liga_egresos') || [];
+    check(egresos2.length === 1, 'Se puede eliminar un egreso', egresos2.map(e => e.concepto));
+    const balance2 = num(el('txt-total-egresos').textContent);
+    check(Math.abs(balance2) === egresos2.reduce((a, e) => a + e.monto, 0), 'El balance se actualiza al borrar un egreso', { enPantalla: balance2, guardado: egresos2.reduce((a, e) => a + e.monto, 0) });
+}
+
+async function campanita() {
+    out('\n=== CAMPANITA PÚBLICA: marcar leídos y limpiar ===');
+    await cargar('admin.html');
+    await tab('sec-alertas');
+    setv('alerta-titulo', 'Segundo aviso de prueba', false); setv('alerta-texto', 'Texto del segundo aviso.', false); setv('alerta-tipo', 'normal', false);
+    await enviar('form-alerta-admin');
+    check((LS('liga_notificaciones') || []).length === 2, 'Hay 2 avisos publicados', (LS('liga_notificaciones') || []).length);
+    await cargar('index.html');
+    const btnCamp = D().getElementById('btn-notificaciones-header') || D().getElementById('btn-notificaciones');
+    if (btnCamp) btnCamp.click();
+    await esperar(2);
+    const lista = D().getElementById('contenedor-lista-notificaciones');
+    check(lista && lista.querySelectorAll('.notif-item, div').length > 0 && /Segundo aviso/.test(lista.textContent), 'La campanita muestra los avisos', lista && lista.textContent.replace(/\s+/g, ' ').trim().slice(0, 80));
+    const badge = D().getElementById('badge-notificacion');
+    const badgeVisible = badge ? getComputedStyle(badge).display !== 'none' : false;
+    const btnLeido = D().getElementById('btn-marcar-leido');
+    if (btnLeido) btnLeido.click();
+    await esperar(2);
+    const trasLeer = LS('liga_notificaciones') || [];
+    check(trasLeer.every(n => n.leida), '"Marcar leídos" marca todos como leídos (ojo: el visitante escribe en la clave compartida)', { badgeAntes: badgeVisible, leidas: trasLeer.map(n => n.leida) });
+    const btnLimpiar = D().getElementById('btn-limpiar-notifs');
+    if (btnLimpiar) btnLimpiar.click();
+    await esperar(2);
+    check((LS('liga_notificaciones') || []).length === 0, '"Limpiar" vacía la campanita');
+    check(/No hay|sin avisos|Sin notificaciones/i.test(D().getElementById('contenedor-lista-notificaciones').textContent), 'La campanita vacía muestra su cartel', D().getElementById('contenedor-lista-notificaciones').textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
+    // El admin vuelve a publicar y el historial del panel se vacía con su propio botón
+    await cargar('admin.html');
+    await tab('sec-alertas');
+    setv('alerta-titulo', 'Aviso para vaciar', false); setv('alerta-texto', 'prueba', false);
+    await enviar('form-alerta-admin');
+    respuestaConfirm = false;
+    el('btn-vaciar-alertas-admin').click();
+    check((LS('liga_notificaciones') || []).length === 1, 'Cancelar "Vaciar Historial" del panel no borra');
+    respuestaConfirm = true;
+    el('btn-vaciar-alertas-admin').click();
+    await esperar(2);
+    check((LS('liga_notificaciones') || []).length === 0, '"Vaciar Historial" del panel borra los avisos');
+}
+
+async function responsive780() {
+    out('\n=== RESPONSIVE 769–799 px (franja nunca revisada) ===');
+    const anchoOriginal = marco.style.width;
+    marco.style.width = '780px';
+    await cargar('index.html');
+    await esperar(5);
+    const medir = (etiqueta) => {
+        const d = D();
+        const w = d.documentElement.clientWidth;
+        const desbordes = [...d.querySelectorAll('body *')]
+            .filter(e => getComputedStyle(e).display !== 'none')
+            .map(e => ({ e, r: e.getBoundingClientRect() }))
+            .filter(x => x.r.right > w + 2 && x.r.width > 0 && x.r.height > 0 && !/hero|sponsor/i.test(x.e.className || ''))
+            .map(x => (x.e.id ? '#' + x.e.id : x.e.tagName + '.' + [...x.e.classList].join('.')) + ' right=' + Math.round(x.r.right));
+        return { etiqueta, ancho: w, scroll: d.documentElement.scrollWidth, desbordes: [...new Set(desbordes)].slice(0, 6) };
+    };
+    const home = medir('home');
+    check(home.scroll <= home.ancho + 2, 'A 780 px la portada no desborda a lo ancho', home);
+    D().querySelector('.nav-item[href="#pantalla-tablas"]').click();
+    await esperar(3);
+    const tablas = medir('tablas');
+    check(tablas.scroll <= tablas.ancho + 2, 'A 780 px la pantalla de Posiciones no desborda', tablas);
+    const filas = D().querySelectorAll('.tbody-sup tr').length;
+    const ptsVisible = D().querySelector('.tbody-sup .td-pts-total');
+    check(filas > 0 && ptsVisible && ptsVisible.getBoundingClientRect().right <= D().documentElement.clientWidth + 2, 'A 780 px la columna PTS entra en pantalla', { filas, right: ptsVisible && Math.round(ptsVisible.getBoundingClientRect().right) });
+    D().querySelector('.nav-item[href="#pantalla-fixture"]').click();
+    await esperar(3);
+    const fix = medir('fixture');
+    check(fix.scroll <= fix.ancho + 2, 'A 780 px la pantalla de Partidos no desborda', fix);
+    const tp = D().getElementById('toggle-titulo-playoffs');
+    D().querySelector('.nav-item[href="#pantalla-tablas"]').click();
+    await esperar(2);
+    if (tp) tp.click();
+    await esperar(3);
+    const po = medir('playoffs');
+    check(po.scroll <= po.ancho + 2, 'A 780 px el bracket no desborda la página (scrollea dentro de su caja)', po);
+    marco.style.width = anchoOriginal;
+}
+
+
+// ---------------- Suspensión contada por fechas realmente jugadas ----------------
+async function suspensionPorFechasJugadas() {
+    out('\n=== SUSPENSIÓN: sólo descuenta la fecha que se jugó (regla nueva del 23/09/2026) ===');
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    const EQ = '7mo 1ra';
+    const rivales = { 4: '4to 1ra', 5: '5to 2da', 6: '6to 3ra', 7: '4to 1ra' };
+    for (const f of [4, 5, 6, 7]) await crearPartido(f, 'superior', 'A', EQ, rivales[f], 0);
+    const creados = [4, 5, 6, 7].every(f => !!P(f, EQ, rivales[f]));
+    check(creados, 'Se cargaron los partidos de las fechas 4 a 7 de ' + EQ);
+    // Fecha 4 jugada (es la fecha del acta)
+    const jugarFechaDe = async (f, gl, gv) => {
+        const partido = P(f, EQ, rivales[f]);
+        editarPartido(partido);
+        setv('goles-local', String(gl), false); setv('goles-visitante', String(gv), false);
+        setv('dorsales-goles-local', '', false); setv('dorsales-goles-visitante', '', false);
+        await enviar('form-partido');
+        await esperar(2);
+    };
+    await jugarFechaDe(4, 1, 0);
+    // Acta en la Fecha 4, 2 fechas de suspensión
+    await tab('sec-tribunal');
+    const suspendido = jug(EQ, 1);
+    setv('sancion-acta-num', '4', false); setv('sancion-ciclo', 'superior'); setv('sancion-equipo', EQ);
+    setv('sancion-jugador-id', suspendido.dni, false);
+    setv('sancion-tipo', 'Sanción Disciplinaria', false); setv('sancion-puntos', '2', false);
+    setv('sancion-motivo', 'Roja en la Fecha 4.', false);
+    await enviar('form-sancion');
+    const sancionCargada = (LS('liga_sanciones') || []).find(x => x.jugadorId === suspendido.dni && x.acta === '4');
+    check(!!sancionCargada, 'Acta 4 cargada con 2 fechas de suspensión', sancionCargada && { acta: sancionCargada.acta, fechas: sancionCargada.puntosRestados });
+
+    const marcaSusp = async f => {
+        await abrirTeso(f);
+        const partido = P(f, EQ, rivales[f]);
+        const fila = D().querySelector(`.bf-chk-asist[data-pid="${partido.id}"][data-lado="local"][data-jid="${suspendido.dni}"]`);
+        const contenedor = fila && fila.closest('.bf-fila');
+        return { susp: !!(contenedor && contenedor.querySelector('.bf-tag-susp')), texto: contenedor ? contenedor.textContent.replace(/\s+/g, ' ').trim().slice(0, 60) : 'sin fila' };
+    };
+    const f4 = await marcaSusp(4), f5 = await marcaSusp(5), f6 = await marcaSusp(6), f7 = await marcaSusp(7);
+    check(!f4.susp, 'Fecha 4 (la del acta): todavía no está suspendido', f4);
+    check(f5.susp, 'Fecha 5: suspendido (primera fecha de la sanción)', f5);
+    check(f6.susp, 'Fecha 6: sigue suspendido porque la Fecha 5 NO se jugó', f6);
+    check(f7.susp, 'Fecha 7: sigue suspendido (ninguna fecha se jugó todavía)', f7);
+    // Se juega la Fecha 5: cuenta 1 sola fecha cumplida
+    await tab('sec-jornada');
+    await jugarFechaDe(5, 2, 2);
+    const f6b = await marcaSusp(6), f7b = await marcaSusp(7);
+    check(f6b.susp, 'Con la Fecha 5 jugada: en la Fecha 6 sigue suspendido (lleva 1 de 2)', f6b);
+    check(f7b.susp, 'Con la Fecha 5 jugada: en la Fecha 7 sigue suspendido', f7b);
+    // Se juega la Fecha 6: cumple las 2
+    await tab('sec-jornada');
+    await jugarFechaDe(6, 0, 1);
+    const f7c = await marcaSusp(7);
+    check(!f7c.susp, 'Con las Fechas 5 y 6 jugadas: en la Fecha 7 queda libre', f7c);
+    const chkF7 = D().querySelector(`.bf-chk-asist[data-pid="${P(7, EQ, rivales[7]).id}"][data-lado="local"][data-jid="${suspendido.dni}"]`);
+    if (chkF7) { chkF7.checked = true; chkF7.dispatchEvent(new Event('change', { bubbles: true })); await esperar(2); }
+    check((P(7, EQ, rivales[7]).asistentesLocal || []).includes(suspendido.dni), 'Cumplida la suspensión, se lo puede volver a tildar en la lista');
+}
+
+// ---------------- Tabla Única (Bombos) ----------------
+async function tablaUnica() {
+    out('\n=== TABLA ÚNICA (Bombos) ===');
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    el('btn-sub-plantel-admin').click();
+    setv('mover-equipo-ciclo', 'superior');
+    for (const eq of SUP.C) {
+        setv('mover-equipo-select', eq, false);
+        setv('mover-equipo-nuevo-grupo', 'Unico', false);
+        el('btn-mover-equipo').click();
+        await esperar(2);
+    }
+    const movidos = (LS('liga_cicloSuperior') || []).filter(e => e.grupo === 'Unico').map(e => e.nombre);
+    check(movidos.length === 4, 'Los 4 equipos del Grupo C pasaron a Tabla Única', movidos);
+    // Sin activar el formato, la web pública NO debe mostrar la pestaña
+    await cargar('index.html');
+    const antes = [...D().querySelectorAll('.tabs-sup .tab-btn')].map(b => b.textContent.trim());
+    check(!antes.includes('Tabla Única'), 'Mover equipos solo no activa la pestaña: hace falta el toggle', antes);
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    el('btn-sub-plantel-admin').click();
+    setv('formato-torneo-superior', 'unico', false);
+    el('btn-guardar-formato-torneo').click();
+    await esperar(2);
+    check((LS('liga_formato_torneo') || {}).superior === 'unico', 'Formato del torneo guardado como Tabla Única', LS('liga_formato_torneo'));
+    await cargar('index.html');
+    const botones = [...D().querySelectorAll('.tabs-sup .tab-btn')].map(b => b.textContent.trim());
+    check(botones.includes('Tabla Única'), 'La web pública muestra la pestaña "Tabla Única"', botones);
+    [...D().querySelectorAll('.tabs-sup .tab-btn')].find(b => b.textContent.trim() === 'Tabla Única').click();
+    await esperar(2);
+    const filas = [...D().querySelectorAll('.tbody-sup tr')];
+    const nombres = filas.map(tr => tr.querySelector('.td-team-name').textContent.trim());
+    check(filas.length === 4 && nombres.every(n => SUP.C.includes(n)), 'La Tabla Única lista a los equipos movidos', nombres);
+    const clases = filas.map(tr => tr.querySelector('td').className);
+    check(clases.every(c => c === 'td-pos-bombo1'), 'Los 4 primeros quedan marcados como Bombo 1', clases);
+    const titulo = D().querySelector('.group-name-sup').textContent.trim();
+    const subtitulo = D().querySelector('.group-name-sup').nextElementSibling;
+    check(titulo === 'TABLA ÚNICA' && /Bombo 1/.test(subtitulo.textContent), 'Título y subtítulo de Bombos', { titulo, subtitulo: subtitulo.textContent.trim().slice(0, 60) });
+    const pts = filas.map(tr => Number(tr.querySelector('.td-pts-total').textContent));
+    check(pts.join(',') === [...pts].sort((a, b) => b - a).join(','), 'La Tabla Única queda ordenada por puntos', pts);
+}
+
+
+// ---------------- Regla del 3-0 automático en las suspensiones (23/09/2026) ----------------
+// Dos equipos con la MISMA sanción (acta 4, 2 fechas) y resultados opuestos en la misma fecha:
+// uno gana 3-0 estando presente (esa fecha le cuenta) y el otro pierde 3-0 por no presentarse (no le cuenta).
+async function suspension30() {
+    out('\n=== SUSPENSIÓN Y 3-0 AUTOMÁTICO: sólo cuenta la fecha si el equipo se presentó ===');
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    const X = '4to 2da';        // se presenta y gana 3-0
+    const Y = '6to 1ra';        // no se presenta y pierde 3-0
+    const rivalX = '5to 3ra';
+    const rivalY = '7mo 2da';
+    await crearPartido(5, 'superior', 'B', X, rivalX, 0);
+    await crearPartido(5, 'superior', 'B', Y, rivalY, 1);
+    await crearPartido(6, 'superior', 'B', X, Y, 2);
+    await crearPartido(7, 'superior', 'B', X, rivalY, 0);
+    await crearPartido(7, 'superior', 'B', Y, rivalX, 1);
+    check(!!P(5, X, rivalX) && !!P(5, Y, rivalY) && !!P(6, X, Y) && !!P(7, X, rivalY) && !!P(7, Y, rivalX), 'Se cargaron los partidos del escenario (fechas 5, 6 y 7 del Grupo B)');
+
+    // Sanciones iguales para los dos: acta en la Fecha 4, 2 fechas
+    await tab('sec-tribunal');
+    const jugX = jug(X, 5), jugY = jug(Y, 5);
+    for (const [equipo, jugador] of [[X, jugX], [Y, jugY]]) {
+        setv('sancion-acta-num', '4', false); setv('sancion-ciclo', 'superior'); setv('sancion-equipo', equipo);
+        setv('sancion-jugador-id', jugador.dni, false);
+        setv('sancion-tipo', 'Sanción Disciplinaria', false); setv('sancion-puntos', '2', false);
+        setv('sancion-motivo', `Roja en la Fecha 4 (${equipo}).`, false);
+        await enviar('form-sancion');
+    }
+    const sanciones = (LS('liga_sanciones') || []).filter(x => x.acta === '4' && x.tipo === 'Sanción Disciplinaria');
+    check(sanciones.length >= 2, 'Las dos sanciones quedaron cargadas con 2 fechas', sanciones.map(x => x.equipo + ':' + x.puntosRestados));
+
+    const marca = async (fecha, equipo, rival, lado, jugador) => {
+        await abrirTeso(fecha);
+        const partido = P(fecha, equipo, rival);
+        const chk = D().querySelector(`.bf-chk-asist[data-pid="${partido.id}"][data-lado="${lado}"][data-jid="${jugador.dni}"]`);
+        const fila = chk && chk.closest('.bf-fila');
+        return !!(fila && fila.querySelector('.bf-tag-susp'));
+    };
+
+    // Fecha 5: el rival de X no se presenta (X gana 3-0) y Y no se presenta (pierde 3-0)
+    await abrirTeso(5);
+    const p5X = P(5, X, rivalX), p5Y = P(5, Y, rivalY);
+    await asistencia(p5X.id, 'visita', 'sin_aviso');
+    await asistencia(p5X.id, 'local', 'presente');
+    await pagar(p5X.id, 'local', 'in-p-ef', 30000);
+    await asistencia(p5Y.id, 'local', 'sin_aviso');
+    await asistencia(p5Y.id, 'visita', 'presente');
+    await pagar(p5Y.id, 'visita', 'in-p-ef', 30000);
+    const p5Xd = P(5, X, rivalX), p5Yd = P(5, Y, rivalY);
+    check(p5Xd.jugado && p5Xd.resultadoAuto && p5Xd.golesLocal === 3 && p5Xd.golesVisitante === 0, `Fecha 5: ${X} gana 3-0 automático estando presente`, { goles: [p5Xd.golesLocal, p5Xd.golesVisitante], auto: p5Xd.resultadoAuto });
+    check(p5Yd.jugado && p5Yd.resultadoAuto && p5Yd.golesLocal === 0 && p5Yd.golesVisitante === 3, `Fecha 5: ${Y} pierde 3-0 automático por no presentarse`, { goles: [p5Yd.golesLocal, p5Yd.golesVisitante], auto: p5Yd.resultadoAuto });
+
+    check(await marca(5, X, rivalX, 'local', jugX), 'Fecha 5: el jugador de ' + X + ' está suspendido (primera fecha)');
+    check(await marca(5, Y, rivalY, 'local', jugY), 'Fecha 5: el jugador de ' + Y + ' está suspendido (primera fecha)');
+    check(await marca(6, X, Y, 'local', jugX), 'Fecha 6: ' + X + ' lleva 1 de 2 cumplidas (el 3-0 a favor contó) y sigue suspendido');
+    check(await marca(6, X, Y, 'visita', jugY), 'Fecha 6: ' + Y + ' lleva 0 de 2 (el 3-0 en contra NO contó) y sigue suspendido');
+
+    // Fecha 6: partido normal, los dos presentes (asistencia sin registrar = cuenta igual)
+    await tab('sec-jornada');
+    editarPartido(P(6, X, Y));
+    setv('goles-local', '1', false); setv('goles-visitante', '1', false);
+    setv('dorsales-goles-local', '', false); setv('dorsales-goles-visitante', '', false);
+    await enviar('form-partido');
+    await esperar(2);
+    check(P(6, X, Y).jugado && !P(6, X, Y).resultadoAuto, 'Fecha 6: partido normal jugado 1-1');
+
+    // Fecha 7: X cumplió las 2 (3-0 a favor + normal). Y sólo cumplió 1 (la del 3-0 en contra no cuenta).
+    const x7 = await marca(7, X, rivalY, 'local', jugX);
+    const y7 = await marca(7, Y, rivalX, 'local', jugY);
+    check(!x7, 'Fecha 7: ' + X + ' queda LIBRE — el 3-0 ganado estando presente sí descontó fecha');
+    check(y7, 'Fecha 7: ' + Y + ' sigue SUSPENDIDO — el 3-0 perdido por ausencia no descontó fecha');
+    const chk7 = D().querySelector(`.bf-chk-asist[data-pid="${P(7, Y, rivalX).id}"][data-lado="local"][data-jid="${jugY.dni}"]`);
+    if (chk7) { chk7.checked = true; chk7.dispatchEvent(new Event('change', { bubbles: true })); await esperar(2); }
+    check(!(P(7, Y, rivalX).asistentesLocal || []).includes(jugY.dni) && /suspendido/i.test(ultimaAlerta()), 'Fecha 7: al de ' + Y + ' todavía no se lo puede tildar', ultimaAlerta());
+    const chk7x = D().querySelector(`.bf-chk-asist[data-pid="${P(7, X, rivalY).id}"][data-lado="local"][data-jid="${jugX.dni}"]`);
+    if (chk7x) { chk7x.checked = true; chk7x.dispatchEvent(new Event('change', { bubbles: true })); await esperar(2); }
+    check((P(7, X, rivalY).asistentesLocal || []).includes(jugX.dni), 'Fecha 7: al de ' + X + ', ya libre, se lo puede tildar');
 }
 
 // ---------------- Casos borde al final ----------------
@@ -1137,8 +1587,15 @@ async function bordes() {
         await playoffs();
         await publica();
         await sponsors();
+        await prensa();
+        await finanzas();
+        await campanita();
+        await responsive780();
         localStorage.setItem('__snapshot', JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter(x => x.startsWith('liga_')).map(x => [x, localStorage.getItem(x)]))));
         await bordes();
+        await suspensionPorFechasJugadas();
+        await suspension30();
+        await tablaUnica();
     } catch (e) {
         out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
     }

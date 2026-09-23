@@ -1,0 +1,276 @@
+
+=== FASE 0: arranque limpio con la semilla real (data.js sin tocar) ===
+PASS Abrir admin con localStorage vacío NO debería guardar los partidos del torneo anterior  → {"partidosGuardados":0}
+PASS Crear el primer equipo del torneo nuevo debería dejar 1 solo equipo guardado  → {"equiposGuardados":1,"ejemplos":["Equipo Nuevo"]}
+  info: web pública con localStorage vacío y semilla real muestra 0 filas en la tabla del Grupo A (equipos del torneo anterior).
+
+=== FASE 1: grupos, equipos y jugadores (data.js vaciado, como pide 11.1 punto 8) ===
+PASS Gestor de grupos deja Superior A-B-C y Básico A  → {"superior":["A","B","C"],"basico":["A"]}
+PASS Se crearon 12 equipos Superior y 4 Básico  → {"sup":12,"bas":4}
+PASS Ids de equipo únicos
+PASS Cada equipo quedó en su grupo
+PASS Nombre de equipo repetido (mayúsculas/espacios) se rechaza  → "Ya existe un equipo con ese nombre."
+PASS Se cargaron 92 jugadores  → 92
+PASS Jugador con dorsal 0 guardado como número 0  → 0
+PASS Fichas de emergencia guardadas  → 23
+PASS Dorsal repetido en el equipo se rechaza  → "El número 5 ya lo tiene otro jugador de este equipo (los goles se cargan por número de camiseta)."
+PASS Tras un alta rechazada, el botón OK/Debe de ficha de la tabla sigue guardando  → {"antes":"no","despues":"si"}
+  (form form-jugador inválido para el navegador: jugador-dorsal)
+PASS Dorsal vacío se rechaza  → "El número de camiseta es obligatorio y va de 0 a 99."
+  (form form-jugador inválido para el navegador: jugador-dorsal)
+PASS Dorsal 100 se rechaza  → "El número de camiseta es obligatorio y va de 0 a 99."
+  (form form-jugador inválido para el navegador: jugador-dni)
+PASS Jugador sin DNI se rechaza (formulario de Planteles; el navegador lo frena si el campo es required)  → {"alerta":"¡Sin DNI añadido a 5to 2da!","guardadoSinValidarJS":true,"required":true}
+PASS DNI de otro equipo (escrito con puntos) pide confirmar traslado y al cancelar no mueve nada  → "Ignacio López (DNI 45009864) está inscripto en 7mo 3ra y todavía no jugó ningún partido con ese equipo. ¿Pasarlo a 7mo 2da? Se lo saca de 7mo 3ra."
+PASS Traslado aceptado: sale de 7mo 3ra y entra a 7mo 2da con #33  → {"dorsal":33,"ficha":"no"}
+PASS Tabla de Planteles muestra #0 para el dorsal 0  → "#0"
+PASS Al editar un jugador con dorsal 0 el campo muestra 0  → "0"
+PASS Editar jugador #0 (solo cambiar Instagram) se guarda sin error  → {"alerta":["¡Ficha de Mateo Pérez actualizada correctamente!"],"instagram":"arquero_cero","dorsal":0}
+PASS Botón OK/Debe de ficha en Planteles alterna la ficha  → {"antes":"si","despues":"no"}
+PASS Modal de emergencia (SOS) muestra el dorsal 0  → "(#0)"
+
+=== FASE 2: fixture (3 fechas, 3 grupos Superior + 1 Básico, sin resultados) ===
+PASS Se crearon 24 partidos  → 24
+PASS Todos pendientes, con ids de equipo, día y arancel  → 0
+PASS Partido con "horario a confirmar" guarda horario vacío  → 1
+PASS Ids de partido únicos
+PASS Equipo contra sí mismo se rechaza  → "¡Un equipo no puede jugar contra sí mismo!"
+
+=== FECHA 1: lista de buena fe + pagos + carga de resultados ===
+PASS F1: tildar jugadores marca solo al equipo "Se presentó"
+PASS F1: todos los partidos quedaron jugados  → []
+PASS F1: marcadores guardados como se cargaron  → []
+
+=== FECHA 2: lista de buena fe + pagos + carga de resultados ===
+PASS F2: tildar jugadores marca solo al equipo "Se presentó"
+PASS F2: todos los partidos quedaron jugados  → []
+PASS F2: marcadores guardados como se cargaron  → []
+
+=== FECHA 3: lista de buena fe + pagos + carga de resultados ===
+PASS F3: tildar jugadores marca solo al equipo "Se presentó"
+PASS F3: todos los partidos quedaron jugados  → []
+PASS F3: marcadores guardados como se cargaron  → []
+
+=== CASOS ESPECIALES DE CARGA ===
+PASS Goleadores con dorsal 0 repetido se agrupan: "(#0)" x2 y "(#5)" x1  → [{"nombre":"Mateo Pérez (#0)","cantidad":2},{"nombre":"Benjamín Ruiz (#5)","cantidad":1}]
+PASS Dos amarillas al mismo dorsal = dos entradas con su DNI  → ["45000274","45000274"]
+PASS Roja guardada con el DNI del jugador  → ["45001370"]
+PASS Al editar, goleadores y tarjetas se rellenan  → {"gol":"0, 0, 5","am":"5, 5","roja":"9"}
+PASS Guardar la edición sin cambios no duplica ni borra goles del #0  → 2
+PASS Editar 2-1 → 3-1 con un goleador más: contador correcto  → {"g7":3,"esperado":3}
+PASS Gol con dorsal inexistente (88): el resto del resultado se guarda igual que antes  → {"jugado":true,"marcador":[2,2],"goleadoresLocal":[{"nombre":"Lucas Romero (#5)","cantidad":1}],"goleadoresVisitante":[{"nombre":"Mateo Pérez (#1)","cantidad":1},{"nombre":"Thiago Rodríguez (#7)","cantidad":1}]}
+PASS Se registró un único aviso interno por el dorsal inexistente  → ["dorsal_invalido_gol"]
+PASS El aviso trae dorsal, equipo, fecha y rival correctos  → "Gol cargado con el dorsal #88 en 4to 3ra (FECHA 2 vs 6to 2da), pero no hay ningún jugador con ese número en el plantel."
+PASS La pestaña "Avisos Internos" muestra el aviso con su botón Eliminar  → "Gol cargado con el dorsal #88 en 4to 3ra (FECHA 2 vs 6to 2da), pero no hay ningún jugador con ese número en el plantel. Hace un momento Elim"
+PASS Cancelar "Vaciar Historial" no borra los avisos
+PASS "Vaciar Historial" borra los avisos internos  → "No hay avisos pendientes."
+PASS Tarjeta con dorsal inexistente se rechaza y no guarda nada  → "No hay ningún jugador con el número 77 en 4to 1ra (campo de tarjetas)."
+PASS Re-guardar el partido deja los goleadores iguales
+
+=== TESORERÍA: Art. 17 Bis, saldo a favor, deuda, suspensiones y planillas ===
+PASS Ausencia sin aviso + rival pagó 100% → 3-0 automático  → {"jugado":true,"auto":true,"g":[3,0]}
+PASS Sanción automática −2 al ausente que no pagó el 50%  → [["7mo 3ra",2,null]]
+PASS Tarjeta del ausente muestra chip −2 PTS
+PASS Pagó el 50% → quita levantada con fecha  → {"id":1790146090084,"acta":2,"fecha":2,"ciclo":"superior","equipo":"7mo 3ra","equipoId":1790146086614,"jugador":"","tipo":"Quita de Puntos","puntosRestados":0,"motivo":"Fecha 2 (vs 5to 1ra): no se presentó y no abonó el 50% del derecho de partido (Art. 17 Bis).","origenAuto":true,"claveTeso":"F2_1790146087944_visita_7mo 3ra","puntosOriginales":2,"levantada":true,"fechaLevantada":"23/09/2026"}
+PASS Saldo a favor de F1 ($10.000) se aplica en F2 y queda cancelado  → "Saldo a favor aplicado: -$10,000."
+PASS 6to 2da pagó $20.000 en F2 → F3 muestra "Arrastra deuda $10.000 (F2)"  → "Arrastra deuda de $10,000 (F2)"
+PASS Tesorería F3: el partido sin horario dice "A confirmar"  → [" FECHA 3 — Cancha 1 (A confirmar) Árbitro: Árbitro 1 Imprimir planilla "," FECHA 3 — Cancha 1 (14:20 hs) Árbitro: Árbitro 4 Imprimir planilla "]
+PASS Con 3 tildados aparece "Faltan 1 para poder jugar (mínimo 4)"  → "Faltan 1 para poder jugar (mínimo 4)"
+PASS Suspensión guardada con jugadorId (DNI) y "Nombre (#9)"  → {"jugador":"Lucas Romero (#9)","acta":"1","tipoActa":"string"}
+PASS F1 (fecha del acta): no figura suspendido
+PASS F2: figura "SUSPENDIDO · Acta 1 · 2 fechas"  → "SUSPENDIDO · Acta 1 · 2 fechas"
+PASS F3: sigue suspendido (2da fecha)
+PASS Suspendido que ya estaba tildado → fila en rojo
+PASS F2: el suspendido figura tildado de antes (el acta se cargó después)
+PASS Destildar a un jugador suspendido sigue permitido
+PASS Tildar a un suspendido se bloquea: se destilda solo, avisa y no se guarda  → {"alerta":"Lucas Romero está suspendido en esta fecha (Acta 1): no puede jugar ni figurar en la lista de buena fe.","guardado":false}
+PASS Un jugador no suspendido se sigue tildando normal
+PASS Imprimir planillas F2 genera 8 hojas (una por partido)  → {"hojas":8,"prints":1}
+PASS Planilla impresa marca al suspendido en la celda Firma
+PASS Planilla: 10 filas por equipo, sin columna Goles ni RESULTADO
+PASS Planilla impresa muestra el N° 0  → "0"
+PASS Alta en cancha con #0: queda en el plantel, ficha pendiente y tildado  → {"dorsal":0,"ficha":"no"}
+PASS Alta en cancha con DNI de un jugador que ya jugó en otro equipo se rechaza  → "Ese DNI ya está inscripto en 4to 1ra y ya jugó con ese equipo, por eso no puede jugar en otro."
+PASS Botón FALTA→OK de la lista de buena fe guarda la ficha  → "si"
+PASS Caja por Fecha: suma de movimientos = suma de pagos cargados  → {"totalCaja":1415000,"totalTeso":1415000}
+  info: Tesorería > total recaudado en partidos (tarjeta del Coordinador) = $1,415,000 | esperado $1,415,000
+PASS Rol Staff oculta elementos .solo-admin (cosmético)
+PASS Aviso publicado  → 1
+
+=== PLAYOFFS ===
+PASS Config del bracket guardada  → {"superior":{"rondaInicial":"cuartos","slots":4},"basico":{"rondaInicial":"semis","slots":2}}
+PASS Armador muestra solo las rondas vigentes del ciclo elegido  → ["semis","final"]
+PASS Se armaron 6 cruces  → 6
+PASS Pisar una llave ocupada pide confirmación y al cancelar no cambia
+PASS Ganador de Llave 1 avanza a Semis Llave 1 (local); el empate sin penales no avanza a nadie  → {"id":1790146091699,"ciclo":"superior","ronda":"semis","slot":1,"local":"6to 3ra","visitante":null}
+PASS Al editar un partido de playoff se ven los penales
+PASS Semis Llave 1 = G1 vs G2 (G2 ganó por penales)  → {"id":1790146091699,"ciclo":"superior","ronda":"semis","slot":1,"local":"6to 3ra","visitante":"4to 1ra"}
+PASS Semis Llave 2 = G3 vs G4  → {"id":1790146091737,"ciclo":"superior","ronda":"semis","slot":2,"local":"5to 1ra","visitante":"5to 2da"}
+PASS Final Superior armada sola  → {"id":1790146091765,"ciclo":"superior","ronda":"final","slot":1,"local":"6to 3ra","visitante":"5to 1ra"}
+PASS Final Básico armada sola  → {"id":1790146091807,"ciclo":"basico","ronda":"final","slot":1,"local":"3ro 1ra","visitante":"1ro 1ra"}
+PASS 10 partidos de playoff jugados  → 10
+PASS Playoffs publicados
+PASS Filtro de fechas del cronograma en orden cronológico (Cuartos antes que la Final)  → ["Todas las Fechas","Fecha 1","Fecha 2","Fecha 3","Cuartos de Final","Semifinal","Gran Final"]
+PASS Tesorería lista las fases en orden cronológico  → ["FECHA 1","FECHA 2","FECHA 3","CUARTOS DE FINAL","SEMIFINAL","GRAN FINAL"]
+
+=== WEB PÚBLICA (index.html) ===
+PASS Tabla Grupo A: orden, PTS y PJ correctos (PTS→DIF→GF, quita manual y 3-0 incluidos)  → {"web":["6to 3ra 7pts 3pj","4to 1ra 6pts 3pj","5to 2da 4pts 3pj","7mo 1ra 0pts 3pj"],"esperado":["6to 3ra 7pts 3pj","4to 1ra 6pts 3pj","5to 2da 4pts 3pj","7mo 1ra 0pts 3pj"]}
+PASS Grupo A: top 3 resaltado
+PASS Tabla Grupo B: orden, PTS y PJ correctos (PTS→DIF→GF, quita manual y 3-0 incluidos)  → {"web":["4to 2da 7pts 3pj","5to 3ra 4pts 3pj","7mo 2da 4pts 3pj","6to 1ra 0pts 3pj"],"esperado":["4to 2da 7pts 3pj","5to 3ra 4pts 3pj","7mo 2da 4pts 3pj","6to 1ra 0pts 3pj"]}
+PASS Grupo B: top 3 resaltado
+PASS Tabla Grupo C: orden, PTS y PJ correctos (PTS→DIF→GF, quita manual y 3-0 incluidos)  → {"web":["4to 3ra 7pts 3pj","5to 1ra 6pts 3pj","6to 2da 2pts 3pj","7mo 3ra 1pts 3pj"],"esperado":["4to 3ra 7pts 3pj","5to 1ra 6pts 3pj","6to 2da 2pts 3pj","7mo 3ra 1pts 3pj"]}
+PASS Grupo C: top 3 resaltado
+PASS Mejor 4° resaltado en su grupo  → {"esperado":"7mo 3ra","grupo":"C"}
+PASS Tabla Básico correcta  → {"web":["3ro 1ra 5","2do 2da 3","1ro 1ra 3","3ro 2da 2"],"esperado":["3ro 1ra 5","2do 2da 3","1ro 1ra 3","3ro 2da 2"]}
+PASS Goleadores Superior: el máximo coincide con lo cargado  → {"web":[{"n":"Ignacio López","e":"5to 2da","g":3},{"n":"Máximo Álvarez","e":"6to 3ra","g":3},{"n":"Valentín Sánchez","e":"4to 2da","g":3}],"esperadoMax":3,"candidatos":["Ignacio López","Máximo Álvarez","Valentín Sánchez"]}
+PASS Cada goleador del top 10 tiene la cantidad esperada  → []
+PASS Modal 4to 1ra: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal público muestra el dorsal #0  → "#0"
+  info: fechas en el modal de 4to 1ra: FECHA 1 | FECHA 2 | FECHA 3 | CUARTOS | SEMIFINAL
+PASS Desplegable del modal (F1): goleadores con el formato nuevo "(#0) x2"  → "Mateo Pérez (#0) x2Benjamín Ruiz (#5) Benjamín Ruiz (#5) x2 Lucas Romero (#9) Franco Fernández (#7) Lucas Romero (#9)"
+PASS Desplegable del modal muestra las tarjetas del partido (2 amarillas #5, amarilla #7 rival, roja #9 rival)  → {"am":["Benjamín Ruiz (#5) x2","Franco Fernández (#7)"],"ro":["Lucas Romero (#9)"]}
+PASS Modal: playoffs en orden y con nombre de ronda  → ["FECHA 1","FECHA 2","FECHA 3","CUARTOS","SEMIFINAL"]
+PASS Modal 5to 2da: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 4to 2da: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 5to 1ra: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 5to 1ra muestra el 3-0 automático
+PASS Modal 7mo 3ra: PJ / goles / amarillas / rojas por jugador  → []
+PASS Modal 7mo 3ra: banner "Quita levantada" en la F2
+PASS Modal 7mo 2da: PJ / goles / amarillas / rojas por jugador  → []
+PASS Fixture abre en la última fecha de grupos con resultados (Fecha 3)  → "Fecha 3"
+PASS Fixture Fecha 1: 8 partidos  → 8
+PASS Fixture Fecha 1: marcador y goleadores en cada desplegable  → []
+PASS Fixture Fecha 2: 8 partidos  → 8
+PASS Fixture Fecha 2: marcador y goleadores en cada desplegable  → []
+PASS Fixture Fecha 3: 8 partidos  → 8
+PASS Fixture Fecha 3: marcador y goleadores en cada desplegable  → []
+PASS Fixture público: botones de las 3 fechas y de las rondas de playoff con sus nombres  → ["1:Fecha 1","2:Fecha 2","3:Fecha 3","104:Cuartos","102:Semifinal","100:Final"]
+PASS Fixture: los Cuartos muestran sus 4 partidos, el título "Superior — CUARTOS" y sus goleadores  → {"partidos":4,"titulos":["Superior — CUARTOS"],"goleadoresLlave1":2}
+PASS Fixture: la Final muestra las dos finales (Superior y Básico)  → 2
+  info: playoffs en el fixture público: sin decidir (no se cuenta como falla).
+  info: "Últimos partidos" muestra: ULTIMOS PARTIDOS — FINAL —
+PASS El hero ya no trae la noticia fija "SE ACERCA LA FINAL"
+PASS Álbumes: sin semilla del torneo anterior, cartel de vacío y la web pública no escribe la clave  → {"guardado":null,"texto":"Todavía no hay álbumes publicados."}
+PASS Tribunal público: sin botones de acta duplicados  → ["Acta N° 1","Acta N° 2","Acta N° 3"]
+PASS Tribunal Acta 1: "2 fechas de suspensión" del #9  → " RESOLUCIONES OFICIALES — ACTA N° 1 5to 2da — Lucas Romero (#9) Sanción Disciplinaria (2 fechas de suspensión) \"Roja directa por juego brusco (F1).\" "
+  info: actas en el Tribunal: Acta N° 1, Acta N° 2, Acta N° 3 | tipos de acta guardados: number:2, string:1, string:2, string:3
+PASS Bracket Superior: campeón correcto  → {"web":"5to 1ra","esperado":"5to 1ra"}
+PASS Bracket Superior arranca en Cuartos  → ["CUARTOS","SEMIS","FINAL"]
+PASS Bracket: botón Octavos oculto y la pestaña activa es Cuartos  → {"octavosVisible":false,"activa":"cuartos"}
+PASS Bracket muestra los penales de los 2 partidos definidos por penales  → 4
+PASS Bracket completo sin casilleros "A definir"  → 0
+PASS Bracket Básico: campeón correcto (final por penales)  → {"web":"3ro 1ra","esperado":"3ro 1ra"}
+PASS Campanita muestra el aviso publicado
+PASS La campanita no mezcla los avisos de ejemplo cuando ya hay avisos reales  → " Fecha 4 suspendida por lluvia Se reprograma para el sábado siguiente. Hace un momento "
+PASS Buscador encuentra "7mo 3ra"  → ["7mo 3ra"]
+PASS Sin errores de JavaScript en toda la simulación  → 0
+
+=== SPONSORS: alta con logo, ubicación, edición, orden y baja ===
+PASS Admin arranca sin sponsors (semilla vacía)  → "Todavía no hay sponsors cargados."
+PASS Se guardaron los 3 sponsors  → ["Kiosco El Gol","Panadería La Mitre","Radio Local FM"]
+PASS Ubicación guardada: link, texto y vacía  → {"a":"https://maps.google.com/?q=kiosco+el+gol","b":"Av. Mitre 1234, Berazategui","c":""}
+PASS Sponsor completo: categoría, color, Instagram (sin @), teléfono, link y beneficio  → {"id":1790146094019,"orden":0,"nombre":"Kiosco El Gol","categoria":"Sponsor Oficial","descripcion":"Bebidas y snacks para las dos canchas.","beneficio":"10% de descuento presentando el carnet.","colorFondo":"#112233","instagram":"kioscoelgol","telefono":"221 555-0001","link":"https://kioscoelgol.com","ubicacion":"https://maps.google.com/?q=kiosco+el+gol","logo":"data:image/jpeg;base64,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"}
+PASS Logo grande subido se guarda comprimido (JPEG, mucho más liviano que el original)  → {"originalKB":3140,"guardadoKB":15,"formato":"data:image/jpeg"}
+PASS El logo se redimensiona a 500 px de lado máximo y sigue siendo una imagen válida  → {"ancho":500,"alto":333}
+PASS Sponsor sin logo usa el logo por defecto  → "Recursos/logo pelota fut.svg"
+PASS Orden asignado por alta (0, 1, 2)  → ["Kiosco El Gol:0","Panadería La Mitre:1","Radio Local FM:2"]
+PASS Al editar se precargan ubicación, Instagram y color  → {"ubicacion":"https://maps.google.com/?q=kiosco+el+gol","ig":"kioscoelgol"}
+PASS Editar guarda los cambios, conserva el logo y el orden, y no duplica  → {"desc":"Bebidas, snacks y hielo para las dos canchas.","ubi":"https://maps.google.com/?q=kiosco+nuevo","orden":0}
+PASS Botón Bajar reordena el sponsor  → ["Panadería La Mitre","Kiosco El Gol","Radio Local FM"]
+PASS Botón Subir lo devuelve al primer lugar  → ["Kiosco El Gol","Panadería La Mitre","Radio Local FM"]
+PASS Carrusel público muestra los 3 sponsors  → 3
+PASS Ubicación que arranca con http se muestra como link que abre en otra pestaña  → {"tag":"A","href":"https://maps.google.com/?q=kiosco+nuevo"}
+PASS Ubicación de texto se muestra sin link  → {"tag":"SPAN","txt":"Av. Mitre 1234, Berazategui"}
+PASS Sponsor sin ubicación no muestra nada  → null
+PASS Con Instagram y teléfono se muestran los dos  → ["@kioscoelgol","221 555-0001"]
+PASS Sin Instagram se muestra el teléfono  → ["221 555-0002"]
+PASS Color de fondo y categoría en la tarjeta pública  → "background-color: #112233;"
+PASS El logo comprimido se ve bien en la tarjeta del carrusel  → {"ancho":500,"alto":333}
+PASS Beneficio y "Más información" con el link del sponsor  → "10% de descuento presentando el carnet. Más información"
+PASS Cancelar la eliminación no borra el sponsor
+PASS Eliminar saca el sponsor de la lista  → ["Kiosco El Gol","Panadería La Mitre"]
+PASS El sponsor eliminado desaparece del carrusel público  → ["Kiosco El Gol","Panadería La Mitre"]
+
+=== PRENSA: noticias con foto, álbumes y galería ===
+PASS Noticia sin foto se rechaza  → "Falta la foto de la noticia: pegá una ruta/URL o subí un archivo."
+PASS Se guardaron las 2 noticias  → ["ARRANCÓ EL CLAUSURA","GOLEADA EN EL GRUPO B"]
+PASS La foto subida se guarda comprimida (JPEG)  → {"originalKB":1973,"guardadaKB":202}
+PASS Noticia por ruta de texto y link guardados  → {"foto":"Recursos/Fotos/DSC05325.JPG","link":"https://instagram.com/mitreleague","texto":"VER FOTOS"}
+PASS El panel lista las noticias con su botón
+PASS Se guardaron los 2 álbumes  → ["Fecha 1 — Cancha 1","Fecha 2 — Cancha 2"]
+PASS La portada subida se guarda comprimida  → {"originalKB":1313,"guardadaKB":113}
+PASS Álbum con portada por ruta de texto  → "Recursos/Fotos/DSC05325.JPG"
+  (form form-fotos-admin inválido para el navegador: foto-album-link)
+PASS Álbum sin portada se rechaza  → "Falta la foto de portada: pegá una ruta/URL o subí un archivo."
+PASS Hero: una tarjeta y un puntito por noticia (sin tarjetas fantasma)  → {"tarjetas":2,"puntos":2}
+PASS Hero muestra las noticias cargadas  → ["ARRANCÓ EL CLAUSURA","GOLEADA EN EL GRUPO B"]
+PASS La foto subida se ve como fondo de la tarjeta del hero
+PASS Con 2 noticias, las flechas del hero quedan visibles
+PASS La flecha del hero pasa a la noticia siguiente  → "GOLEADA EN EL GRUPO B"
+PASS Clic en la tarjeta abre el modal de la noticia  → "GOLEADA EN EL GRUPO B"
+PASS El modal trae texto y foto
+PASS El modal de la noticia se cierra
+PASS Galería pública muestra los 2 álbumes  → 2
+PASS Los álbumes muestran su portada (subida y por ruta)  → ["Fecha 2 — Cancha 2","Fecha 1 — Cancha 1"]
+PASS Cada álbum enlaza a su link  → ["https://drive.google.com/album2","https://drive.google.com/album1"]
+
+=== TESORERÍA: egresos y balance general ===
+PASS Se cargaron los 2 egresos ($125.000) con concepto y detalle  → ["varios/Pelotas y pecheras (corralón):85000","arbitros/Terna Fecha 3:40000"]
+PASS El panel lista los dos egresos  → "Pelotas y pecheras (corralón) (VARIOS) Medio: EFECTIVO -$85,000 Eliminar Terna Fecha 3 (ARBITROS) Medio: EFECT"
+PASS Balance general: inscripciones + partidos - egresos = saldo neto  → {"balance":{"insc":0,"partidos":1415000,"egresos":-125000,"neto":1290000},"esperado":{"insc":0,"partidos":1415000,"egresos":125000,"neto":1290000}}
+PASS Se puede eliminar un egreso  → ["arbitros"]
+PASS El balance se actualiza al borrar un egreso  → {"enPantalla":-40000,"guardado":40000}
+
+=== CAMPANITA PÚBLICA: marcar leídos y limpiar ===
+PASS Hay 2 avisos publicados  → 2
+PASS La campanita muestra los avisos  → "Segundo aviso de prueba Texto del segundo aviso. Hace un momento Fecha 4 suspend"
+PASS "Marcar leídos" marca todos como leídos (ojo: el visitante escribe en la clave compartida)  → {"badgeAntes":true,"leidas":[true,true]}
+PASS "Limpiar" vacía la campanita
+PASS La campanita vacía muestra su cartel  → "No hay alertas en el casillero."
+PASS Cancelar "Vaciar Historial" del panel no borra
+PASS "Vaciar Historial" del panel borra los avisos
+
+=== RESPONSIVE 769–799 px (franja nunca revisada) ===
+PASS A 780 px la portada no desborda a lo ancho  → {"etiqueta":"home","ancho":772,"scroll":772,"desbordes":["H2. right=1087","P. right=1087","H4. right=1005","P. right=1005","#modal-noticia right=780","#modal-equipo right=780"]}
+PASS A 780 px la pantalla de Posiciones no desborda  → {"etiqueta":"tablas","ancho":772,"scroll":772,"desbordes":["#modal-noticia right=780","#modal-equipo right=780"]}
+PASS A 780 px la columna PTS entra en pantalla  → {"filas":4,"right":701}
+PASS A 780 px la pantalla de Partidos no desborda  → {"etiqueta":"fixture","ancho":772,"scroll":772,"desbordes":["#modal-noticia right=780","#modal-equipo right=780"]}
+PASS A 780 px el bracket no desborda la página (scrollea dentro de su caja)  → {"etiqueta":"playoffs","ancho":772,"scroll":772,"desbordes":["DIV.bracket-round right=819","H4.round-title right=819","DIV.bracket-matches right=819","DIV.bracket-match right=819","DIV.team-row right=818","DIV. right=808"]}
+
+=== CASOS BORDE (al final, para no alterar lo anterior) ===
+PASS Inscripciones: 6 jugadores x $3.500 = $21.000  → "$21,000"
+PASS Inscripción pagada: AL DÍA y movimiento en la Caja
+PASS Baja de jugador después de pasar por otra pestaña: se borra de verdad  → {"alerta":"La ficha de Ignacio López fue eliminada.","sigueGuardado":false}
+PASS Cambiar el dorsal de un goleador (7→17) y re-guardar su partido conserva los 3 goles del partido  → {"campoRelleno":"17, 17, 9","goleadoresGuardados":[{"nombre":"Valentín Sánchez (#17)","cantidad":2},{"nombre":"Bautista Flores (#9)","cantidad":1}],"golesDelJugador":3}
+PASS Corregir el DNI de un jugador que ya jugó conserva sus asistencias (PJ)  → {"antes":3,"despues":3}
+  info: alerta al guardar Quita sin cantidad: Falta la cantidad: indicá cuántos puntos se restan.
+PASS Suspensión sin cantidad de fechas se rechaza  → {"alerta":"Falta la cantidad: indicá cuántas fechas dura la suspensión.","guardada":false}
+PASS Quita de Puntos con cantidad 0 se rechaza  → "Falta la cantidad: indicá cuántos puntos se restan."
+PASS Suspensión con 0 fechas se rechaza  → "Falta la cantidad: indicá cuántas fechas dura la suspensión."
+PASS Advertencia / Acta con 0 sigue aceptándose  → "¡Resolución publicada en el Acta N° 3!"
+PASS Quita de puntos con cantidad vacía no guarda NaN (rompería la tabla)
+
+=== SUSPENSIÓN: sólo descuenta la fecha que se jugó (regla nueva del 23/09/2026) ===
+PASS Se cargaron los partidos de las fechas 4 a 7 de 7mo 1ra
+PASS Acta 4 cargada con 2 fechas de suspensión  → {"acta":"4","fechas":2}
+PASS Fecha 4 (la del acta): todavía no está suspendido  → {"susp":false,"texto":"#1 Bruno Torres DNI 45002603 OK"}
+PASS Fecha 5: suspendido (primera fecha de la sanción)  → {"susp":true,"texto":"#1 Bruno Torres SUSPENDIDO · Acta 4 · 2 fechas DNI 45002603 "}
+PASS Fecha 6: sigue suspendido porque la Fecha 5 NO se jugó  → {"susp":true,"texto":"#1 Bruno Torres SUSPENDIDO · Acta 4 · 2 fechas DNI 45002603 "}
+PASS Fecha 7: sigue suspendido (ninguna fecha se jugó todavía)  → {"susp":true,"texto":"#1 Bruno Torres SUSPENDIDO · Acta 4 · 2 fechas DNI 45002603 "}
+PASS Con la Fecha 5 jugada: en la Fecha 6 sigue suspendido (lleva 1 de 2)  → {"susp":true,"texto":"#1 Bruno Torres SUSPENDIDO · Acta 4 · 2 fechas DNI 45002603 "}
+PASS Con la Fecha 5 jugada: en la Fecha 7 sigue suspendido  → {"susp":true,"texto":"#1 Bruno Torres SUSPENDIDO · Acta 4 · 2 fechas DNI 45002603 "}
+PASS Con las Fechas 5 y 6 jugadas: en la Fecha 7 queda libre  → {"susp":false,"texto":"#1 Bruno Torres DNI 45002603 OK"}
+PASS Cumplida la suspensión, se lo puede volver a tildar en la lista
+
+=== TABLA ÚNICA (Bombos) ===
+PASS Los 4 equipos del Grupo C pasaron a Tabla Única  → ["4to 3ra","5to 1ra","6to 2da","7mo 3ra"]
+PASS Mover equipos solo no activa la pestaña: hace falta el toggle  → ["Grupo A","Grupo B","Grupo C"]
+PASS Formato del torneo guardado como Tabla Única  → {"superior":"unico","basico":"grupos"}
+PASS La web pública muestra la pestaña "Tabla Única"  → ["Grupo A","Grupo B","Grupo C","Tabla Única"]
+PASS La Tabla Única lista a los equipos movidos  → ["4to 3ra","5to 1ra","6to 2da","7mo 3ra"]
+PASS Los 4 primeros quedan marcados como Bombo 1  → ["td-pos-bombo1","td-pos-bombo1","td-pos-bombo1","td-pos-bombo1"]
+PASS Título y subtítulo de Bombos  → {"titulo":"TABLA ÚNICA","subtitulo":"Clasificación a Playoffs: Bombo 1 (1° al 4°) | Bombo 2 (5° a"}
+PASS La Tabla Única queda ordenada por puntos  → [7,6,2,1]
+Veces que Editar partido dejó Local/Visitante vacíos (bug): 0
+
+RESUMEN: 226 PASS, 0 FAIL. Alertas: 230. Confirms: 14.
