@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_LADO_FOTO_JUGADOR = 250;
     const MAX_LADO_FOTO_NOTICIA = 1000;
     const MAX_LADO_LOGO_SPONSOR = 500;
+    const MAX_LADO_PORTADA_ALBUM = 800;
     const CALIDAD_JPEG = 0.75;
     const LIMITE_STORAGE_BYTES = 5 * 1024 * 1024;
 
@@ -220,6 +221,15 @@ document.addEventListener('DOMContentLoaded', () => {
         pesoId: 'noticia-foto-peso',
         btnQuitarId: 'btn-quitar-foto-noticia',
         maxLado: MAX_LADO_FOTO_NOTICIA
+    });
+
+    const portadaAlbumSubida = conectarSubidaFoto({
+        inputId: 'foto-album-portada-file',
+        previewWrapId: 'foto-album-portada-preview-wrap',
+        previewImgId: 'foto-album-portada-preview',
+        pesoId: 'foto-album-portada-peso',
+        btnQuitarId: 'btn-quitar-portada-album',
+        maxLado: MAX_LADO_PORTADA_ALBUM
     });
 
     const ETIQUETAS_STORAGE = {
@@ -362,6 +372,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (checkHorarioConfirmar) checkHorarioConfirmar.addEventListener('change', aplicarHorarioAConfirmar);
 
+    // Igual que el horario: con la casilla tildada el partido se guarda con cancha vacía
+    // ("Cancha a confirmar"). El select conserva su valor para cuando se destilda.
+    const checkCanchaConfirmar = document.getElementById('partido-cancha-confirmar');
+    function aplicarCanchaAConfirmar() {
+        const selectCancha = document.getElementById('partido-cancha');
+        if (!checkCanchaConfirmar || !selectCancha) return;
+        selectCancha.disabled = checkCanchaConfirmar.checked;
+    }
+
+    if (checkCanchaConfirmar) checkCanchaConfirmar.addEventListener('change', aplicarCanchaAConfirmar);
+
     // Selector de Fecha del Cronograma
     function actualizarSelectFechasCronograma() {
         if (!selectFiltroCronograma) return;
@@ -418,6 +439,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Filtrar Equipos para Cruces Libres en Playoffs
+    // Sólo se ofrecen los equipos que YA están puestos en el bracket de esa ronda: los que
+    // ganaron su llave anterior, o los que el staff sorteó a mano en el Armador. Un equipo
+    // eliminado no tiene que poder elegirse en la ronda siguiente. Si algún lado del cruce
+    // todavía no se definió, se muestra "A definir" (deshabilitado): hasta que no se juegue
+    // la llave anterior no hay equipo para cargar ahí.
     function filtrarEquiposPlayoffs() {
         recargarPools();
         const ciclo = cicloSelect ? cicloSelect.value : 'superior';
@@ -434,13 +460,50 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        pool.sort((a, b) => a.nombre.localeCompare(b.nombre));
-        pool.forEach(e => {
+        const fechaVal = parseInt(inputFechaPartido ? inputFechaPartido.value : 0);
+        const ronda = (typeof rondaPorCodigoFecha === 'function' ? rondaPorCodigoFecha(fechaVal) : null);
+        const crucesRonda = (JSON.parse(localStorage.getItem('liga_cruces_playoffs')) || [])
+            .filter(c => c.ciclo === ciclo && c.ronda === ronda);
+
+        // Sin cruces armados (ronda inicial antes del sorteo) se ofrece el plantel completo,
+        // que es el comportamiento de siempre: ahí todavía no hay bracket del que deducir nada.
+        let equipos = pool.slice();
+        let ladosSinDefinir = 0;
+
+        if (crucesRonda.length > 0) {
+            const clasificados = [];
+            crucesRonda.forEach(c => {
+                ['local', 'visitante'].forEach(lado => {
+                    if (c[lado]) {
+                        if (!clasificados.includes(c[lado])) clasificados.push(c[lado]);
+                    } else {
+                        ladosSinDefinir++;
+                    }
+                });
+            });
+            equipos = pool.filter(e => clasificados.includes(e.nombre));
+        }
+
+        equipos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+        if (equipos.length === 0) {
+            const vacio = '<option value="">Todavía no hay equipos clasificados a esta ronda</option>';
+            localSelect.innerHTML += vacio;
+            visitanteSelect.innerHTML += vacio;
+        }
+
+        equipos.forEach(e => {
             localSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
             visitanteSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
         });
 
-        if (visitanteSelect.options.length > 1) visitanteSelect.selectedIndex = 1;
+        if (ladosSinDefinir > 0) {
+            const pendiente = `<option value="" disabled>A definir (faltan jugarse ${ladosSinDefinir} lugar${ladosSinDefinir > 1 ? 'es' : ''} de esta ronda)</option>`;
+            localSelect.innerHTML += pendiente;
+            visitanteSelect.innerHTML += pendiente;
+        }
+
+        if (equipos.length > 1) visitanteSelect.selectedIndex = 1;
     }
 
     // Detección de Modo Regular vs Modo Playoffs en el Formulario
@@ -555,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(255,255,255,0.03); padding:8px 10px; margin-bottom:6px; border-radius:3px; border-left: 4px solid ${p.jugado ? '#2c68e7' : '#e11d48'};">
                     <div style="text-align:left;">
-                        <span style="font-size:9px; color:#869bd8; display:block;">${faseLabel} — ${p.dia ? p.dia + ' — ' : ''}${p.cancha || 'Cancha 1'} (${p.ciclo ? p.ciclo.toUpperCase() : 'SUP'})</span>
+                        <span style="font-size:9px; color:#869bd8; display:block;">${faseLabel} — ${p.dia ? p.dia + ' — ' : ''}${p.cancha || 'Cancha a confirmar'} (${p.ciclo ? p.ciclo.toUpperCase() : 'SUP'})</span>
                         <span style="font-size:12px; color:white;">${p.local} <strong style="color:#2edae3;">${marcador}</strong> ${p.visitante}</span>
                     </div>
                     <div style="display:flex; gap:5px;">
@@ -606,6 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('partido-horario').value = p.horario || '';
                     aplicarHorarioAConfirmar();
                     document.getElementById('partido-cancha').value = p.cancha || 'Cancha 1';
+                    if (checkCanchaConfirmar) checkCanchaConfirmar.checked = !p.cancha;
+                    aplicarCanchaAConfirmar();
                     document.getElementById('partido-arbitro-nombre').value = p.arbitro || '';
 
                     recargarPools();
@@ -687,6 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
             horario: inputHorarioPartido ? inputHorarioPartido.value : "14:20",
             horarioAConfirmar: checkHorarioConfirmar ? checkHorarioConfirmar.checked : false,
             cancha: selectCancha ? selectCancha.value : "Cancha 1",
+            canchaAConfirmar: checkCanchaConfirmar ? checkCanchaConfirmar.checked : false,
             arbitro: inputArbitro ? inputArbitro.value : "",
             arancel: inputArancel ? inputArancel.value : ""
         };
@@ -707,6 +773,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inputHorarioPartido) inputHorarioPartido.value = contexto.horario;
         aplicarHorarioAConfirmar();
         if (selectCancha) selectCancha.value = contexto.cancha;
+        if (checkCanchaConfirmar) checkCanchaConfirmar.checked = contexto.canchaAConfirmar;
+        aplicarCanchaAConfirmar();
         if (inputArbitro) inputArbitro.value = contexto.arbitro;
         if (inputArancel && contexto.arancel) inputArancel.value = contexto.arancel;
 
@@ -811,7 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // El gol no se asigna a nadie (decisión de Joaquín, 22/09/2026): el resto del resultado
                         // se guarda igual, pero queda un aviso para que el staff lo revise y corrija después.
                         registrarAvisoStaff('dorsal_invalido_gol',
-                            `Gol cargado con el dorsal #${dorsalStr} en ${equipoObj.nombre} (Fecha ${fechaVal} vs ${rivalNombre || 'rival a definir'}), pero no hay ningún jugador con ese número en el plantel.`);
+                            `Gol cargado con el dorsal #${dorsalStr} en ${equipoObj.nombre} (${nombreFaseTeso(fechaVal)} vs ${rivalNombre || 'rival a definir'}), pero no hay ningún jugador con ese número en el plantel.`);
                     }
                 });
 
@@ -851,7 +919,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 horario: (checkHorarioConfirmar && checkHorarioConfirmar.checked)
                     ? ''
                     : ((inputHorarioPartido ? inputHorarioPartido.value.trim() : '') || "14:20"),
-                cancha: document.getElementById('partido-cancha').value || "Cancha 1",
+                cancha: (checkCanchaConfirmar && checkCanchaConfirmar.checked)
+                    ? ''
+                    : (document.getElementById('partido-cancha').value || "Cancha 1"),
                 arbitro: document.getElementById('partido-arbitro-nombre').value.trim() || "Por asignar",
                 goleadoresLocal: arrayGolesLocal,
                 goleadoresVisitante: arrayGolesVisita,
@@ -2133,17 +2203,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (formFotos) {
         formFotos.addEventListener('submit', (e) => {
             e.preventDefault();
+            const portada = portadaAlbumSubida.dataURL || document.getElementById('foto-album-portada').value.trim();
+            if (!portada) {
+                alert('Falta la foto de portada: pegá una ruta/URL o subí un archivo.');
+                return;
+            }
+
             const nuevoAlbum = {
                 id: Date.now(),
                 titulo: document.getElementById('foto-album-titulo').value.trim(),
-                portada: document.getElementById('foto-album-portada').value.trim(),
+                portada: portada,
                 link: document.getElementById('foto-album-link').value.trim()
             };
 
+            const respaldo = listaFotosAlbumes.slice();
             listaFotosAlbumes.push(nuevoAlbum);
-            localStorage.setItem('liga_fotos_albumes', JSON.stringify(listaFotosAlbumes));
+            if (!guardarClaveConAviso('liga_fotos_albumes', JSON.stringify(listaFotosAlbumes))) {
+                listaFotosAlbumes = respaldo;
+                return;
+            }
             formFotos.reset();
+            portadaAlbumSubida.limpiar();
             actualizarListaFotosAdmin();
+            renderizarUsoStorage();
             alert('¡Álbum publicado con éxito!');
         });
     }
@@ -3167,7 +3249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const filtroFecha = filtroTesoreriaFecha ? filtroTesoreriaFecha.value : 'todas';
         const filtroCancha = filtroTesoreriaCancha ? filtroTesoreriaCancha.value : 'todas';
         let lista = filtroFecha === 'todas' ? [...partidos] : partidos.filter(p => p.fecha.toString() === filtroFecha.toString());
-        if (filtroCancha !== 'todas') lista = lista.filter(p => (p.cancha || 'Cancha 1') === filtroCancha);
+        if (filtroCancha !== 'todas') lista = lista.filter(p => (p.cancha || 'Cancha a confirmar') === filtroCancha);
         return lista;
     }
 
@@ -3194,7 +3276,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `
             <section class="plan-hoja">
                 <h2 class="plan-titulo">MITRE LEAGUE — Planilla de buena fe</h2>
-                <p class="plan-partido">${attrSeguro(p.local)} VS ${attrSeguro(p.visitante)} — ${attrSeguro(nombreFaseTeso(p.fecha))} — ${attrSeguro(p.cancha || 'Cancha 1')} — ${hora}</p>
+                <p class="plan-partido">${attrSeguro(p.local)} VS ${attrSeguro(p.visitante)} — ${attrSeguro(nombreFaseTeso(p.fecha))} — ${attrSeguro(p.cancha || 'Cancha a confirmar')} — ${hora}</p>
                 <div class="plan-equipos">${htmlPlanillaEquipo(p.local, ciclo, p.fecha)}${htmlPlanillaEquipo(p.visitante, ciclo, p.fecha)}</div>
             </section>`;
     }
@@ -3239,7 +3321,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `
                 <div class="teso-match-card">
                     <div class="teso-match-header">
-                        <span><strong>${faseLabel}</strong> — ${p.cancha || 'Cancha 1'} (${p.horario ? p.horario + ' hs' : 'A confirmar'})</span>
+                        <span><strong>${faseLabel}</strong> — ${p.cancha || 'Cancha a confirmar'} (${p.horario ? p.horario + ' hs' : 'A confirmar'})</span>
                         <span>Árbitro: <strong>${p.arbitro || 'Por Asignar'}</strong></span>
                         <button type="button" class="teso-btn-imprimir" data-pid="${p.id}">Imprimir planilla</button>
                     </div>
@@ -3362,7 +3444,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function actualizarFiltroCanchasTesoreria() {
         if (!filtroTesoreriaCancha) return;
         const valorActual = filtroTesoreriaCancha.value || 'todas';
-        const canchas = [...new Set(partidos.map(p => p.cancha || 'Cancha 1'))].sort();
+        const canchas = [...new Set(partidos.map(p => p.cancha || 'Cancha a confirmar'))].sort();
         filtroTesoreriaCancha.innerHTML = '<option value="todas">Todas las Canchas</option>' +
             canchas.map(c => `<option value="${attrSeguro(c)}">${attrSeguro(c)}</option>`).join('');
         filtroTesoreriaCancha.value = canchas.includes(valorActual) ? valorActual : 'todas';
@@ -3676,7 +3758,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contProximo.innerHTML = pendientes.length === 0
                 ? '<p style="color:#869bd8; font-size:11px;">No hay partidos pendientes cargados.</p>'
                 : `<p style="font-size:13px; color:#fff; font-weight:bold; margin:0 0 6px 0;">${pendientes[0].p.local} vs ${pendientes[0].p.visitante}</p>
-                   <p style="font-size:11px; color:#869bd8; margin:0;">${pendientes[0].p.dia || 'Sin fecha'} — ${pendientes[0].p.horario || 'Sin horario'} — ${pendientes[0].p.cancha || 'Sin cancha'}</p>`;
+                   <p style="font-size:11px; color:#869bd8; margin:0;">${pendientes[0].p.dia || 'Sin fecha'} — ${pendientes[0].p.horario || 'Sin horario'} — ${pendientes[0].p.cancha || 'Cancha a confirmar'}</p>`;
         }
 
         // Últimas sanciones

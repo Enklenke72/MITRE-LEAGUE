@@ -356,7 +356,7 @@
 
 <!-- SECCIÓN INFERIOR: ESTADÍSTICAS Y TABLA ANUAL COMPLETA -->
 <div class="seccion-tabla-anual seccion-oculta" style="margin-top: 40px; background: rgba(4, 12, 38,0.8); border: 1px solid #1a3274; padding: 20px; border-radius: 6px;">
-    <h2 style="font-family: 'Michroma', sans-serif; font-size: 14px; color: #fff; text-align: center; margin-top: 0; margin-bottom: 15px;"> TABLA ANUAL <br><span style="color: rgba(35, 177, 240, .8); border-top: 1px solid rgba(255,255,255,0.5);display: inline-block;
+    <h2 style="font-family: 'Michroma', sans-serif; font-size: 14px; color: #fff; text-align: center; margin-top: 0; margin-bottom: 15px;"> TABLA GENERAL <br><span style="color: rgba(35, 177, 240, .8); border-top: 1px solid rgba(255,255,255,0.5);display: inline-block;
 margin-top: 3px;"> Mitre League 2026</span></h2>
 
     <!-- FILTRO 1: CICLO -->
@@ -367,7 +367,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 
     <!-- FILTRO 2: MODO / METRICA -->
     <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 20px;">
-        <button class="tab-btn active btn-anual-criterio" data-criterio="puntos" style="font-size: 10px; border-color: #f2c00e; color: #f2c00e;">Tabla Anual (Puntos)</button>
+        <button class="tab-btn active btn-anual-criterio" data-criterio="puntos" style="font-size: 10px; border-color: #f2c00e; color: #f2c00e;">Tabla General (Puntos)</button>
         <button class="tab-btn btn-anual-criterio" data-criterio="gf" style="font-size: 10px; border-color: #4ade80; color: #4ade80;">Más Goles a Favor</button>
         <button class="tab-btn btn-anual-criterio" data-criterio="gc" style="font-size: 10px; border-color: #23b1f0; color: #23b1f0;">Valla Menos Vencida (Menos GC)</button>
     </div>
@@ -628,7 +628,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 
 
 
-            <!-- SECCIÓN 5: ADMIN / LOGIN STAFF (maqueta — sin lógica de validación, pendiente Firebase Auth) -->
+            <!-- SECCIÓN 5: ADMIN / LOGIN STAFF (enganche listo, autenticación real pendiente de crear el proyecto de Firebase — ver JAVASCRIPT/auth-login.js y Claude outputs/preparacion-login-firebase.md) -->
             <section id="pantalla-admin" class="login-staff-section">
                 <div class="login-staff-card">
                     <div class="login-staff-icono" aria-hidden="true">
@@ -636,18 +636,19 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                     </div>
                     <h2 class="login-staff-titulo">Panel de Control</h2>
                     <p class="login-staff-intro">Acceso exclusivo para Staff y Coordinación General del torneo.</p>
-                    <form class="login-staff-form" onsubmit="return false;" novalidate>
+                    <form id="form-login-staff" class="login-staff-form" novalidate>
                         <div class="form-group">
                             <label for="login-email">Email</label>
-                            <input type="email" id="login-email" name="login-email" placeholder="tu-email@ejemplo.com" autocomplete="username">
+                            <input type="email" id="login-email" name="login-email" placeholder="tu-email@ejemplo.com" autocomplete="username" required>
                         </div>
                         <div class="form-group">
                             <label for="login-password">Contraseña</label>
-                            <input type="password" id="login-password" name="login-password" placeholder="••••••••" autocomplete="current-password">
+                            <input type="password" id="login-password" name="login-password" placeholder="••••••••" autocomplete="current-password" required>
                         </div>
+                        <p id="login-staff-error" class="login-staff-error" role="alert"></p>
                         <button type="submit" class="btn-submit-admin">Iniciar Sesión</button>
                     </form>
-                    <p class="login-staff-nota">Maqueta de acceso — próximamente vía Firebase Authentication.</p>
+                    <p class="login-staff-nota">Acceso todavía no activado — falta crear el proyecto de Firebase.</p>
                 </div>
             </section>
 
@@ -677,6 +678,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 <script src="JAVASCRIPT/data.js"></script>
 <script src="JAVASCRIPT/playoffs.js"></script>
 <script src="JAVASCRIPT/main.js"></script>
+<script src="JAVASCRIPT/auth-login.js"></script>
 <!-- ==========================================
      MODAL LIGHTBOX DE NOTICIA AMPLIADA
      ========================================== -->
@@ -746,8 +748,8 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                             <th style="text-align: left;">JUGADOR</th>
                             <th>PJ</th>
                             <th style="color: #2edae3;">GOLES</th>
-                            <th style="color: #f2c00e;"></th>
-                            <th style="color: #f43f5e;"></th>
+                            <th style="color: #f2c00e;">A</th>
+                            <th style="color: #f43f5e;">R</th>
                             <th>INSTAGRAM</th>
                         </tr>
                     </thead>

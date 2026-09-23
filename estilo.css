@@ -2004,6 +2004,8 @@ body .top-bar {
     gap: 8px !important;
     z-index: 30 !important;
 }
+.hero-btn-nav[hidden],
+.hero-dots-container[hidden] { display: none !important; }
 
 /* 4. SPONSORS SEPARADOS (Sin encimarse con el Hero) */
 .sponsors-section {
@@ -3830,6 +3832,24 @@ body.rol-staff .solo-admin {
     align-items: stretch !important; /* 👈 iguala la altura de todas las columnas al contenido más alto, sin fijar un alto en px (rompía en mobile con menos partidos) */
 }
 
+/* Misma barra que la del body. Sin scrollbar-color: en Chrome anularía estas reglas. */
+.bracket-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+.bracket-scroll-container::-webkit-scrollbar-track {
+    background: rgba(4, 12, 38, 0.5);
+    border-radius: 4px;
+}
+.bracket-scroll-container::-webkit-scrollbar-thumb {
+    background: rgb(10, 29, 84);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+.bracket-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #2edae3;
+    box-shadow: 0 0 8px rgba(46, 218, 227, 0.8);
+}
+
 .bracket-round {
     display: flex !important;
     flex-direction: column !important;
@@ -3989,7 +4009,8 @@ body.rol-staff .solo-admin {
 .footer-contacto-popover {
     position: absolute;
     bottom: calc(100% + 12px);
-    left: 50%;
+    --popover-shift: 0px;
+    left: calc(50% + var(--popover-shift));
     transform: translateX(-50%) translateY(6px);
     width: 260px;
     max-width: 80vw;
@@ -4014,7 +4035,10 @@ body.rol-staff .solo-admin {
     content: "";
     position: absolute;
     top: 100%;
-    left: 50%;
+    /* La flechita tiene que seguir apuntando al botón aunque el cartel
+       se corra para no salirse de pantalla (--popover-shift), por eso
+       se mueve al revés que el cartel */
+    left: calc(50% - var(--popover-shift));
     transform: translateX(-50%);
     border-style: solid;
 }
@@ -4151,6 +4175,23 @@ body.rol-staff .solo-admin {
     font-size: 14px;
     letter-spacing: 1px;
     text-transform: uppercase;
+}
+
+.login-staff-form .btn-submit-admin:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.login-staff-error {
+    display: none;
+    color: #f87171;
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    margin: 0 0 14px;
+}
+
+.login-staff-error.visible {
+    display: block;
 }
 
 .login-staff-nota {

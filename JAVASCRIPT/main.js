@@ -310,12 +310,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         contenedor.innerHTML = ''; 
 
-        // 1. Si no le pasamos fecha, detecta automáticamente la última fecha con partidos en el sistema
-        // (excluye partidos de playoff: usan códigos 100/102/104/108 que son más altos que
-        // cualquier fecha real de temporada regular y rompían este cálculo con Math.max)
+        // 1. Si no le pasamos fecha, detecta automáticamente la última fecha con partidos en el sistema.
+        // Los playoffs entran en la cuenta: sus códigos (108/104/102/100) no se pueden comparar con
+        // Math.max porque van al revés, así que se ordenan con ordenCronologicoFechaPublico.
         if (!fechaSeleccionada) {
-            const ultimasFechas = ligaData.partidos.filter(p => !p.esPlayoff).map(p => p.fecha);
-            fechaSeleccionada = ultimasFechas.length > 0 ? Math.max(...ultimasFechas) : 1;
+            const fechasCargadas = ligaData.partidos.map(p => p.fecha);
+            fechaSeleccionada = fechasCargadas.length > 0
+                ? fechasCargadas.reduce((masReciente, f) =>
+                    ordenCronologicoFechaPublico(f) > ordenCronologicoFechaPublico(masReciente) ? f : masReciente)
+                : 1;
         }
 
         // 2. Buscamos el título principal del bloque en la Home/Fixture para ponerle la Fecha
@@ -326,13 +329,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (tituloSeccion) {
-            tituloSeccion.innerHTML = `ULTIMOS PARTIDOS <span style="font-size: 13px; color: #2edae3; font-family: 'Oswald'; display: block; margin-top: 10px;">— FECHA ${fechaSeleccionada} —</span>`;
+            tituloSeccion.innerHTML = `ULTIMOS PARTIDOS <span style="font-size: 13px; color: #2edae3; font-family: 'Oswald'; display: block; margin-top: 10px;">— ${nombreFechaPublico(fechaSeleccionada)} —</span>`;
         }
 
         const partidosFiltrados = ligaData.partidos.filter(partido => partido.fecha === fechaSeleccionada);
 
         if (partidosFiltrados.length === 0) {
-            contenedor.innerHTML = `<p style="color: #869bd8; font-size: 11px; text-align: center; padding: 18px;">No hay partidos cargados para la Fecha ${fechaSeleccionada}.</p>`;
+            contenedor.innerHTML = `<p style="color: #869bd8; font-size: 11px; text-align: center; padding: 18px;">No hay partidos cargados para ${nombreFechaPublico(fechaSeleccionada)}.</p>`;
             return;
         }
 
@@ -345,7 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         partidosFiltrados.forEach(partido => {
             const grupoActual = partido.grupo || 'A';
-            const infoSeparador = `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} - Grupo ${grupoActual}`;
+            const esDePlayoff = partido.esPlayoff || Number(partido.fecha) >= 100;
+            const infoSeparador = esDePlayoff
+                ? `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} — ${nombreFechaPublico(partido.fecha)}`
+                : `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} - Grupo ${grupoActual}`;
 
             if (infoSeparador !== ultimoSeparador) {
                 contenedor.innerHTML += `
@@ -371,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="score" style="color: #f43f5e; font-size: 13px;">VS<br>
                             ${partido.dia ? `<span class="match-meta-dia">${partido.dia}</span>` : ''}
                             <span style="font-size: 10px; color: #869bd8; display:block; margin-top:2px;">${partido.horario || 'Horario a confirmar'}</span>
-                            <span style="font-size: 9px; color: #2edae3; display:block; font-family:'Oswald',sans-serif; margin-top:1px;">${partido.cancha || 'Cancha 1'}</span>
+                            <span style="font-size: 9px; color: #2edae3; display:block; font-family:'Oswald',sans-serif; margin-top:1px;">${partido.cancha || 'Cancha a confirmar'}</span>
                         </span>
                         <span class="team-name">${partido.visitante}</span>
                     </div>
@@ -381,16 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-
-    // EVENTOS DE NAVEGACIÓN Y BOTONES
-    const botonesFecha = document.querySelectorAll('.tabs-fechas .tab-btn');
-    botonesFecha.forEach(boton => {
-        boton.addEventListener('click', () => {
-            botonesFecha.forEach(b => b.classList.remove('active'));
-            boton.classList.add('active');
-            renderizarResultados(parseInt(boton.getAttribute('data-fecha')));
-        });
-    });
 
     // ============================================================
     // RENDERIZADO DINÁMICO DE BOTONES DE GRUPOS EN LA WEB PÚBLICA
@@ -789,12 +785,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ============================================================
+    // DIBUJAR NOTICIAS DINÁMICAS DESDE LA MEMORIA EN EL HERO
+    // ============================================================
+    // Tiene que ir antes del carrusel: si no, las tarjetas nuevas quedan sin posición (invisibles) y sin clic.
+    const heroTrack = document.getElementById('hero-track-3d');
+    const noticiasGuardadas = JSON.parse(localStorage.getItem('liga_noticias')) || [];
+
+    if (heroTrack && noticiasGuardadas.length > 0) {
+        heroTrack.innerHTML = ''; // Limpiamos las noticias por defecto si cargaste nuevas
+
+        noticiasGuardadas.forEach(n => {
+            // Evaluamos si cargaste un link o no
+            let htmlLink = '';
+            if (n.linkUrl && n.linkUrl !== '') {
+                htmlLink = `<a href="${n.linkUrl}" class="hero-inline-link">${n.linkTexto}</a>`;
+            }
+
+            heroTrack.innerHTML += `
+                <div class="hero-card-3d">
+                    <div class="hero-card-bg" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.95)), url('${n.foto}');"></div>
+                    <div class="hero-card-content">
+                        <h2>${n.titulo}</h2>
+                        <p>${n.texto} ${htmlLink}</p>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // ============================================================
     // LÓGICA DEL HERO EN 3D
     // ============================================================
     const heroSlides3D    = document.querySelectorAll('.hero-card-3d');
     const heroBtnPrev3D   = document.getElementById('prev-hero');
     const heroBtnNext3D   = document.getElementById('next-hero');
     const heroDotsCont3D  = document.getElementById('hero-dots-3d');
+
+    const heroUnaSola = heroSlides3D.length <= 1;
+    [heroBtnPrev3D, heroBtnNext3D, heroDotsCont3D].forEach(el => { if (el) el.hidden = heroUnaSola; });
 
     if (heroSlides3D.length > 0 && heroBtnPrev3D && heroBtnNext3D) {
         let currentHero = 0;
@@ -965,35 +993,6 @@ document.addEventListener('DOMContentLoaded', () => {
             item.classList.toggle('active');
         });
     });
-
-    // ============================================================
-    // DIBUJAR NOTICIAS DINÁMICAS DESDE LA MEMORIA EN EL HERO
-    // ============================================================
-    const heroTrack = document.getElementById('hero-track-3d');
-    const noticiasGuardadas = JSON.parse(localStorage.getItem('liga_noticias')) || [];
-
-    if (heroTrack && noticiasGuardadas.length > 0) {
-        heroTrack.innerHTML = ''; // Limpiamos las noticias por defecto si cargaste nuevas
-
-        noticiasGuardadas.forEach(n => {
-            // Evaluamos si cargaste un link o no
-            let htmlLink = '';
-            if (n.linkUrl && n.linkUrl !== '') {
-                htmlLink = `<a href="${n.linkUrl}" class="hero-inline-link">${n.linkTexto}</a>`;
-            }
-
-            heroTrack.innerHTML += `
-                <div class="hero-card-3d">
-                    <div class="hero-card-bg" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.95)), url('${n.foto}');"></div>
-                    <div class="hero-card-content">
-                        <h2>${n.titulo}</h2>
-                        <p>${n.texto} ${htmlLink}</p>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
 
     // ============================================================
     // TRIBUNAL DE DISCIPLINA DESPLEGABLE
@@ -1434,13 +1433,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const esJugado = partido.jugado;
             const horarioTxt = partido.horario || 'Horario a confirmar';
-            const canchaTxt = partido.cancha || 'Cancha 1';
+            const canchaTxt = partido.cancha || 'Cancha a confirmar';
             const diaTxt = partido.dia || '';
 
             // Goles y Tarjetas Local
             let htmlLocal = '';
             if (partido.goleadoresLocal && partido.goleadoresLocal.length > 0) {
-                htmlLocal += partido.goleadoresLocal.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `(${g.cantidad})` : ''}</div>`).join('');
+                htmlLocal += partido.goleadoresLocal.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
             }
             htmlLocal += htmlTarjetasPartido(partido, 'local');
             if (!htmlLocal && esJugado) htmlLocal = '<div style="opacity: 0.4;">Sin incidencias</div>';
@@ -1448,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Goles y Tarjetas Visitante
             let htmlVisita = '';
             if (partido.goleadoresVisitante && partido.goleadoresVisitante.length > 0) {
-                htmlVisita += partido.goleadoresVisitante.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `(${g.cantidad})` : ''}</div>`).join('');
+                htmlVisita += partido.goleadoresVisitante.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
             }
             htmlVisita += htmlTarjetasPartido(partido, 'visitante');
             if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin incidencias</div>';
@@ -2032,7 +2031,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `FECHA ${fecha}`;
     }
 
-    // Tarjetas de un lado del partido con el mismo formato que los goleadores ("Nombre (#N)", y "(2)" si tiene más de una).
+    // Tarjetas de un lado del partido con el mismo formato que los goleadores ("Nombre (#N)", y "x2" si tiene más de una).
     // En el partido se guarda el DNI de cada jugador: acá se busca el nombre y el dorsal en el plantel.
     function htmlTarjetasPartido(partido, lado) {
         const esLocal = lado === 'local';
@@ -2048,7 +2047,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return Object.keys(cantidades).map(id => {
                 const jugador = (equipo.jugadores || []).find(j => j.dni === id);
                 if (!jugador) return '';
-                return `<div><span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>${jugador.nombre} (#${jugador.dorsal}) ${cantidades[id] > 1 ? `(${cantidades[id]})` : ''}</div>`;
+                return `<div><span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>${jugador.nombre} (#${jugador.dorsal}) ${cantidades[id] > 1 ? `x${cantidades[id]}` : ''}</div>`;
             }).join('');
         }).join('');
     }
@@ -2097,7 +2096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><img src="${fotoUrl}" alt="${j.nombre}" class="player-avatar-img"></td>
                         <td style="color: #869bd8; font-size: 11px; text-align: center;">${dorsal}</td>
                         <td style="text-align: left !important; color: #fff; font-weight: bold;">${j.nombre}</td>
-                        <td style="text-align: center;">${partidosJugadosDeJugador(j, equipo, partidosParaPJ)}</td>
+                        <td style="text-align: center; color:#fff;">${partidosJugadosDeJugador(j, equipo, partidosParaPJ)}</td>
                         <td style="color: #2edae3; font-weight: bold; text-align: center;">${j.goles || 0}</td>
                         <td style="color: #f2c00e; text-align: center;">${tarjetasDeJugador(j, equipo, partidosParaPJ).amarillas}</td>
                         <td style="color: #f43f5e; text-align: center;">${tarjetasDeJugador(j, equipo, partidosParaPJ).rojas}</td>
@@ -2131,13 +2130,13 @@ document.addEventListener('DOMContentLoaded', () => {
             misPartidos.forEach(partido => {
                 const esJugado = partido.jugado;
                 const horarioTxt = partido.horario || 'Horario a confirmar';
-                const canchaTxt = partido.cancha || 'Cancha 1';
+                const canchaTxt = partido.cancha || 'Cancha a confirmar';
                 const diaTxt = partido.dia || '';
 
                 // Incidencias Local
                 let htmlLocal = '';
                 if (partido.goleadoresLocal && partido.goleadoresLocal.length > 0) {
-                    htmlLocal += partido.goleadoresLocal.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `(${g.cantidad})` : ''}</div>`).join('');
+                    htmlLocal += partido.goleadoresLocal.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
                 }
                 htmlLocal += htmlTarjetasPartido(partido, 'local');
                 if (!htmlLocal && esJugado) htmlLocal = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';
@@ -2145,7 +2144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Incidencias Visitante
                 let htmlVisita = '';
                 if (partido.goleadoresVisitante && partido.goleadoresVisitante.length > 0) {
-                    htmlVisita += partido.goleadoresVisitante.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `(${g.cantidad})` : ''}</div>`).join('');
+                    htmlVisita += partido.goleadoresVisitante.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
                 }
                 htmlVisita += htmlTarjetasPartido(partido, 'visitante');
                 if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';
@@ -2261,10 +2260,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     const footerFirmaWrapper = document.querySelector('.footer-firma-wrapper');
     const footerFirmaTrigger = document.getElementById('footer-firma-trigger');
+    const footerContactoPopover = document.querySelector('.footer-contacto-popover');
 
-    if (footerFirmaWrapper && footerFirmaTrigger) {
+    if (footerFirmaWrapper && footerFirmaTrigger && footerContactoPopover) {
+        // El cartel se centra sobre el botón, pero el botón no siempre queda
+        // centrado en la pantalla (el texto "Diseñado y Desarrollado por" lo
+        // corre hacia un lado). En celus angostos (~360px) eso lo hacía salir
+        // de la pantalla. Esto lo vuelve a meter en pantalla sin moverle la flechita.
+        const ajustarPopoverFooter = () => {
+            footerContactoPopover.style.setProperty('--popover-shift', '0px');
+            const margen = 10;
+            const rect = footerContactoPopover.getBoundingClientRect();
+            let shift = 0;
+            if (rect.right > window.innerWidth - margen) {
+                shift = (window.innerWidth - margen) - rect.right;
+            } else if (rect.left < margen) {
+                shift = margen - rect.left;
+            }
+            footerContactoPopover.style.setProperty('--popover-shift', shift + 'px');
+        };
+
+        ajustarPopoverFooter();
+        window.addEventListener('resize', ajustarPopoverFooter);
+        footerFirmaWrapper.addEventListener('mouseenter', ajustarPopoverFooter);
+
         footerFirmaTrigger.addEventListener('click', (e) => {
             e.stopPropagation();
+            ajustarPopoverFooter();
             const visible = footerFirmaWrapper.classList.toggle('popover-visible');
             footerFirmaTrigger.setAttribute('aria-expanded', visible ? 'true' : 'false');
         });
