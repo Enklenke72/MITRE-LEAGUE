@@ -2525,10 +2525,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Solo el resumen (total pagado + estado de deuda) de UNA tarjeta: cargar un monto no debe redibujar
+    // la lista entera, o se pierde el foco y el scroll en el equipo que se estaba cargando (celular en cancha).
+    function htmlResumenInscripcion(totalExigido, pagoData) {
+        const pagado = (pagoData.ef || 0) + (pagoData.tr || 0);
+        const deuda = totalExigido - pagado;
+        const alDia = deuda <= 0;
+        return `
+            <div class="teso-insc-resumen">
+                <span class="teso-insc-total">Total pagado: $${pagado.toLocaleString()}</span>
+                <span class="teso-chip ${alDia ? 'teso-chip-verde' : 'teso-chip-rojo'}">${alDia ? 'AL DÍA' : `Falta $${deuda.toLocaleString()}`}</span>
+            </div>
+        `;
+    }
+
+    function htmlCardInscripcion(idEq, cantJugadores, totalExigido, pagoData) {
+        return `
+            <div class="teso-team-box teso-insc-card" data-eq="${attrSeguro(idEq)}" data-exigido="${totalExigido}">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                    <span class="teso-team-name">${attrSeguro(idEq)}</span>
+                    <span style="font-family:'Oswald',sans-serif; font-size:11px; color:#869bd8;">${cantJugadores} jug. — Exigido $${totalExigido.toLocaleString()}</span>
+                </div>
+                <div class="teso-inputs-row">
+                    <label>Pago Efectivo ($):</label>
+                    <input type="number" class="input-monto-teso in-insc-ef" data-eq="${attrSeguro(idEq)}" value="${pagoData.ef || 0}">
+                </div>
+                <div class="teso-inputs-row">
+                    <label>Pago Transf. ($):</label>
+                    <input type="number" class="input-monto-teso in-insc-tr" data-eq="${attrSeguro(idEq)}" value="${pagoData.tr || 0}">
+                </div>
+                ${htmlResumenInscripcion(totalExigido, pagoData)}
+            </div>
+        `;
+    }
+
+    // Reemplaza solo el bloque de resumen de esa tarjeta (no la tarjeta entera, para no tocar los inputs).
+    function actualizarCardInscripcion(card) {
+        if (!card) return;
+        const totalExigido = parseFloat(card.dataset.exigido) || 0;
+        const ef = parseFloat(card.querySelector('.in-insc-ef').value) || 0;
+        const tr = parseFloat(card.querySelector('.in-insc-tr').value) || 0;
+        const resumenViejo = card.querySelector('.teso-insc-resumen');
+        if (resumenViejo) resumenViejo.outerHTML = htmlResumenInscripcion(totalExigido, { ef, tr });
+    }
+
     function renderizarTesoreriaInscripciones() {
-        const tbody = document.getElementById('tbody-tesoreria-inscripciones');
+        const contenedor = document.getElementById('contenedor-tesoreria-inscripciones');
         const inputMontoInscripcion = document.getElementById('monto-inscripcion-individual');
-        if (!tbody) return;
+        if (!contenedor) return;
 
         if (inputMontoInscripcion) {
             const montoGuardado = localStorage.getItem('liga_valor_inscripcion');
@@ -2543,10 +2587,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const pool = ciclo === 'superior' ? poolSuperior : poolBasico;
         const valorIndividual = parseFloat(inputMontoInscripcion ? inputMontoInscripcion.value : 3000) || 3000;
 
-        tbody.innerHTML = '';
+        contenedor.innerHTML = '';
 
         if (!pool || pool.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#869bd8; padding:15px;">Sin equipos cargados.</td></tr>';
+            contenedor.innerHTML = '<p style="color:#869bd8; text-align:center; font-size:12px; padding:15px;">Sin equipos cargados.</p>';
             return;
         }
 
@@ -2555,26 +2599,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalExigido = cantJugadores * valorIndividual;
             const idEq = eq.nombre.trim();
             const pagoData = tesoreriaInscripciones[idEq] || { ef: 0, tr: 0 };
-            const deuda = totalExigido - ((pagoData.ef || 0) + (pagoData.tr || 0));
-
-            tbody.innerHTML += `
-                <tr>
-                    <td style="font-weight:bold; color:#fff;">${eq.nombre}</td>
-                    <td style="text-align:center; color:#2edae3; font-weight:bold;">${cantJugadores} jug.</td>
-                    <td style="text-align:center; color:#f2c00e; font-weight:bold;">$${totalExigido.toLocaleString()}</td>
-                    <td style="text-align:center;">
-                        <input type="number" class="input-monto-teso in-insc-ef" data-eq="${idEq}" value="${pagoData.ef || 0}">
-                    </td>
-                    <td style="text-align:center;">
-                        <input type="number" class="input-monto-teso in-insc-tr" data-eq="${idEq}" value="${pagoData.tr || 0}">
-                    </td>
-                    <td style="text-align:center;">
-                        <span style="font-weight:bold; color:${deuda <= 0 ? '#4ade80' : '#f43f5e'};">
-                            ${deuda <= 0 ? 'AL DÍA' : `$${deuda.toLocaleString()}`}
-                        </span>
-                    </td>
-                </tr>
-            `;
+            contenedor.innerHTML += htmlCardInscripcion(idEq, cantJugadores, totalExigido, pagoData);
         });
 
         document.querySelectorAll('.in-insc-ef').forEach(inpt => {
@@ -2586,7 +2611,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tesoreriaInscripciones[idEq].ef = valorNuevo;
                 localStorage.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
                 registrarMovimientoCaja({ equipo: idEq, concepto: 'Inscripción', medio: 'Efectivo', monto: valorNuevo - valorAnterior });
-                renderizarTesoreriaInscripciones();
+                actualizarCardInscripcion(e.target.closest('.teso-insc-card'));
                 calcularBalanceGeneral();
             });
         });
@@ -2600,7 +2625,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tesoreriaInscripciones[idEq].tr = valorNuevo;
                 localStorage.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
                 registrarMovimientoCaja({ equipo: idEq, concepto: 'Inscripción', medio: 'Transferencia', monto: valorNuevo - valorAnterior });
-                renderizarTesoreriaInscripciones();
+                actualizarCardInscripcion(e.target.closest('.teso-insc-card'));
                 calcularBalanceGeneral();
             });
         });

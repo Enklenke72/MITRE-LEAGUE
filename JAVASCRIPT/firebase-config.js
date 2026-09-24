@@ -1,34 +1,25 @@
 // ============================================================
-// CONFIGURACIÓN DE FIREBASE — completar cuando exista el proyecto
+// CONFIGURACIÓN DE FIREBASE — proyecto "mitre-league" (creado 24/09/2026)
 // ============================================================
-// Este archivo hoy es una plantilla vacía: el proyecto de Firebase de
-// Mitre League todavía no está creado (ver CLAUDE.md, sección 11, y
-// Claude outputs/preparacion-login-firebase.md).
+// El proyecto ya existe (Auth con Email/contraseña, Firestore Standard en
+// southamerica-east1, Storage en plan Blaze). Estas claves no son secretas
+// (van igual en el navegador); lo que protege los datos son las Security
+// Rules, que todavía no están escritas.
 //
-// Pasos para completarlo:
-//   1. Entrar a https://console.firebase.google.com/ y crear un proyecto
-//      (por ejemplo "mitre-league").
-//   2. "Compilación" > "Authentication" > "Comenzar" > habilitar el
-//      proveedor "Correo electrónico/contraseña".
-//   3. "Compilación" > "Firestore Database" > crear la base.
-//   4. "Configuración del proyecto" (el engranaje, arriba a la izquierda) >
-//      "Tus apps" > agregar una app web (ícono </>) > copiar acá abajo el
-//      objeto de configuración que te muestra.
-//   5. Recién ahí este archivo se importa desde index.html/admin.html (con
-//      <script type="module">) junto con el SDK de Firebase, y
-//      JAVASCRIPT/auth-login.js pasa a llamar a Firebase Auth de verdad.
-//
-// No completar con datos inventados: mientras no exista el proyecto, este
-// archivo se deja vacío así, y el login sigue mostrando "acceso no
-// activado" en vez de fallar contra una clave falsa.
+// Esta web no usa npm ni bundler (ver CLAUDE.md, sección 8): el snippet que
+// muestra la consola de Firebase asume `import "firebase/app"` vía npm, algo
+// que un <script type="module"> del navegador no puede resolver solo. Acá
+// hay que importar el SDK modular desde el CDN de Firebase
+// (https://www.gstatic.com/firebasejs/.../firebase-app.js) en vez de esa
+// ruta corta. Ese cableado todavía no está hecho (ver sección 11.3).
 
 const firebaseConfig = {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    apiKey: "AIzaSyAd1enyYzTsetAv6UMgbAoc8v5MeGVURzc",
+    authDomain: "mitre-league.firebaseapp.com",
+    projectId: "mitre-league",
+    storageBucket: "mitre-league.firebasestorage.app",
+    messagingSenderId: "1046538157868",
+    appId: "1:1046538157868:web:a241b659b0102c30dbf689"
 };
 
 export { firebaseConfig };

@@ -3693,6 +3693,32 @@ body.rol-staff .solo-admin {
 .teso-chip-verde { background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); color: #4ade80; }
 .teso-chip-gris { background: rgba(134, 155, 216, 0.1); border: 1px solid rgba(134, 155, 216, 0.3); color: #869bd8; }
 
+/* Inscripciones por Jugador: tarjetas por equipo (reemplaza la tabla de 6 columnas, ilegible en celular) */
+.teso-insc-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+    gap: 15px !important;
+    margin-top: 15px !important;
+}
+
+.teso-insc-resumen {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08) !important;
+    padding-top: 10px !important;
+    margin-top: 2px !important;
+}
+
+.teso-insc-total {
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    color: #a9bce8;
+    font-weight: bold;
+}
+
 .teso-avisos-partido {
     display: flex;
     flex-direction: column;

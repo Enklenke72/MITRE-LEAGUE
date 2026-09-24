@@ -958,21 +958,9 @@
                 </div>
             </div>
 
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Equipo</th>
-                            <th style="text-align: center;">Jugadores</th>
-                            <th style="text-align: center;">Exigido ($)</th>
-                            <th style="text-align: center;">Efectivo ($)</th>
-                            <th style="text-align: center;">Transf. ($)</th>
-                            <th style="text-align: center;">Estado Deuda</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-tesoreria-inscripciones"></tbody>
-                </table>
-            </div>
+            <!-- Tarjetas (no tabla): a 390px una tabla de 6 columnas deja los inputs de monto ilegibles.
+                 Mismo criterio que "Aranceles por Partido" (.teso-team-box), pensado para cargarse desde el celular. -->
+            <div id="contenedor-tesoreria-inscripciones" class="teso-insc-grid"></div>
         </section>
     </div>
 
