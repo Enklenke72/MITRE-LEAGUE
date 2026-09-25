@@ -1,22 +1,27 @@
 // ============================================================
-// LOGIN DE STAFF (index.html #pantalla-admin) — enganche listo,
-// autenticación real pendiente de crear el proyecto de Firebase.
+// LOGIN DE STAFF (index.html #pantalla-admin) — Firebase Auth real.
 // ============================================================
-// Hoy esto NO autentica de verdad: no hay proyecto de Firebase creado
-// todavía (ver CLAUDE.md, sección 11, y Claude outputs/preparacion-login-firebase.md).
-// Este archivo deja armado el enganche con el formulario para que, cuando
-// el proyecto exista, activar el login real sea reemplazar la función
-// iniciarSesionStaff de acá abajo por la llamada a Firebase Auth — no hace
-// falta tocar el HTML ni el CSS de nuevo.
-//
-// Pasos para activarlo:
-//   1. Crear el proyecto en Firebase y activar "Email/contraseña" en Authentication.
-//   2. Completar JAVASCRIPT/firebase-config.js con las claves del proyecto.
-//   3. Sumar el SDK de Firebase (Auth) y esta etiqueta a index.html con
-//      type="module", e importar acá signInWithEmailAndPassword.
-//   4. Crear, por cada persona del staff, su usuario en Authentication (con
-//      su email) y un documento en la colección "usuarios" de Firestore
-//      con su rol (staff / coordinador).
+// Acá solo se valida email/contraseña; el rol lo lee admin.html al entrar
+// (JAVASCRIPT/auth-admin.js). El SDK se baja recién al tocar "Iniciar Sesión".
+
+import { cargarFirebase } from "./firebase-sdk.js";
+
+function mensajeError(error) {
+    switch (error.code) {
+        case 'auth/invalid-email':
+            return 'El email no tiene un formato válido.';
+        case 'auth/invalid-credential':
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+            return 'Email o contraseña incorrectos.';
+        case 'auth/too-many-requests':
+            return 'Demasiados intentos. Probá de nuevo en unos minutos.';
+        case 'auth/network-request-failed':
+            return 'No hay conexión. Revisá tu internet e intentá de nuevo.';
+        default:
+            return 'No se pudo iniciar sesión. Probá de nuevo.';
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('form-login-staff');
@@ -39,14 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
         elError.classList.remove('visible');
     }
 
-    // Reemplazar esta función cuando exista el proyecto de Firebase, por ejemplo:
-    //   const cred = await signInWithEmailAndPassword(auth, email, password);
-    //   const rolDoc = await getDoc(doc(db, 'usuarios', cred.user.uid));
-    //   // guardar el rol (rolDoc.data().rol) y redirigir a admin.html
-    // Hoy, sin Firebase, siempre devuelve este error para dejar claro que el
-    // acceso todavía no está activado (no hay backend real detrás del botón).
     function iniciarSesionStaff(email, password) {
-        return Promise.reject(new Error('El acceso todavía no está activado. Falta conectar el proyecto de Firebase (ver CLAUDE.md, sección 11).'));
+        return cargarFirebase().then(({ auth, authSdk }) =>
+            authSdk.signInWithEmailAndPassword(auth, email, password));
     }
 
     form.addEventListener('submit', (evento) => {
@@ -64,8 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
         boton.textContent = 'Ingresando...';
 
         iniciarSesionStaff(email, password)
+            .then(() => {
+                window.location.href = 'admin.html';
+            })
             .catch((error) => {
-                mostrarError(error.message || 'No se pudo iniciar sesión.');
+                mostrarError(mensajeError(error));
             })
             .finally(() => {
                 boton.disabled = false;

@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Rol de cada persona del staff ("coordinador" o "staff"). Se carga a mano
+    // desde la consola de Firebase, que no pasa por estas reglas: desde la web
+    // nadie escribe acá, y cada usuario solo puede leer su propio documento.
+    match /usuarios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Todo lo demás queda cerrado hasta que se migren los datos
+    // (CLAUDE.md, sección 11).
+  }
+}

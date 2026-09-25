@@ -83,24 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
         poolBasico = (bas && bas.length > 0) ? bas : (typeof ligaData !== 'undefined' ? ligaData.cicloBasico : []);
     }
 
-    // ============================================================
-    // 2. SELECTOR DE ROL (ADMIN / STAFF)
-    // ============================================================
-    const selectorRol = document.getElementById('selector-rol-usuario');
-
-    function actualizarRolDOM() {
-        const rol = selectorRol ? selectorRol.value : 'admin';
-        if (rol === 'staff') {
-            document.body.classList.remove('rol-admin');
-            document.body.classList.add('rol-staff');
-        } else {
-            document.body.classList.remove('rol-staff');
-            document.body.classList.add('rol-admin');
-        }
-    }
-
-    if (selectorRol) selectorRol.addEventListener('change', actualizarRolDOM);
-    actualizarRolDOM();
+    // El rol (clases rol-admin / rol-staff del <body>) lo pone auth-admin.js
+    // según usuarios/{uid} en Firestore.
 
     // ============================================================
     // 2 BIS. IMÁGENES Y ESPACIO DE ALMACENAMIENTO

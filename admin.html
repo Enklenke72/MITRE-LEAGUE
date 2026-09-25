@@ -7,18 +7,22 @@
     <link rel="stylesheet" href="estilo.css">
     <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
 </head>
-<body class="staff-page">
+<body class="staff-page auth-pendiente">
+
+    <div id="auth-gate" class="auth-gate" role="status">
+        <p id="auth-gate-mensaje" class="auth-gate-mensaje">Verificando acceso...</p>
+        <div class="auth-gate-acciones">
+            <button type="button" id="auth-gate-reintentar" class="auth-gate-btn" hidden>Reintentar</button>
+            <button type="button" id="auth-gate-salir" class="auth-gate-btn" hidden>Cerrar sesión</button>
+        </div>
+    </div>
 
     <header class="staff-header">
         <h1 class="staff-title">MITRE LEAGUE — STAFF CONTROL</h1>
         <p class="staff-subtitle">Panel de Operaciones en Campo y Administración Central</p>
-        <!-- Selector de Rol (Simulación de Permisos) -->
-    <div class="staff-modo-vista" style="margin-top: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
-        <span style="font-size: 11px; color: #869bd8;">Modo de Vista:</span>
-        <select id="selector-rol-usuario" style="background: #0a1d54; color: #2edae3; border: 1px solid #2edae3; padding: 6px 12px; border-radius: 3px; font-family: 'Oswald', sans-serif; font-size: 11px; outline: none; cursor: pointer;">
-            <option value="admin">Administrador (Acceso Total + Tesorería)</option>
-            <option value="staff">Staff / Planillero (Carga de Partidos, Sanciones y Pagos)</option>
-        </select>
+    <div class="staff-sesion">
+        <span id="staff-sesion-usuario" class="staff-sesion-usuario"></span>
+        <button type="button" id="btn-cerrar-sesion" class="staff-sesion-salir">Cerrar sesión</button>
     </div>
 
     <div class="buscador-global-staff">
@@ -1153,6 +1157,7 @@
     <script src="JAVASCRIPT/data.js"></script>
     <script src="JAVASCRIPT/playoffs.js"></script>
     <script src="JAVASCRIPT/admin.js"></script>
+    <script type="module" src="JAVASCRIPT/auth-admin.js"></script>
 
     <!-- MODAL FLOTANTE DE EMERGENCIA MÉDICA Y CONTACTOS -->
 <div id="modal-emergencia" class="modal-noticia-overlay seccion-oculta">

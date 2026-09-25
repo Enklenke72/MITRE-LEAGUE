@@ -628,7 +628,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 
 
 
-            <!-- SECCIÓN 5: ADMIN / LOGIN STAFF (enganche listo, autenticación real pendiente de crear el proyecto de Firebase — ver JAVASCRIPT/auth-login.js y Claude outputs/preparacion-login-firebase.md) -->
+            <!-- SECCIÓN 5: ADMIN / LOGIN STAFF (Firebase Auth, ver JAVASCRIPT/auth-login.js) -->
             <section id="pantalla-admin" class="login-staff-section">
                 <div class="login-staff-card">
                     <div class="login-staff-icono" aria-hidden="true">
@@ -648,7 +648,6 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                         <p id="login-staff-error" class="login-staff-error" role="alert"></p>
                         <button type="submit" class="btn-submit-admin">Iniciar Sesión</button>
                     </form>
-                    <p class="login-staff-nota">Acceso todavía no activado — falta crear el proyecto de Firebase.</p>
                 </div>
             </section>
 
@@ -678,7 +677,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 <script src="JAVASCRIPT/data.js"></script>
 <script src="JAVASCRIPT/playoffs.js"></script>
 <script src="JAVASCRIPT/main.js"></script>
-<script src="JAVASCRIPT/auth-login.js"></script>
+<script type="module" src="JAVASCRIPT/auth-login.js"></script>
 <!-- ==========================================
      MODAL LIGHTBOX DE NOTICIA AMPLIADA
      ========================================== -->

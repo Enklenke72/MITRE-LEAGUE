@@ -4285,15 +4285,6 @@ body.rol-staff .solo-admin {
     display: block;
 }
 
-.login-staff-nota {
-    color: #7d8fbe;
-    font-family: 'Oswald', sans-serif;
-    font-size: 11px;
-    margin: 18px 0 0;
-    padding-top: 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 @media (max-width: 480px) {
     .login-staff-section {
         padding: 24px 12px;
@@ -4324,18 +4315,75 @@ body.staff-page {
     margin-bottom: 25px;
     width: 100%;
     max-width: 1000px;
-    min-width: 0; /* flex-item de body.staff-page: sin esto, el <select> sin ancho de abajo empuja todo el panel a lo ancho en celus angostos */
+    min-width: 0; /* flex-item de body.staff-page: sin esto, un hijo sin ancho propio empuja todo el panel a lo ancho en celus angostos */
 }
 
-/* Fila "Modo de Vista": el <select> no tiene ancho propio y en celus angostos
-   se pasaba de largo en vez de acomodarse (encontrado a 390px, 23/09/2026) */
-.staff-modo-vista {
+.staff-sesion {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     flex-wrap: wrap;
-    row-gap: 8px;
+    gap: 8px 12px;
 }
 
-.staff-modo-vista select {
-    max-width: 100%;
+.staff-sesion-usuario {
+    font-size: 12px;
+    color: #869bd8;
+    letter-spacing: 1px;
+    overflow-wrap: anywhere;
+}
+
+.staff-sesion-salir,
+.auth-gate-btn {
+    background: #0a1d54;
+    color: #2edae3;
+    border: 1px solid #2edae3;
+    padding: 6px 14px;
+    border-radius: 3px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.staff-sesion-salir:hover,
+.auth-gate-btn:hover {
+    background: rgba(46, 218, 227, 0.15);
+}
+
+/* admin.html arranca tapado hasta que auth-admin.js confirma sesión y rol */
+.auth-gate {
+    display: none;
+}
+
+body.auth-pendiente > :not(.auth-gate) {
+    display: none !important;
+}
+
+body.auth-pendiente .auth-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    min-height: 80vh;
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+}
+
+.auth-gate-mensaje {
+    color: #869bd8;
+    font-size: 14px;
+    letter-spacing: 1px;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.auth-gate-acciones {
+    display: flex;
+    gap: 10px;
 }
 
 .staff-title {
