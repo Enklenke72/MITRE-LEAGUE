@@ -1,39 +1,39 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('liga:datos-listos', () => {
 
     // ============================================================
     // 1. ESTADO GLOBAL Y MEMORIA (LOCALSTORAGE)
     // ============================================================
-    let partidos = JSON.parse(localStorage.getItem('liga_partidos')) || [];
+    let partidos = JSON.parse(almacen.getItem('liga_partidos')) || [];
     if (partidos.length === 0 && typeof ligaData !== 'undefined') {
         partidos = ligaData.partidos || [];
-        localStorage.setItem('liga_partidos', JSON.stringify(partidos));
+        almacen.setItem('liga_partidos', JSON.stringify(partidos));
     }
 
-    let gruposTorneo = JSON.parse(localStorage.getItem('liga_grupos')) || {
+    let gruposTorneo = JSON.parse(almacen.getItem('liga_grupos')) || {
         superior: ['A', 'B', 'C', 'D', 'E'],
         basico: ['A', 'B']
     };
 
-    let poolSuperior = JSON.parse(localStorage.getItem('liga_cicloSuperior')) || (typeof ligaData !== 'undefined' ? ligaData.cicloSuperior : []);
-    let poolBasico = JSON.parse(localStorage.getItem('liga_cicloBasico')) || (typeof ligaData !== 'undefined' ? ligaData.cicloBasico : []);
+    let poolSuperior = JSON.parse(almacen.getItem('liga_cicloSuperior')) || (typeof ligaData !== 'undefined' ? ligaData.cicloSuperior : []);
+    let poolBasico = JSON.parse(almacen.getItem('liga_cicloBasico')) || (typeof ligaData !== 'undefined' ? ligaData.cicloBasico : []);
 
-    let crucesPlayoffs = JSON.parse(localStorage.getItem('liga_cruces_playoffs')) || [];
+    let crucesPlayoffs = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
     if (typeof migrarCrucesConSlot === 'function') {
         const migracion = migrarCrucesConSlot(crucesPlayoffs);
         crucesPlayoffs = migracion.cruces;
-        localStorage.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
+        almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
         if (migracion.advertencias.length > 0) {
             console.warn('[Playoffs] Advertencias de migración de slots:\n' + migracion.advertencias.join('\n'));
         }
     }
-    let playoffsPublicados = localStorage.getItem('liga_playoffs_publicados') === 'true';
+    let playoffsPublicados = almacen.getItem('liga_playoffs_publicados') === 'true';
 
-    let listaSanciones = JSON.parse(localStorage.getItem('liga_sanciones')) || [];
-    let listaNoticias = JSON.parse(localStorage.getItem('liga_noticias')) || [];
-    let listaAlertas = JSON.parse(localStorage.getItem('liga_notificaciones')) || [];
+    let listaSanciones = JSON.parse(almacen.getItem('liga_sanciones')) || [];
+    let listaNoticias = JSON.parse(almacen.getItem('liga_noticias')) || [];
+    let listaAlertas = JSON.parse(almacen.getItem('liga_notificaciones')) || [];
     // Avisos internos del staff (no es liga_notificaciones, que es la campanita pública): avisos que genera
     // el propio sistema para que el staff revise algo después, sin bloquear la carga de datos.
-    let avisosStaff = JSON.parse(localStorage.getItem('liga_avisos_staff')) || [];
+    let avisosStaff = JSON.parse(almacen.getItem('liga_avisos_staff')) || [];
 
     function registrarAvisoStaff(tipo, detalle) {
         avisosStaff.unshift({
@@ -42,13 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
             detalle,
             timestamp: Date.now()
         });
-        localStorage.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
+        almacen.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
         if (typeof actualizarListaAvisosStaff === 'function') actualizarListaAvisosStaff();
     }
-    let tesoreriaPartidos = JSON.parse(localStorage.getItem('liga_tesoreria_partidos_v2')) || {};
-    let tesoreriaInscripciones = JSON.parse(localStorage.getItem('liga_tesoreria_inscripciones')) || {};
-    let listaEgresos = JSON.parse(localStorage.getItem('liga_egresos')) || [];
-    let cajaMovimientos = JSON.parse(localStorage.getItem('liga_caja_movimientos')) || [];
+    let tesoreriaPartidos = JSON.parse(almacen.getItem('liga_tesoreria_partidos_v2')) || {};
+    let tesoreriaInscripciones = JSON.parse(almacen.getItem('liga_tesoreria_inscripciones')) || {};
+    let listaEgresos = JSON.parse(almacen.getItem('liga_egresos')) || [];
+    let cajaMovimientos = JSON.parse(almacen.getItem('liga_caja_movimientos')) || [];
 
     // Registra cada pago individual (quién, cuánto, cómo y cuándo) para la Caja por Fecha (exclusivo Coordinador).
     // Se llama cada vez que se carga o modifica un monto en Tesorería; "monto" es la diferencia contra el valor anterior.
@@ -63,23 +63,23 @@ document.addEventListener('DOMContentLoaded', () => {
             monto: monto,
             fechaHora: new Date().toISOString()
         });
-        localStorage.setItem('liga_caja_movimientos', JSON.stringify(cajaMovimientos));
+        almacen.setItem('liga_caja_movimientos', JSON.stringify(cajaMovimientos));
         if (typeof renderizarCajaPorFecha === 'function') renderizarCajaPorFecha();
     }
 
     function guardarEquiposEnStorage() {
-        guardarClaveConAviso('liga_cicloSuperior', JSON.stringify(poolSuperior));
-        guardarClaveConAviso('liga_cicloBasico', JSON.stringify(poolBasico));
+        almacen.setItem('liga_cicloSuperior', JSON.stringify(poolSuperior));
+        almacen.setItem('liga_cicloBasico', JSON.stringify(poolBasico));
     }
 
     function guardarGruposEnStorage() {
-        localStorage.setItem('liga_grupos', JSON.stringify(gruposTorneo));
+        almacen.setItem('liga_grupos', JSON.stringify(gruposTorneo));
     }
 
     function recargarPools() {
-        const sup = JSON.parse(localStorage.getItem('liga_cicloSuperior'));
+        const sup = JSON.parse(almacen.getItem('liga_cicloSuperior'));
         poolSuperior = (sup && sup.length > 0) ? sup : (typeof ligaData !== 'undefined' ? ligaData.cicloSuperior : []);
-        const bas = JSON.parse(localStorage.getItem('liga_cicloBasico'));
+        const bas = JSON.parse(almacen.getItem('liga_cicloBasico'));
         poolBasico = (bas && bas.length > 0) ? bas : (typeof ligaData !== 'undefined' ? ligaData.cicloBasico : []);
     }
 
@@ -87,18 +87,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // según usuarios/{uid} en Firestore.
 
     // ============================================================
-    // 2 BIS. IMÁGENES Y ESPACIO DE ALMACENAMIENTO
+    // 2 BIS. IMÁGENES
     // ============================================================
-    // localStorage guarda texto: una foto entra como dataURL base64 y una sacada con el
-    // celular pesa varios MB, contra un tope de ~5 MB para TODO el torneo. Por eso cada
-    // imagen que sube el staff se redimensiona y se recomprime en el navegador (canvas)
-    // antes de guardarse.
+    // Las fotos se guardan como dataURL dentro del documento de Firestore (tope de 1 MB por
+    // documento, y cada visitante las descarga): una sacada con el celular pesa varios MB,
+    // así que cada imagen que sube el staff se redimensiona y recomprime en el navegador.
     const MAX_LADO_FOTO_JUGADOR = 250;
     const MAX_LADO_FOTO_NOTICIA = 1000;
     const MAX_LADO_LOGO_SPONSOR = 500;
     const MAX_LADO_PORTADA_ALBUM = 800;
     const CALIDAD_JPEG = 0.75;
-    const LIMITE_STORAGE_BYTES = 5 * 1024 * 1024;
 
     function comprimirImagen(file, maxLado, calidad) {
         return new Promise((resolve, reject) => {
@@ -215,69 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnQuitarId: 'btn-quitar-portada-album',
         maxLado: MAX_LADO_PORTADA_ALBUM
     });
-
-    const ETIQUETAS_STORAGE = {
-        liga_cicloSuperior: 'Equipos y jugadores (Superior)',
-        liga_cicloBasico: 'Equipos y jugadores (Básico)',
-        liga_noticias: 'Noticias',
-        liga_sponsors: 'Sponsors',
-        liga_fotos_albumes: 'Álbumes de fotos',
-        liga_partidos: 'Partidos',
-        liga_sanciones: 'Sanciones',
-        liga_caja_movimientos: 'Caja por fecha',
-        liga_notificaciones: 'Avisos',
-        liga_avisos_staff: 'Avisos internos del staff'
-    };
-
-    function renderizarUsoStorage() {
-        const cont = document.getElementById('storage-uso-admin');
-        if (!cont) return;
-
-        let total = 0;
-        const porClave = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const clave = localStorage.key(i);
-            const bytes = pesoDeTexto(clave) + pesoDeTexto(localStorage.getItem(clave));
-            total += bytes;
-            if (clave.indexOf('liga_') === 0) porClave.push({ clave: clave, bytes: bytes });
-        }
-
-        const porcentaje = Math.min(100, (total / LIMITE_STORAGE_BYTES) * 100);
-        const nivel = porcentaje >= 90 ? 'critico' : (porcentaje >= 80 ? 'alerta' : '');
-
-        const detalles = porClave
-            .sort((a, b) => b.bytes - a.bytes)
-            .slice(0, 5)
-            .map(x => `<div class="storage-detalle"><strong>${ETIQUETAS_STORAGE[x.clave] || x.clave}</strong><span>${pesoLegible(x.bytes)}</span></div>`)
-            .join('');
-
-        let aviso = '';
-        if (porcentaje >= 90) {
-            aviso = '<span class="storage-aviso critico">Casi sin espacio. Si se llena, el navegador va a fallar al guardar. Borrá noticias o álbumes viejos antes de subir más fotos.</span>';
-        } else if (porcentaje >= 80) {
-            aviso = '<span class="storage-aviso">Ya usaste más del 80% del espacio. Conviene ir limpiando noticias o álbumes viejos.</span>';
-        }
-
-        cont.innerHTML = `
-            <span class="storage-total">${pesoLegible(total)} de ~5 MB usados (${porcentaje.toFixed(1)}%)</span>
-            <div class="storage-barra"><div class="storage-barra-fill ${nivel}" style="width:${porcentaje.toFixed(1)}%;"></div></div>
-            ${detalles || '<div class="storage-detalle"><strong>Todavía no hay datos guardados</strong><span>0 B</span></div>'}
-            ${aviso}
-        `;
-    }
-
-    // Si el navegador se queda sin espacio, setItem tira una excepción y el dato se pierde
-    // en silencio: avisamos para que el staff sepa que tiene que liberar lugar.
-    function guardarClaveConAviso(clave, valor) {
-        try {
-            localStorage.setItem(clave, valor);
-            return true;
-        } catch (err) {
-            alert('No se pudo guardar: el navegador se quedó sin espacio.\n\nBorrá noticias o álbumes viejos desde Prensa & Fotos y volvé a intentar.');
-            console.error('[Storage] ' + clave, err);
-            return false;
-        }
-    }
 
     // ============================================================
     // 3. MÓDULO JORNADA: CARGA DE PARTIDOS Y PLAYOFFS
@@ -446,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fechaVal = parseInt(inputFechaPartido ? inputFechaPartido.value : 0);
         const ronda = (typeof rondaPorCodigoFecha === 'function' ? rondaPorCodigoFecha(fechaVal) : null);
-        const crucesRonda = (JSON.parse(localStorage.getItem('liga_cruces_playoffs')) || [])
+        const crucesRonda = (JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [])
             .filter(c => c.ciclo === ciclo && c.ronda === ronda);
 
         // Sin cruces armados (ronda inicial antes del sorteo) se ofrece el plantel completo,
@@ -504,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ronda = (typeof rondaPorCodigoFecha === 'function' ? rondaPorCodigoFecha(fechaVal) : null) || 'octavos';
 
-            const crucesGuardados = JSON.parse(localStorage.getItem('liga_cruces_playoffs')) || [];
+            const crucesGuardados = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
             // Sólo cruces con ambos equipos definidos — un cruce generado automáticamente
             // por el avance de playoffs puede tener un lado todavía "A definir".
             const crucesRonda = crucesGuardados
@@ -617,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 partidos = partidos.filter(p => p.id !== idBorrar);
-                localStorage.setItem('liga_partidos', JSON.stringify(partidos));
+                almacen.setItem('liga_partidos', JSON.stringify(partidos));
                 if (idPartidoEnEdicion === idBorrar) cancelarEdicionPartido();
                 sincronizarAusencias();
                 actualizarListaAdmin();
@@ -925,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('¡Partido guardado!');
             }
 
-            localStorage.setItem('liga_partidos', JSON.stringify(partidos));
+            almacen.setItem('liga_partidos', JSON.stringify(partidos));
 
             if (datosPartido.esPlayoff && datosPartido.jugado) {
                 procesarAvancePlayoff(datosPartido);
@@ -1010,7 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnTogglePublicarPlayoffs) {
         btnTogglePublicarPlayoffs.addEventListener('click', () => {
             playoffsPublicados = !playoffsPublicados;
-            localStorage.setItem('liga_playoffs_publicados', playoffsPublicados ? 'true' : 'false');
+            almacen.setItem('liga_playoffs_publicados', playoffsPublicados ? 'true' : 'false');
             actualizarBotonEstadoPlayoffs();
             alert(playoffsPublicados 
                 ? '¡Playoffs activados en la web!' 
@@ -1118,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 crucesPlayoffs = crucesPlayoffs.filter(c => c.id !== idBorrar);
-                localStorage.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
+                almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
                 renderizarCrucesPlayoffsAdmin();
                 actualizarOpcionesGrupo();
             });
@@ -1185,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cruceDestino[ladoDest] = nombreGanador;
 
-        localStorage.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
+        almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
         renderizarCrucesPlayoffsAdmin();
         actualizarSelectsPlayoffs();
         actualizarRondaYSlotPlayoffs();
@@ -1229,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            localStorage.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
+            almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
             renderizarCrucesPlayoffsAdmin();
             actualizarOpcionesGrupo();
             alert(`Cruce de ${ronda.toUpperCase()} (Llave ${slot}) guardado: ${eq1} vs ${eq2}`);
@@ -1274,7 +1209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGuardarFormatoTorneo = document.getElementById('btn-guardar-formato-torneo');
 
     function obtenerFormatoTorneo() {
-        return JSON.parse(localStorage.getItem('liga_formato_torneo')) || { superior: 'grupos', basico: 'grupos' };
+        return JSON.parse(almacen.getItem('liga_formato_torneo')) || { superior: 'grupos', basico: 'grupos' };
     }
 
     function actualizarSelectsFormatoTorneo() {
@@ -1289,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 superior: selectFormatoSuperior ? selectFormatoSuperior.value : 'grupos',
                 basico: selectFormatoBasico ? selectFormatoBasico.value : 'grupos'
             };
-            localStorage.setItem('liga_formato_torneo', JSON.stringify(formato));
+            almacen.setItem('liga_formato_torneo', JSON.stringify(formato));
             alert('Formato del torneo guardado. Los cambios se ven en la web pública al recargarla.');
         });
     }
@@ -1553,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderizarTablaJugadores();
     });
 
-    // Otras acciones vuelven a leer los equipos de localStorage (recargarPools) y dejan viejos los objetos con los que
+    // Otras acciones vuelven a leer los equipos del almacén (recargarPools) y dejan viejos los objetos con los que
     // se dibujó la tabla: por eso cada botón busca el equipo y el jugador actuales al momento del clic.
     function buscarJugadorPlantel(ciclo, equipoNombre, dni) {
         recargarPools();
@@ -1601,7 +1536,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
-        if (partidosTocados) localStorage.setItem('liga_partidos', JSON.stringify(partidos));
+        if (partidosTocados) almacen.setItem('liga_partidos', JSON.stringify(partidos));
 
         let sancionesTocadas = false;
         listaSanciones.forEach(s => {
@@ -1610,7 +1545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.jugador = `${despues.nombre} (${dorsalBF(despues)})`;
             sancionesTocadas = true;
         });
-        if (sancionesTocadas) localStorage.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+        if (sancionesTocadas) almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
     }
 
     function renderizarTablaJugadores() {
@@ -1977,7 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 desvincularSancionAuto(listaSanciones.find(s => s.id === idBorrar));
                 listaSanciones = listaSanciones.filter(s => s.id !== idBorrar);
-                localStorage.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+                almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
                 if (idSancionEnEdicion === idBorrar) cancelarEdicionSancion();
                 actualizarListaSancionesAdmin();
             });
@@ -2069,7 +2004,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`¡Resolución publicada en el Acta N° ${datosSancion.acta}!`);
             }
 
-            localStorage.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+            almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
             cancelarEdicionSancion();
             actualizarListaSancionesAdmin();
         });
@@ -2106,7 +2041,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 listaNoticias = listaNoticias.filter(n => n.id !== idBorrar);
-                localStorage.setItem('liga_noticias', JSON.stringify(listaNoticias));
+                almacen.setItem('liga_noticias', JSON.stringify(listaNoticias));
                 actualizarListaNoticiasAdmin();
             });
         });
@@ -2131,17 +2066,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 linkTexto: document.getElementById('noticia-link-texto').value.trim() || 'VER MÁS'
             };
 
-            const respaldo = listaNoticias.slice();
             listaNoticias.push(nuevaNoticia);
-            if (!guardarClaveConAviso('liga_noticias', JSON.stringify(listaNoticias))) {
-                listaNoticias = respaldo;
-                return;
-            }
+            almacen.setItem('liga_noticias', JSON.stringify(listaNoticias));
 
             formNoticia.reset();
             fotoNoticiaSubida.limpiar();
             actualizarListaNoticiasAdmin();
-            renderizarUsoStorage();
             alert('¡Noticia guardada con éxito!');
         });
     }
@@ -2149,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // 6.0 MÓDULO ÁLBUMES DE FOTOS
     // ============================================================
-    let listaFotosAlbumes = JSON.parse(localStorage.getItem('liga_fotos_albumes')) || (typeof ligaData !== 'undefined' && ligaData.fotosAlbumes ? ligaData.fotosAlbumes : []);
+    let listaFotosAlbumes = JSON.parse(almacen.getItem('liga_fotos_albumes')) || (typeof ligaData !== 'undefined' && ligaData.fotosAlbumes ? ligaData.fotosAlbumes : []);
     const formFotos = document.getElementById('form-fotos-admin');
 
     function actualizarListaFotosAdmin() {
@@ -2178,7 +2108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 listaFotosAlbumes = listaFotosAlbumes.filter(a => a.id !== idBorrar);
-                localStorage.setItem('liga_fotos_albumes', JSON.stringify(listaFotosAlbumes));
+                almacen.setItem('liga_fotos_albumes', JSON.stringify(listaFotosAlbumes));
                 actualizarListaFotosAdmin();
             });
         });
@@ -2200,16 +2130,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 link: document.getElementById('foto-album-link').value.trim()
             };
 
-            const respaldo = listaFotosAlbumes.slice();
             listaFotosAlbumes.push(nuevoAlbum);
-            if (!guardarClaveConAviso('liga_fotos_albumes', JSON.stringify(listaFotosAlbumes))) {
-                listaFotosAlbumes = respaldo;
-                return;
-            }
+            almacen.setItem('liga_fotos_albumes', JSON.stringify(listaFotosAlbumes));
             formFotos.reset();
             portadaAlbumSubida.limpiar();
             actualizarListaFotosAdmin();
-            renderizarUsoStorage();
             alert('¡Álbum publicado con éxito!');
         });
     }
@@ -2219,10 +2144,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // 6.1 GESTOR DE SPONSORS (CRUD completo, editable desde Prensa & Fotos)
     // ============================================================
-    let listaSponsors = JSON.parse(localStorage.getItem('liga_sponsors')) || (typeof ligaData !== 'undefined' && ligaData.sponsors ? ligaData.sponsors : []);
+    let listaSponsors = JSON.parse(almacen.getItem('liga_sponsors')) || (typeof ligaData !== 'undefined' && ligaData.sponsors ? ligaData.sponsors : []);
 
     function guardarSponsorsEnStorage() {
-        localStorage.setItem('liga_sponsors', JSON.stringify(listaSponsors));
+        almacen.setItem('liga_sponsors', JSON.stringify(listaSponsors));
     }
 
     const formSponsor = document.getElementById('form-sponsor-admin');
@@ -2559,7 +2484,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!contenedor) return;
 
         if (inputMontoInscripcion) {
-            const montoGuardado = localStorage.getItem('liga_valor_inscripcion');
+            const montoGuardado = almacen.getItem('liga_valor_inscripcion');
             if (montoGuardado && !inputMontoInscripcion.dataset.cargado) {
                 inputMontoInscripcion.value = montoGuardado;
                 inputMontoInscripcion.dataset.cargado = "true";
@@ -2593,7 +2518,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const valorAnterior = tesoreriaInscripciones[idEq].ef || 0;
                 const valorNuevo = parseFloat(e.target.value) || 0;
                 tesoreriaInscripciones[idEq].ef = valorNuevo;
-                localStorage.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+                almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
                 registrarMovimientoCaja({ equipo: idEq, concepto: 'Inscripción', medio: 'Efectivo', monto: valorNuevo - valorAnterior });
                 actualizarCardInscripcion(e.target.closest('.teso-insc-card'));
                 calcularBalanceGeneral();
@@ -2607,7 +2532,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const valorAnterior = tesoreriaInscripciones[idEq].tr || 0;
                 const valorNuevo = parseFloat(e.target.value) || 0;
                 tesoreriaInscripciones[idEq].tr = valorNuevo;
-                localStorage.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+                almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
                 registrarMovimientoCaja({ equipo: idEq, concepto: 'Inscripción', medio: 'Transferencia', monto: valorNuevo - valorAnterior });
                 actualizarCardInscripcion(e.target.closest('.teso-insc-card'));
                 calcularBalanceGeneral();
@@ -2619,7 +2544,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (document.getElementById('monto-inscripcion-individual')) {
         document.getElementById('monto-inscripcion-individual').addEventListener('change', (e) => {
-            localStorage.setItem('liga_valor_inscripcion', e.target.value);
+            almacen.setItem('liga_valor_inscripcion', e.target.value);
             renderizarTesoreriaInscripciones();
             calcularBalanceGeneral();
         });
@@ -2634,7 +2559,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const PUNTOS_QUITA_AUSENCIA = 2;
 
     function guardarTesoreriaPartidos() {
-        localStorage.setItem('liga_tesoreria_partidos_v2', JSON.stringify(tesoreriaPartidos));
+        almacen.setItem('liga_tesoreria_partidos_v2', JSON.stringify(tesoreriaPartidos));
     }
 
     // Orden cronológico real: fechas de grupo (1, 2, 3…) y después 8vos (108) → 4tos (104) → semis (102) → final (100).
@@ -2896,11 +2821,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (cambioTeso) guardarTesoreriaPartidos();
         if (cambioPartidos) {
-            localStorage.setItem('liga_partidos', JSON.stringify(partidos));
+            almacen.setItem('liga_partidos', JSON.stringify(partidos));
             if (typeof actualizarListaAdmin === 'function') actualizarListaAdmin();
         }
         if (cambioSanciones) {
-            localStorage.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+            almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
             if (typeof actualizarListaSancionesAdmin === 'function') actualizarListaSancionesAdmin();
         }
 
@@ -2937,7 +2862,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function guardarPartidosBF() {
-        localStorage.setItem('liga_partidos', JSON.stringify(partidos));
+        almacen.setItem('liga_partidos', JSON.stringify(partidos));
     }
 
     // Suspensión de un jugador en la fecha de un partido: corre desde la fecha SIGUIENTE a la del acta y dura tantas fechas
@@ -3532,7 +3457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 medio: document.getElementById('egreso-medio').value
             };
             listaEgresos.push(nuevoEgreso);
-            localStorage.setItem('liga_egresos', JSON.stringify(listaEgresos));
+            almacen.setItem('liga_egresos', JSON.stringify(listaEgresos));
             formEgreso.reset();
             renderizarEgresosAdmin();
             calcularBalanceGeneral();
@@ -3569,7 +3494,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 listaEgresos = listaEgresos.filter(e => e.id !== idBorrar);
-                localStorage.setItem('liga_egresos', JSON.stringify(listaEgresos));
+                almacen.setItem('liga_egresos', JSON.stringify(listaEgresos));
                 renderizarEgresosAdmin();
                 calcularBalanceGeneral();
             });
@@ -3622,7 +3547,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // sigue cargando el admin a mano en "Aranceles por Partido". Guarda su
     // configuración aparte en `liga_calculadora_arancel`.
     // ============================================================
-    let configCalculadoraArancel = JSON.parse(localStorage.getItem('liga_calculadora_arancel')) || {};
+    let configCalculadoraArancel = JSON.parse(almacen.getItem('liga_calculadora_arancel')) || {};
 
     const CAMPOS_CALC_EGRESOS = ['calc-egreso-canchas', 'calc-egreso-arbitros', 'calc-egreso-pelotas', 'calc-egreso-premios', 'calc-egreso-otros'];
     const elCalcCiclo = document.getElementById('calc-ciclo');
@@ -3667,7 +3592,7 @@ document.addEventListener('DOMContentLoaded', () => {
             config.rubros[id] = el ? (parseFloat(el.value) || 0) : 0;
         });
         configCalculadoraArancel = config;
-        localStorage.setItem('liga_calculadora_arancel', JSON.stringify(config));
+        almacen.setItem('liga_calculadora_arancel', JSON.stringify(config));
     }
 
     // Rellena el formulario con la última configuración guardada. Si nunca se guardó una
@@ -3821,7 +3746,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
                 listaAlertas = listaAlertas.filter(a => a.id !== idBorrar);
-                localStorage.setItem('liga_notificaciones', JSON.stringify(listaAlertas));
+                almacen.setItem('liga_notificaciones', JSON.stringify(listaAlertas));
                 actualizarListaAlertasAdmin();
             });
         });
@@ -3832,7 +3757,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (listaAlertas.length === 0) return;
             if (!confirm('¿Vaciar todo el historial de avisos? Esta acción no se puede deshacer.')) return;
             listaAlertas = [];
-            localStorage.setItem('liga_notificaciones', JSON.stringify(listaAlertas));
+            almacen.setItem('liga_notificaciones', JSON.stringify(listaAlertas));
             actualizarListaAlertasAdmin();
         });
     }
@@ -3867,7 +3792,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const idBorrar = btn.getAttribute('data-id');
                 avisosStaff = avisosStaff.filter(a => a.id !== idBorrar);
-                localStorage.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
+                almacen.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
                 actualizarListaAvisosStaff();
             });
         });
@@ -3878,7 +3803,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (avisosStaff.length === 0) return;
             if (!confirm('¿Vaciar todo el historial de avisos internos? Esta acción no se puede deshacer.')) return;
             avisosStaff = [];
-            localStorage.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
+            almacen.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
             actualizarListaAvisosStaff();
         });
     }
@@ -3896,7 +3821,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             listaAlertas.unshift(nuevaAlerta);
-            localStorage.setItem('liga_notificaciones', JSON.stringify(listaAlertas));
+            almacen.setItem('liga_notificaciones', JSON.stringify(listaAlertas));
             formAlerta.reset();
             actualizarListaAlertasAdmin();
             alert('¡Alerta emitida!');
@@ -4021,7 +3946,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Equipos con inscripción pendiente (solo cantidad — el detalle en $ vive en Tesorería, exclusivo Admin)
         const contPagos = document.getElementById('resumen-pagos-pendientes');
         if (contPagos) {
-            const valorIndividual = parseFloat(localStorage.getItem('liga_valor_inscripcion')) || 3000;
+            const valorIndividual = parseFloat(almacen.getItem('liga_valor_inscripcion')) || 3000;
             const equiposTotal = [...(poolSuperior || []), ...(poolBasico || [])];
             const pendientesPago = equiposTotal.filter(eq => {
                 const cant = eq.jugadores ? eq.jugadores.length : 0;
@@ -4036,8 +3961,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 : `<p style="font-size:24px; color:#f2c00e; font-family:'Michroma'; font-weight:bold; margin:0;">${pendientesPago.length}</p>
                    <p style="font-size:10px; color:#869bd8; margin:4px 0 0 0;">equipo(s) con inscripción incompleta</p>`;
         }
-
-        renderizarUsoStorage();
     }
 
     document.querySelectorAll('.btn-acceso-rapido[data-target]').forEach(btn => {

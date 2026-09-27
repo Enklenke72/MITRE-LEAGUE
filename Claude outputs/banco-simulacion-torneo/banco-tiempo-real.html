@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>banco tiempo real</title></head>
+<body>
+<pre id="res">corriendo...</pre>
+<!-- Dos paneles (dos personas del staff) y la web pública abiertos a la vez, compartiendo el Firestore simulado
+     (JAVASCRIPT/firebase-sdk.js = firebase-sdk-falso.js en la copia de prueba). -->
+<iframe id="admin1" style="width:1100px;height:700px"></iframe>
+<iframe id="admin2" style="width:1100px;height:700px"></iframe>
+<iframe id="publico" style="width:1100px;height:900px"></iframe>
+<script>
+const salida = [];
+let pases = 0, fallas = 0;
+const out = s => { salida.push(s); document.getElementById('res').textContent = salida.join('\n'); };
+function check(cond, msg, det) {
+    cond ? pases++ : fallas++;
+    out((cond ? 'PASS ' : 'FAIL ') + msg + (det !== undefined ? '  → ' + JSON.stringify(det) : ''));
+}
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+const marcos = { admin1: document.getElementById('admin1'), admin2: document.getElementById('admin2'), publico: document.getElementById('publico') };
+const W = n => marcos[n].contentWindow;
+const D = n => marcos[n].contentDocument;
+
+async function cargar(nombre, url) {
+    await new Promise(res => {
+        marcos[nombre].onload = () => {
+            const w = marcos[nombre].contentWindow;
+            w.alert = m => out('  [' + nombre + ' alert] ' + m);
+            w.confirm = () => true;
+            w.onerror = (m, s, l) => out('JS ERROR [' + nombre + '] ' + m + ' @' + s + ':' + l);
+            res();
+        };
+        marcos[nombre].src = url;
+    });
+    for (let i = 0; i < 400; i++) {
+        const d = D(nombre);
+        const listo = /admin/.test(url)
+            ? d.body && !d.body.classList.contains('auth-pendiente')
+            : ((d.getElementById('contenedor-lista-notificaciones') || {}).innerHTML || '').trim() !== '';
+        if (listo) return;
+        await esperar(25);
+    }
+    out('  (' + nombre + ' no terminó de cargar)');
+}
+
+const guardar = (nombre, clave, valor) => W(nombre).almacen.setItem(clave, JSON.stringify(valor));
+const leer = (nombre, clave) => JSON.parse(W(nombre).almacen.getItem(clave));
+const fakefs = () => JSON.parse(localStorage.getItem('fakefs') || '{}');
+const banner = nombre => !D(nombre).getElementById('aviso-cambios-ajenos').hidden;
+const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', foto: '', goles: 0, amarillas: 0, rojas: 0, fichaMedica: 'si', celular: '1122334455' });
+
+(async () => {
+  try {
+    localStorage.clear();
+    out('=== Preparación: el panel 1 carga dos equipos y un partido sin jugar ===');
+    await cargar('admin1', 'admin.html');
+    guardar('admin1', 'liga_grupos', { superior: ['A', 'B'], basico: ['A'] });
+    guardar('admin1', 'liga_cicloSuperior', [
+        { id: 1, nombre: 'Rojo FC', grupo: 'A', pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, dif: 0, pts: 0, jugadores: [jugador('Ana Uno', '40111222', 9), jugador('Beto Dos', '40333444', 10)] },
+        { id: 2, nombre: 'Azul FC', grupo: 'A', pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, dif: 0, pts: 0, jugadores: [jugador('Carla Tres', '40555666', 7)] }
+    ]);
+    guardar('admin1', 'liga_partidos', [{ id: 100, fecha: 1, dia: '', horario: '10:00', cancha: 'Cancha 1', local: 'Rojo FC', visitante: 'Azul FC', localId: 1, visitanteId: 2, golesLocal: null, golesVisitante: null, ciclo: 'superior', grupo: 'A', jugado: false, asistentesLocal: [], asistentesVisitante: [] }]);
+    await esperar(300);
+
+    await cargar('publico', 'index.html');
+    await cargar('admin2', 'admin.html');
+    check(/VS/.test(D('publico').getElementById('contenedor-partidos-fecha').textContent), 'Web pública: el partido aparece pendiente (VS)');
+    check(!banner('admin1') && !banner('admin2'), 'Al abrir, ningún panel muestra el aviso de cambios');
+
+    // El visitante se para en el Grupo B y deja abierto el partido en el fixture.
+    D('publico').querySelector('.tabs-sup .tab-btn[data-grupo-val="B"]').dispatchEvent(new Event('click'));
+    const tarjeta = () => D('publico').querySelector('#contenedor-partidos-fecha .match-card-desplegable[data-pid="100"]');
+    tarjeta().click();
+    check(tarjeta().classList.contains('desplegado'), 'El visitante abrió el partido en el fixture');
+    // Abre también el perfil de Rojo FC.
+    D('publico').querySelector('.tabs-sup .tab-btn[data-grupo-val="A"]').dispatchEvent(new Event('click'));
+    D('publico').querySelector('.tbody-sup .td-team-name').click();
+    D('publico').querySelector('.tabs-sup .tab-btn[data-grupo-val="B"]').dispatchEvent(new Event('click'));
+    check(!D('publico').getElementById('modal-equipo').classList.contains('seccion-oculta'), 'El visitante abrió el perfil de un equipo');
+
+    out('\n=== El panel 1 carga el resultado: 3 a 1 ===');
+    const ps = leer('admin1', 'liga_partidos');
+    Object.assign(ps[0], { jugado: true, golesLocal: 3, golesVisitante: 1 });
+    guardar('admin1', 'liga_partidos', ps);
+    await esperar(1000);
+
+    const dp = D('publico');
+    check(/3 - 1/.test(dp.querySelector('.resultados-lista').textContent), 'Web pública, sin recargar: "Últimos partidos" muestra 3 - 1', dp.querySelector('.resultados-lista').textContent.replace(/\s+/g, ' ').trim().slice(0, 80));
+    check(tarjeta() && tarjeta().classList.contains('desplegado') && /3 - 1/.test(tarjeta().textContent), 'El partido del fixture se actualizó y sigue abierto', tarjeta() && tarjeta().className);
+    check((dp.querySelector('.tabs-sup .tab-btn.active') || {}).textContent === 'Grupo B', 'El visitante sigue parado en el Grupo B', (dp.querySelector('.tabs-sup .tab-btn.active') || {}).textContent);
+    dp.querySelector('.tabs-sup .tab-btn[data-grupo-val="A"]').dispatchEvent(new Event('click'));
+    const fila1 = dp.querySelector('.tbody-sup tr');
+    check(fila1 && /Rojo FC/.test(fila1.textContent) && fila1.querySelector('.td-pts-total').textContent === '3', 'La tabla del Grupo A ya suma los 3 puntos a Rojo FC', fila1 && fila1.textContent.replace(/\s+/g, ' ').trim());
+    check(!dp.getElementById('modal-equipo').classList.contains('seccion-oculta') && dp.getElementById('modal-equipo-nombre').textContent === 'Rojo FC', 'El perfil de equipo sigue abierto');
+    check(banner('admin2'), 'El panel 2 (otra persona) muestra el aviso "Otra persona cargó cambios"');
+    check(!banner('admin1'), 'El panel 1 NO se avisa a sí mismo por su propio guardado');
+
+    out('\n=== Dos planilleros tildan el mismo partido desde paneles distintos ===');
+    // El panel 2 todavía tiene el partido SIN resultado en memoria (no actualizó): su guardado no debe borrar el 3-1.
+    const ps1 = leer('admin1', 'liga_partidos'); ps1[0].asistentesLocal = ['40111222'];
+    guardar('admin1', 'liga_partidos', ps1);
+    const ps2 = leer('admin2', 'liga_partidos'); ps2[0].asistentesLocal = ['40333444'];
+    check(ps2[0].jugado === false, 'El panel 2 sigue con la versión vieja del partido (sin resultado)');
+    guardar('admin2', 'liga_partidos', ps2);
+    await esperar(1000);
+    const doc = fakefs().partidos['100'];
+    check(doc.jugado === true && doc.golesLocal === 3 && doc.golesVisitante === 1, 'El guardado del panel desactualizado NO borró el resultado', { jugado: doc.jugado, gl: doc.golesLocal, gv: doc.golesVisitante });
+    check(doc.asistentesLocal.length === 2 && doc.asistentesLocal.every(x => /^j/.test(x)), 'Quedaron los dos tildados (uno de cada panel), guardados con código y no con DNI', doc.asistentesLocal);
+    check(banner('admin1'), 'Ahora el panel 1 también ve el aviso (el tilde lo hizo el panel 2)');
+    const pj = [...dp.querySelectorAll('#modal-equipo-tbody-jugadores tr')].map(tr => tr.cells[2].textContent.trim() + ':' + tr.cells[3].textContent.trim());
+    check(pj.includes('Ana Uno:1') && pj.includes('Beto Dos:1'), 'El perfil abierto en la web ya muestra 1 PJ para los dos tildados', pj);
+
+    out('\n=== Aviso y Tribunal en vivo ===');
+    dp.getElementById('btn-toggle-tribunal').click();
+    guardar('admin1', 'liga_notificaciones', [{ id: 555, titulo: 'Aviso en vivo', texto: 'Se atrasa la fecha 20 minutos.', tipo: 'normal', timestamp: Date.now(), leida: false }]);
+    guardar('admin1', 'liga_sanciones', [{ id: 777, acta: 1, ciclo: 'superior', equipo: 'Azul FC', equipoId: 2, jugador: 'Carla Tres (#7)', jugadorId: '40555666', tipo: 'Sanción Disciplinaria', puntosRestados: 1, motivo: 'Roja directa' }]);
+    await esperar(1000);
+    check(/Aviso en vivo/.test(dp.getElementById('contenedor-lista-notificaciones').textContent) && dp.getElementById('badge-notificacion').classList.contains('activo'), 'La campanita muestra el aviso nuevo y prende el puntito, sin recargar');
+    check(/Acta N° 1/.test(dp.getElementById('selector-fechas-tribunal').textContent) && /Carla Tres/.test(dp.getElementById('contenido-acta-detalle').textContent), 'El Tribunal abierto muestra la sanción nueva, sin recargar');
+    const sancPublica = leer('publico', 'liga_sanciones')[0];
+    check(/^j/.test(sancPublica.jugadorId) && !JSON.stringify(leer('publico', 'liga_cicloSuperior')).includes('40111222'), 'La web pública nunca recibe DNIs (ni en sanciones ni en planteles)', sancPublica.jugadorId);
+
+    out('\n=== Actualizar el panel 2 ===');
+    await cargar('admin2', 'admin.html');
+    const p2 = leer('admin2', 'liga_partidos')[0];
+    check(!banner('admin2') && p2.jugado === true && p2.asistentesLocal.length === 2 && p2.asistentesLocal.includes('40111222'), 'Al actualizar, el panel 2 ve el resultado y los dos tildados (con DNI real) y el aviso desaparece', p2.asistentesLocal);
+  } catch (e) {
+    out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
+  }
+  out(`\nRESUMEN: ${pases} PASS, ${fallas} FAIL.`);
+  document.title = 'LISTO';
+})();
+</script>
+</body></html>

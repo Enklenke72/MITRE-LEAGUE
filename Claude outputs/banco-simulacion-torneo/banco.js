@@ -12,11 +12,19 @@ const marco = document.getElementById('marco');
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 const D = () => marco.contentDocument;
 const W = () => marco.contentWindow;
-const LS = k => JSON.parse(localStorage.getItem(k));
+// Desde la migración a Firestore (26/09/2026) los datos ya no están en localStorage: se leen del
+// almacén de la página cargada (en admin.html, con DNIs; en index.html, la vista pública con códigos).
+// Para correrlo, JAVASCRIPT/firebase-sdk.js de la copia de prueba se reemplaza por firebase-sdk-falso.js.
+const LS = k => { const a = W() && W().almacen; return a ? JSON.parse(a.getItem(k)) : null; };
+const docsFS = col => Object.keys((JSON.parse(localStorage.getItem('fakefs') || '{}'))[col] || {}).length;
 const ultimaAlerta = () => alertas[alertas.length - 1] || '';
 
-function cargar(url) {
-    return new Promise(res => {
+let avisosFalsos = 0; // con una sola persona cargando, el aviso "otra persona cargó cambios" nunca debería aparecer
+async function cargar(url) {
+    await esperar(150); // que terminen de salir las escrituras de la página anterior
+    const aviso = D() && D().getElementById('aviso-cambios-ajenos');
+    if (aviso && !aviso.hidden) avisosFalsos++;
+    await new Promise(res => {
         marco.onload = () => {
             const w = marco.contentWindow;
             w.alert = m => alertas.push(String(m));
@@ -24,10 +32,22 @@ function cargar(url) {
             w.print = () => { prints++; };
             w.scrollTo = () => {};
             w.onerror = (m, s, l) => out('JS ERROR ' + m + ' @' + s + ':' + l);
-            setTimeout(res, 30);
+            res();
         };
         marco.src = url;
     });
+    // main.js / admin.js arrancan recién cuando llegan los datos ('liga:datos-listos').
+    const esAdmin = /admin\.html/.test(url);
+    for (let i = 0; i < 400; i++) {
+        const d = D();
+        const listo = esAdmin
+            ? d.body && !d.body.classList.contains('auth-pendiente')
+            : ((d.getElementById('contenedor-lista-notificaciones') || {}).innerHTML || '').trim() !== '';
+        if (listo) break;
+        if (i === 399) out('  (la página ' + url + ' no terminó de cargar los datos: ' + ((d.getElementById('auth-gate-mensaje') || {}).textContent || '') + ')');
+        await esperar(25);
+    }
+    await esperar(30);
 }
 function el(id) { const e = D().getElementById(id); if (!e) out('NO EXISTE #' + id); return e; }
 function setv(id, val, evento = true) {
@@ -183,7 +203,7 @@ async function fase1() {
     const sinDni = LS('liga_cicloSuperior').find(e => e.nombre === '5to 2da').jugadores.find(j => j.nombre === 'Sin DNI');
     check(!sinDni || el('jugador-dni').required, 'Jugador sin DNI se rechaza (formulario de Planteles; el navegador lo frena si el campo es required)', { alerta: ultimaAlerta(), guardadoSinValidarJS: !!sinDni, required: el('jugador-dni').required });
     if (sinDni) { // limpiar para no contaminar
-        const s = LS('liga_cicloSuperior'); const e = s.find(x => x.nombre === '5to 2da'); e.jugadores = e.jugadores.filter(j => j.nombre !== 'Sin DNI'); localStorage.setItem('liga_cicloSuperior', JSON.stringify(s));
+        const s = LS('liga_cicloSuperior'); const e = s.find(x => x.nombre === '5to 2da'); e.jugadores = e.jugadores.filter(j => j.nombre !== 'Sin DNI'); W().almacen.setItem('liga_cicloSuperior', JSON.stringify(s));
         await cargar('admin.html'); await tab('sec-planteles'); setv('plantel-ciclo', 'superior'); setv('plantel-equipo-select', '5to 2da');
     }
     // DNI con puntos de otro equipo, traslado cancelado y aceptado
@@ -635,11 +655,16 @@ async function tesoreriaChecks() {
     const totalPartidos = el('txt-total-partidos')?.textContent;
     out('  info: Tesorería > total recaudado en partidos (tarjeta del Coordinador) = ' + totalPartidos + ' | esperado $' + totalTeso.toLocaleString());
 
-    // Rol staff oculta totales
-    setv('selector-rol-usuario', 'staff');
-    const oculto = getComputedStyle(D().querySelector('.solo-admin') || D().body).display === 'none';
-    check(oculto, 'Rol Staff oculta elementos .solo-admin (cosmético)');
-    setv('selector-rol-usuario', 'admin');
+    // Rol staff (sale de usuarios/{uid}; en el banco, de localStorage.fake_rol): oculta totales y no lee lo del coordinador
+    localStorage.setItem('fake_rol', 'staff');
+    await cargar('admin.html');
+    const soloAdmin = [...D().querySelectorAll('.solo-admin')];
+    check(soloAdmin.length > 0 && soloAdmin.every(x => getComputedStyle(x).display === 'none'), 'Rol Staff oculta todos los .solo-admin', soloAdmin.length);
+    check(LS('liga_egresos') === null && LS('liga_caja_movimientos') === null && LS('liga_tesoreria_partidos_v2') !== null && LS('liga_cicloSuperior')[0].jugadores[0].dni && /^\d/.test(String(LS('liga_cicloSuperior')[0].jugadores[0].dni)),
+        'Rol Staff: carga tesorería y DNIs reales, pero no egresos ni Caja por Fecha', { egresos: LS('liga_egresos'), caja: LS('liga_caja_movimientos'), dni: LS('liga_cicloSuperior')[0].jugadores[0].dni });
+    localStorage.removeItem('fake_rol');
+    await cargar('admin.html');
+    await tab('sec-tesoreria');
 
     // Avisos + noticia
     await tab('sec-alertas');
@@ -757,7 +782,7 @@ async function playoffs() {
     // Publicar
     el('btn-sub-jornada-playoffs').click();
     el('btn-toggle-publicar-playoffs').click();
-    check(localStorage.getItem('liga_playoffs_publicados') === 'true', 'Playoffs publicados');
+    check(W().almacen.getItem('liga_playoffs_publicados') === 'true', 'Playoffs publicados');
     // Orden de fechas en el cronograma y en Tesorería
     const opts = [...el('filtro-fecha-cronograma-admin').options].map(o => o.textContent);
     check(opts.indexOf('Cuartos de Final') < opts.indexOf('Gran Final'), 'Filtro de fechas del cronograma en orden cronológico (Cuartos antes que la Final)', opts);
@@ -896,7 +921,7 @@ async function publica() {
     out('  info: "Últimos partidos" muestra: ' + (ultimos || '').replace(/\s+/g, ' '));
 
     check(!/SE ACERCA LA FINAL/i.test(D().body.textContent), 'El hero ya no trae la noticia fija "SE ACERCA LA FINAL"');
-    check(D().querySelectorAll('#galeria-fotos-grid .foto-card').length === 0 && /Todavía no hay álbumes/.test((D().getElementById('galeria-fotos-grid')||{textContent:''}).textContent) && !localStorage.getItem('liga_fotos_albumes'), 'Álbumes: sin semilla del torneo anterior, cartel de vacío y la web pública no escribe la clave', { guardado: localStorage.getItem('liga_fotos_albumes'), texto: (D().getElementById('galeria-fotos-grid')||{textContent:''}).textContent.trim().slice(0,40) });
+    check(D().querySelectorAll('#galeria-fotos-grid .foto-card').length === 0 && /Todavía no hay álbumes/.test((D().getElementById('galeria-fotos-grid')||{textContent:''}).textContent) && docsFS('albumes') === 0, 'Álbumes: sin semilla del torneo anterior, cartel de vacío y la web pública no escribe nada en Firestore', { guardados: docsFS('albumes'), texto: (D().getElementById('galeria-fotos-grid')||{textContent:''}).textContent.trim().slice(0,40) });
     // Tribunal
     const sanciones = LS('liga_sanciones');
     D().getElementById('btn-toggle-tribunal').click();
@@ -946,7 +971,8 @@ async function publica() {
 // ---------------- Sponsors (alta, ubicación, edición, orden, baja) ----------------
 
 // Espera a que la compresión termine (la vista previa recibe el dataURL). Con tiempo virtual un setTimeout fijo no alcanza.
-async function esperarPreview(idPreview, intentos = 200) {
+// Con --virtual-time-budget el reloj de la página corre más rápido que la compresión real de la imagen: margen amplio.
+async function esperarPreview(idPreview, intentos = 2000) {
     for (let i = 0; i < intentos; i++) {
         const prev = D().getElementById(idPreview);
         if (prev && String(prev.src || '').indexOf('data:image/') === 0) return true;
@@ -1251,25 +1277,31 @@ async function campanita() {
     const btnLeido = D().getElementById('btn-marcar-leido');
     if (btnLeido) btnLeido.click();
     await esperar(2);
-    const trasLeer = LS('liga_notificaciones') || [];
-    check(trasLeer.every(n => n.leida), '"Marcar leídos" marca todos como leídos (ojo: el visitante escribe en la clave compartida)', { badgeAntes: badgeVisible, leidas: trasLeer.map(n => n.leida) });
+    // Desde la migración, "leído" y "limpiar" quedan solo en el dispositivo del visitante: los avisos compartidos no cambian.
+    const itemsLeidos = [...lista.querySelectorAll('.notif-item')];
+    check(itemsLeidos.length === 2 && itemsLeidos.every(n => n.classList.contains('leida')) && !D().getElementById('badge-notificacion').classList.contains('activo'),
+        '"Marcar leídos" marca todos como leídos y apaga el puntito', { badgeAntes: badgeVisible, clases: itemsLeidos.map(n => n.className) });
+    check((LS('liga_notificaciones') || []).length === 2 && docsFS('notificaciones') === 2, '"Marcar leídos" no toca los avisos compartidos', docsFS('notificaciones'));
     const btnLimpiar = D().getElementById('btn-limpiar-notifs');
     if (btnLimpiar) btnLimpiar.click();
     await esperar(2);
-    check((LS('liga_notificaciones') || []).length === 0, '"Limpiar" vacía la campanita');
+    check(lista.querySelectorAll('.notif-item').length === 0 && docsFS('notificaciones') === 2, '"Limpiar" vacía la campanita de este dispositivo sin borrar los avisos', docsFS('notificaciones'));
+    await cargar('index.html');
+    check(D().getElementById('contenedor-lista-notificaciones').querySelectorAll('.notif-item').length === 0, 'Lo limpiado sigue oculto al recargar la web');
     check(/No hay|sin avisos|Sin notificaciones/i.test(D().getElementById('contenedor-lista-notificaciones').textContent), 'La campanita vacía muestra su cartel', D().getElementById('contenedor-lista-notificaciones').textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
     // El admin vuelve a publicar y el historial del panel se vacía con su propio botón
     await cargar('admin.html');
     await tab('sec-alertas');
     setv('alerta-titulo', 'Aviso para vaciar', false); setv('alerta-texto', 'prueba', false);
     await enviar('form-alerta-admin');
+    const avisosAntes = (LS('liga_notificaciones') || []).length;
     respuestaConfirm = false;
     el('btn-vaciar-alertas-admin').click();
-    check((LS('liga_notificaciones') || []).length === 1, 'Cancelar "Vaciar Historial" del panel no borra');
+    check(avisosAntes === 3 && (LS('liga_notificaciones') || []).length === avisosAntes, 'Cancelar "Vaciar Historial" del panel no borra', avisosAntes);
     respuestaConfirm = true;
     el('btn-vaciar-alertas-admin').click();
-    await esperar(2);
-    check((LS('liga_notificaciones') || []).length === 0, '"Vaciar Historial" del panel borra los avisos');
+    await esperar(200);
+    check((LS('liga_notificaciones') || []).length === 0 && docsFS('notificaciones') === 0, '"Vaciar Historial" del panel borra los avisos (también en Firestore)', docsFS('notificaciones'));
 }
 
 async function responsive780() {
@@ -1502,11 +1534,14 @@ async function bordes() {
     await tab('sec-tesoreria');
     el('btn-sub-teso-inscripciones').click();
     setv('monto-inscripcion-individual', '3500');
-    const filaInsc = [...D().querySelectorAll('#tbody-tesoreria-inscripciones tr')].find(tr => tr.cells[0].textContent === '4to 1ra');
-    check(filaInsc && /\$21[.,]000/.test(filaInsc.cells[2].textContent), 'Inscripciones: 6 jugadores x $3.500 = $21.000', filaInsc && filaInsc.cells[2].textContent);
-    const inpInsc = filaInsc.querySelector('.in-insc-ef'); inpInsc.value = '21000'; inpInsc.dispatchEvent(new Event('change'));
-    const filaInsc2 = [...D().querySelectorAll('#tbody-tesoreria-inscripciones tr')].find(tr => tr.cells[0].textContent === '4to 1ra');
-    check(/AL DÍA/.test(filaInsc2.cells[5].textContent) && (LS('liga_caja_movimientos') || []).some(m => m.concepto === 'Inscripción' && m.monto === 21000), 'Inscripción pagada: AL DÍA y movimiento en la Caja');
+    // Desde el 24/09/2026 Inscripciones son tarjetas (.teso-insc-card), no filas de tabla.
+    const cardInsc = () => [...D().querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')].find(c => c.dataset.eq === '4to 1ra');
+    const card1 = cardInsc();
+    check(card1 && card1.dataset.exigido === '21000', 'Inscripciones: 6 jugadores x $3.500 = $21.000', card1 && card1.dataset.exigido);
+    if (card1) { const inpInsc = card1.querySelector('.in-insc-ef'); inpInsc.value = '21000'; inpInsc.dispatchEvent(new Event('change', { bubbles: true })); }
+    await esperar(2);
+    const card2 = cardInsc();
+    check(card2 && /AL DÍA/.test(card2.textContent) && (LS('liga_caja_movimientos') || []).some(m => m.concepto === 'Inscripción' && m.monto === 21000), 'Inscripción pagada: AL DÍA y movimiento en la Caja', card2 && card2.textContent.replace(/\s+/g, ' ').trim());
 
     // 0b) Planteles: ir a otra pestaña, volver y dar de baja / tocar ficha sin que se redibuje la tabla
     await tab('sec-planteles');
@@ -1591,7 +1626,7 @@ async function bordes() {
         await finanzas();
         await campanita();
         await responsive780();
-        localStorage.setItem('__snapshot', JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter(x => x.startsWith('liga_')).map(x => [x, localStorage.getItem(x)]))));
+        localStorage.setItem('__snapshot', localStorage.getItem('fakefs') || '{}');
         await bordes();
         await suspensionPorFechasJugadas();
         await suspension30();
@@ -1599,6 +1634,7 @@ async function bordes() {
     } catch (e) {
         out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
     }
+    check(avisosFalsos === 0, 'Con una sola persona cargando, el panel nunca mostró el aviso de cambios ajenos', avisosFalsos);
     out('Veces que Editar partido dejó Local/Visitante vacíos (bug): ' + bugEditarGrupo);
     out(`\nRESUMEN: ${pases} PASS, ${fallas} FAIL. Alertas: ${alertas.length}. Confirms: ${confirms.length}.`);
     document.getElementById('res').textContent = salida.join('\n');

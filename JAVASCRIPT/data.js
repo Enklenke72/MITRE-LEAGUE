@@ -10,7 +10,7 @@ const ligaData = {
 
     // SPONSORS (editables desde el panel Staff — Prensa & Fotos). Arranca vacío
     // (decidido por Joaquín, 22/09/2026): los sponsors del torneo nuevo se cargan
-    // desde el panel. Una vez que se guarda algo en localStorage ('liga_sponsors'),
+    // desde el panel. Una vez que se guarda algo en Firestore (colección 'sponsors'),
     // esa versión manda.
     sponsors: [],
 

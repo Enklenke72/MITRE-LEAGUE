@@ -2,7 +2,7 @@
 // PLAYOFFS.JS — Lógica pura y compartida del árbol de eliminación
 // ============================================================
 // Se carga como <script> plano (sin módulos) ANTES de main.js y admin.js,
-// igual que data.js. No toca el DOM ni localStorage directamente salvo las
+// igual que data.js. No toca el DOM ni el almacén de datos salvo las
 // funciones explícitas de config (que sí lo hacen, por conveniencia, ya que
 // la config se usa desde ambos archivos).
 //
@@ -19,19 +19,19 @@ const CONFIG_PLAYOFFS_DEFAULT_RONDA = 'octavos';
 const CONFIG_PLAYOFFS_DEFAULT_SLOTS = 8;
 
 /**
- * Lee la configuración de bracket por ciclo desde localStorage.
+ * Lee la configuración de bracket por ciclo desde el almacén (JAVASCRIPT/almacen.js).
  * Forma: { superior: {rondaInicial:'octavos', slots:8}, basico: {...} }
  */
 function obtenerConfigPlayoffs() {
     try {
-        return JSON.parse(localStorage.getItem('liga_playoffs_config')) || {};
+        return JSON.parse(almacen.getItem('liga_playoffs_config')) || {};
     } catch (e) {
         return {};
     }
 }
 
 function guardarConfigPlayoffs(config) {
-    localStorage.setItem('liga_playoffs_config', JSON.stringify(config));
+    almacen.setItem('liga_playoffs_config', JSON.stringify(config));
 }
 
 /**

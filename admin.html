@@ -17,6 +17,11 @@
         </div>
     </div>
 
+    <div id="aviso-cambios-ajenos" class="aviso-cambios-ajenos" role="status" hidden>
+        <span>Otra persona cargó cambios. Lo tuyo ya está guardado: actualizá para verlos.</span>
+        <button type="button" id="btn-actualizar-cambios" class="auth-gate-btn">Actualizar</button>
+    </div>
+
     <header class="staff-header">
         <h1 class="staff-title">MITRE LEAGUE — STAFF CONTROL</h1>
         <p class="staff-subtitle">Panel de Operaciones en Campo y Administración Central</p>
@@ -82,12 +87,6 @@
                 <h3 style="color:#f2c00e; margin-top:0;">Equipos con Pagos Pendientes</h3>
                 <p style="font-size:10px; color:#869bd8; margin-top:-6px;">Cantidad de equipos con saldo pendiente — el detalle y los montos están en Tesorería.</p>
                 <div id="resumen-pagos-pendientes"></div>
-            </section>
-
-            <section class="admin-card-panel" style="border-color: #2edae3;">
-                <h3 style="color:#2edae3; margin-top:0;">Espacio de Almacenamiento</h3>
-                <p style="font-size:10px; color:#869bd8; margin-top:-6px;">El navegador guarda todo el torneo en un espacio de ~5 MB. Las fotos que subís se comprimen solas, pero conviene mirar esto cada tanto.</p>
-                <div id="storage-uso-admin"></div>
             </section>
 
             <section class="admin-card-panel" style="grid-column: 1 / -1;">
@@ -1155,6 +1154,7 @@
     </main>
 
     <script src="JAVASCRIPT/data.js"></script>
+    <script src="JAVASCRIPT/almacen.js"></script>
     <script src="JAVASCRIPT/playoffs.js"></script>
     <script src="JAVASCRIPT/admin.js"></script>
     <script type="module" src="JAVASCRIPT/auth-admin.js"></script>

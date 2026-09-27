@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('liga:datos-listos', () => {
 
     // 1. ALGORITMO DE ORDENAMIENTO
     function ordenarTabla(equipos) {
@@ -35,22 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. PROCESAMIENTO MATEMÁTICO DE LA LIGA
     function procesarLiga() {
         // NUEVO: Traemos los equipos actualizados desde la memoria (con sus grupos nuevos)
-        const supDinamicos = localStorage.getItem('liga_cicloSuperior');
+        const supDinamicos = almacen.getItem('liga_cicloSuperior');
         if (supDinamicos) { 
             ligaData.cicloSuperior = JSON.parse(supDinamicos); 
         }
 
-        const basDinamicos = localStorage.getItem('liga_cicloBasico');
+        const basDinamicos = almacen.getItem('liga_cicloBasico');
         if (basDinamicos) { 
             ligaData.cicloBasico = JSON.parse(basDinamicos); 
         }
 
-        const partidosDinamicos = localStorage.getItem('liga_partidos'); 
+        const partidosDinamicos = almacen.getItem('liga_partidos'); 
         if (partidosDinamicos) { 
             ligaData.partidos = JSON.parse(partidosDinamicos); 
         }
 
-        const sancionesDinamicas = localStorage.getItem('liga_sanciones');
+        const sancionesDinamicas = almacen.getItem('liga_sanciones');
         if (sancionesDinamicas) {
             ligaData.sanciones = JSON.parse(sancionesDinamicas);
         }
@@ -184,8 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!tbody) return;
 
         const pool = cicloGoleadoresActivo === 'superior' 
-            ? (JSON.parse(localStorage.getItem('liga_cicloSuperior')) || ligaData.cicloSuperior) 
-            : (JSON.parse(localStorage.getItem('liga_cicloBasico')) || ligaData.cicloBasico);
+            ? (JSON.parse(almacen.getItem('liga_cicloSuperior')) || ligaData.cicloSuperior) 
+            : (JSON.parse(almacen.getItem('liga_cicloBasico')) || ligaData.cicloBasico);
 
         let listaJugadores = [];
         pool.forEach(eq => {
@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. RENDERIZADO DE PARTIDOS EN HOME Y FIXTURE (Con indicación de Fecha)
     function renderizarResultados(fechaSeleccionada) {
-        const partidosDinamicos = localStorage.getItem('liga_partidos');
+        const partidosDinamicos = almacen.getItem('liga_partidos');
         if (partidosDinamicos) ligaData.partidos = JSON.parse(partidosDinamicos);
 
         const contenedor = document.querySelector('.resultados-lista');
@@ -393,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // RENDERIZADO DINÁMICO DE BOTONES (INCLUYE TABLA ÚNICA SÓLO SI EL STAFF LA ACTIVÓ)
     function renderizarBotonesGruposPublico() {
-        const gruposTorneo = JSON.parse(localStorage.getItem('liga_grupos')) || {
+        const gruposTorneo = JSON.parse(almacen.getItem('liga_grupos')) || {
             superior: ['A', 'B', 'C', 'D', 'E'],
             basico: ['A', 'B']
         };
@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Única" NO se infiere de si algún equipo tiene grupo:'Unico' — eso era
         // un efecto secundario accidental. Ahora depende de una decisión
         // explícita del staff en el panel (sección "Formato del Torneo").
-        const formatoTorneo = JSON.parse(localStorage.getItem('liga_formato_torneo')) || { superior: 'grupos', basico: 'grupos' };
+        const formatoTorneo = JSON.parse(almacen.getItem('liga_formato_torneo')) || { superior: 'grupos', basico: 'grupos' };
 
         const contSup = document.querySelector('.tabs-sup');
         const contBas = document.querySelector('.tabs-bas');
@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarBotonesGruposPublico();
 
     // Dibujamos el primer grupo de cada ciclo
-    const gruposIniciales = JSON.parse(localStorage.getItem('liga_grupos')) || { superior: ['A'], basico: ['A'] };
+    const gruposIniciales = JSON.parse(almacen.getItem('liga_grupos')) || { superior: ['A'], basico: ['A'] };
     const primerGrupoSup = (gruposIniciales.superior && gruposIniciales.superior[0]) || 'A';
     const primerGrupoBas = (gruposIniciales.basico && gruposIniciales.basico[0]) || 'A';
 
@@ -606,10 +606,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // SPONSORS: DATOS (editables desde el panel Staff) + RENDER
     // ============================================================
     function obtenerSponsors() {
-        const guardados = JSON.parse(localStorage.getItem('liga_sponsors'));
+        const guardados = JSON.parse(almacen.getItem('liga_sponsors'));
         if (guardados && guardados.length > 0) return guardados;
         const seed = (typeof ligaData !== 'undefined' && ligaData.sponsors) ? ligaData.sponsors : [];
-        if (seed.length > 0) localStorage.setItem('liga_sponsors', JSON.stringify(seed));
+        if (seed.length > 0) almacen.setItem('liga_sponsors', JSON.stringify(seed));
         return seed;
     }
 
@@ -646,10 +646,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // GALERÍA DE FOTOS: DATOS (editables desde el panel Staff) + RENDER
     // ============================================================
     function obtenerFotosAlbumes() {
-        const guardados = JSON.parse(localStorage.getItem('liga_fotos_albumes'));
+        const guardados = JSON.parse(almacen.getItem('liga_fotos_albumes'));
         if (guardados && guardados.length > 0) return guardados;
         const seed = (typeof ligaData !== 'undefined' && ligaData.fotosAlbumes) ? ligaData.fotosAlbumes : [];
-        if (seed.length > 0) localStorage.setItem('liga_fotos_albumes', JSON.stringify(seed));
+        if (seed.length > 0) almacen.setItem('liga_fotos_albumes', JSON.stringify(seed));
         return seed;
     }
 
@@ -789,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // Tiene que ir antes del carrusel: si no, las tarjetas nuevas quedan sin posición (invisibles) y sin clic.
     const heroTrack = document.getElementById('hero-track-3d');
-    const noticiasGuardadas = JSON.parse(localStorage.getItem('liga_noticias')) || [];
+    const noticiasGuardadas = JSON.parse(almacen.getItem('liga_noticias')) || [];
 
     if (heroTrack && noticiasGuardadas.length > 0) {
         heroTrack.innerHTML = ''; // Limpiamos las noticias por defecto si cargaste nuevas
@@ -1010,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function cargarTribunalPublico() {
-        const sanciones = JSON.parse(localStorage.getItem('liga_sanciones')) || [];
+        const sanciones = JSON.parse(almacen.getItem('liga_sanciones')) || [];
 
         if (!contFechasTribunal || !contDetalleActa) return;
 
@@ -1148,7 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const contenidoActivo = document.getElementById('playoffs-contenido-activo');
         const bracketContenedor = document.getElementById('bracket-main');
         
-        const estanPublicados = localStorage.getItem('liga_playoffs_publicados') === 'true';
+        const estanPublicados = almacen.getItem('liga_playoffs_publicados') === 'true';
 
         if (!estanPublicados) {
             if (bannerEspera) bannerEspera.classList.remove('seccion-oculta');
@@ -1161,11 +1161,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!bracketContenedor) return;
 
-        const partidosGuardados = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos || [];
-        const crucesGuardadosRaw = JSON.parse(localStorage.getItem('liga_cruces_playoffs')) || [];
+        const partidosGuardados = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
+        const crucesGuardadosRaw = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
         // Por si el visitante carga index.html antes de que el staff haya abierto
         // admin.html al menos una vez desde esta actualización (que es lo que
-        // persiste el campo 'slot' en localStorage): migramos también acá, sólo
+        // persiste el campo 'slot'): migramos también acá, sólo
         // en memoria, para no depender de ese orden de eventos.
         const crucesGuardados = typeof migrarCrucesConSlot === 'function'
             ? migrarCrucesConSlot(crucesGuardadosRaw).cruces
@@ -1393,13 +1393,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const contenedor = document.getElementById('contenedor-partidos-fecha');
         if (!contenedor) return;
 
-        const partidosDinamicos = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos;
+        const partidosDinamicos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos;
         let partidosFiltrados = partidosDinamicos.filter(p => p.fecha === numeroFecha);
 
         if (filtroCicloFixture !== 'todos') {
             partidosFiltrados = partidosFiltrados.filter(p => p.ciclo === filtroCicloFixture);
         }
 
+        // Si se vuelve a dibujar por una actualización en vivo, los partidos que el visitante tenía abiertos siguen abiertos.
+        const abiertos = new Set([...contenedor.querySelectorAll('.match-card-desplegable.desplegado')].map(c => c.dataset.pid));
         contenedor.innerHTML = '';
 
         if (partidosFiltrados.length === 0) {
@@ -1455,8 +1457,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${partido.mvp}` : '';
 
             contenedor.innerHTML += `
-                <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}">
-                    
+                <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}" data-pid="${partido.id}">
+
                     <!-- HEADER EN GRILLA 3 COLUMNAS -->
                     <div class="match-header-grid">
                         
@@ -1507,30 +1509,33 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // Escuchador de Clics
-        document.querySelectorAll('.match-card-desplegable').forEach(card => {
-            card.addEventListener('click', () => {
-                const drawer = card.querySelector('.match-details-drawer');
-                const arrow = card.querySelector('.arrow-indicator');
-                if (drawer) {
-                    drawer.classList.toggle('seccion-oculta');
-                    card.classList.toggle('desplegado');
-                    if (arrow) arrow.textContent = drawer.classList.contains('seccion-oculta') ? '▼' : '▲';
-                }
-            });
+        // Escuchador de Clics. Solo las tarjetas del fixture: las del modal de un equipo tienen el suyo, y
+        // engancharles otro hacía que se abrieran y cerraran en el mismo clic.
+        const alternarTarjeta = card => {
+            const drawer = card.querySelector('.match-details-drawer');
+            const arrow = card.querySelector('.arrow-indicator');
+            if (drawer) {
+                drawer.classList.toggle('seccion-oculta');
+                card.classList.toggle('desplegado');
+                if (arrow) arrow.textContent = drawer.classList.contains('seccion-oculta') ? '▼' : '▲';
+            }
+        };
+        contenedor.querySelectorAll('.match-card-desplegable').forEach(card => {
+            card.addEventListener('click', () => alternarTarjeta(card));
+            if (abiertos.has(card.dataset.pid)) alternarTarjeta(card);
         });
     }
 
     // Botones de fecha del fixture: uno por cada fecha de fase de grupos que exista en los partidos (sin tope fijo).
     function fechasDeFaseDeGrupos() {
-        const partidosDinamicos = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos || [];
+        const partidosDinamicos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
         return [...new Set(partidosDinamicos.filter(p => !p.esPlayoff && p.fecha < 100).map(p => p.fecha))].sort((a, b) => a - b);
     }
 
     // Rondas de playoff (108/104/102/100) que tienen al menos un partido cargado, en orden cronológico
     // (Octavos → Final). Van como botones aparte, después de las fechas de fase de grupos.
     function rondasDePlayoffConPartidos() {
-        const partidosDinamicos = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos || [];
+        const partidosDinamicos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
         const fechas = [...new Set(partidosDinamicos.filter(p => p.esPlayoff || p.fecha >= 100).map(p => p.fecha))];
         return fechas.sort((a, b) => ordenCronologicoFechaPublico(a) - ordenCronologicoFechaPublico(b));
     }
@@ -1547,7 +1552,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Al abrir la pantalla de Partidos por primera vez, arranca en la última fecha de fase de grupos
     // con resultado cargado; si ninguna tiene resultado todavía, en la primera fecha que exista.
     function calcularFechaInicialFixture(fechasGrupo) {
-        const partidosDinamicos = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos || [];
+        const partidosDinamicos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
         const conResultado = fechasGrupo.filter(f => partidosDinamicos.some(p => !p.esPlayoff && p.fecha === f && p.jugado));
         if (conResultado.length > 0) return Math.max(...conResultado);
         if (fechasGrupo.length > 0) return fechasGrupo[0];
@@ -1733,7 +1738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     searchInput.value = '';
 
                     // 1. Obtenemos los partidos del sistema
-                    const partidosCrudos = localStorage.getItem('liga_partidos');
+                    const partidosCrudos = almacen.getItem('liga_partidos');
                     const partidos = partidosCrudos ? JSON.parse(partidosCrudos) : (ligaData.partidos || []);
 
                     // 2. Filtramos los partidos del equipo buscado
@@ -1838,6 +1843,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // SISTEMA DINÁMICO DE NOTIFICACIONES Y ALERTAS (HEADER + SIDEBAR)
     // ============================================================
+    const CLAVE_AVISOS_LEIDOS = 'liga_avisos_leidos_dispositivo';
+    const CLAVE_AVISOS_OCULTOS = 'liga_avisos_ocultos_dispositivo';
+
+    function idsAvisosEnDispositivo(clave) {
+        try {
+            return JSON.parse(localStorage.getItem(clave)) || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function sumarAvisosEnDispositivo(clave) {
+        const ids = new Set(idsAvisosEnDispositivo(clave));
+        (JSON.parse(almacen.getItem('liga_notificaciones')) || []).forEach(n => ids.add(String(n.id)));
+        try {
+            localStorage.setItem(clave, JSON.stringify([...ids]));
+        } catch (e) {
+            console.warn('[Avisos] No se pudo guardar en este dispositivo:', e);
+        }
+    }
+
     function renderizarNotificaciones() {
         const contenedores = [
             document.getElementById('contenedor-lista-notificaciones'),
@@ -1848,9 +1874,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('badge-notificacion-sidebar')
         ];
 
-        // Sin avisos de ejemplo: el torneo arranca limpio y los avisos los carga el staff desde el admin.
-        // Si 'liga_notificaciones' no existe, se muestra vacío (sin escribir nada desde la web pública).
-        const notifs = JSON.parse(localStorage.getItem('liga_notificaciones')) || [];
+        // Los avisos los carga el staff y son de todos: "leído" y "limpiar" se guardan solo en este dispositivo.
+        const leidos = idsAvisosEnDispositivo(CLAVE_AVISOS_LEIDOS);
+        const ocultos = idsAvisosEnDispositivo(CLAVE_AVISOS_OCULTOS);
+        const notifs = (JSON.parse(almacen.getItem('liga_notificaciones')) || [])
+            .filter(n => !ocultos.includes(String(n.id)))
+            .map(n => ({ ...n, leida: n.leida || leidos.includes(String(n.id)) }));
 
         const hayNoLeidas = notifs.some(n => !n.leida);
 
@@ -1956,9 +1985,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btn) {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                let notifs = JSON.parse(localStorage.getItem('liga_notificaciones')) || [];
-                notifs.forEach(n => n.leida = true);
-                localStorage.setItem('liga_notificaciones', JSON.stringify(notifs));
+                sumarAvisosEnDispositivo(CLAVE_AVISOS_LEIDOS);
                 renderizarNotificaciones();
             });
         }
@@ -1969,7 +1996,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btn) {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                localStorage.setItem('liga_notificaciones', JSON.stringify([]));
+                sumarAvisosEnDispositivo(CLAVE_AVISOS_OCULTOS);
                 renderizarNotificaciones();
             });
         }
@@ -2082,7 +2109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (equipo.jugadores && equipo.jugadores.length > 0) {
             equipo.jugadores.sort((a, b) => (b.goles || 0) - (a.goles || 0));
-            const partidosParaPJ = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos || [];
+            const partidosParaPJ = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
 
             equipo.jugadores.forEach((j, idx) => {
                 const fotoUrl = j.foto || 'Recursos/search.svg';
@@ -2112,8 +2139,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const contPartidos = document.getElementById('modal-equipo-lista-partidos');
         contPartidos.innerHTML = '';
 
-        const partidosDinamicos = JSON.parse(localStorage.getItem('liga_partidos')) || ligaData.partidos;
-        const sancionesDinamicas = JSON.parse(localStorage.getItem('liga_sanciones')) || [];
+        const partidosDinamicos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos;
+        const sancionesDinamicas = JSON.parse(almacen.getItem('liga_sanciones')) || [];
 
         let misPartidos = partidosDinamicos.filter(p =>
             p.localId === equipo.id || p.visitanteId === equipo.id || // ID estable primero (sobrevive a un cambio de nombre)
@@ -2254,6 +2281,53 @@ document.addEventListener('DOMContentLoaded', () => {
             abrirPerfilEquipo(nombreEquipo);
         }
     });
+
+    // ============================================================
+    // TIEMPO REAL: cuando el staff carga algo en el panel
+    // ============================================================
+    // datos-firestore.js actualiza el almacén y avisa con 'liga:datos-actualizados'. Se redibuja lo
+    // que depende de los datos sin perder dónde estaba parado el visitante (grupo, fecha del fixture,
+    // acta del Tribunal, perfil de equipo abierto). Noticias, sponsors y álbumes se actualizan al
+    // volver a entrar: sus carruseles se arman una sola vez al cargar la página.
+
+    // Dispara solo el escuchador del botón: un clic que burbujea cerraría la campanita o el popover.
+    const pulsarSinPropagar = boton => boton.dispatchEvent(new Event('click'));
+
+    function restaurarGrupo(selectorTabs, grupoAnterior) {
+        const botones = [...document.querySelectorAll(`${selectorTabs} .tab-btn`)];
+        const boton = botones.find(b => b.getAttribute('data-grupo-val') === grupoAnterior) || botones[0];
+        if (boton) pulsarSinPropagar(boton);
+    }
+
+    function refrescarConDatosNuevos() {
+        const grupoSup = (document.querySelector('.tabs-sup .tab-btn.active') || {}).dataset?.grupoVal;
+        const grupoBas = (document.querySelector('.tabs-bas .tab-btn.active') || {}).dataset?.grupoVal;
+        procesarLiga();
+        renderizarBotonesGruposPublico();
+        restaurarGrupo('.tabs-sup', grupoSup);
+        restaurarGrupo('.tabs-bas', grupoBas);
+
+        renderizarGoleadores();
+        renderizarResultados();
+        renderizarTablaAnual();
+        renderizarPlayoffsPublico();
+        renderizarBotonesFechaFixture();
+        renderizarFixtureFecha(fechaActivaFixture);
+        renderizarNotificaciones();
+
+        if (panelTribunal && contFechasTribunal && !panelTribunal.classList.contains('seccion-oculta')) {
+            const actaAbierta = (contFechasTribunal.querySelector('.tab-btn.active') || {}).textContent;
+            cargarTribunalPublico();
+            const boton = [...contFechasTribunal.querySelectorAll('.tab-btn')].find(b => b.textContent === actaAbierta);
+            if (boton) pulsarSinPropagar(boton);
+        }
+
+        if (modalEquipo && !modalEquipo.classList.contains('seccion-oculta')) {
+            abrirPerfilEquipo(document.getElementById('modal-equipo-nombre').textContent);
+        }
+    }
+
+    document.addEventListener('liga:datos-actualizados', refrescarConDatosNuevos);
 
     // ============================================================
     // POPOVER DE CONTACTO EN EL FOOTER (al hacer hover/tap en la firma)

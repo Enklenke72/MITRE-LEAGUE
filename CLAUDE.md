@@ -1,6 +1,6 @@
 # Mitre League — Contexto del proyecto (para agentes)
 
-**Última actualización:** 23/09/2026 (armado con reportes de las sesiones de Claude que trabajaron en el repo; guía de migración a Firebase en la sección 11; simulación de torneo completo en Hecho #14 y los arreglos posteriores en #15, #16, #17 y #18)
+**Última actualización:** 26/09/2026 (datos migrados a Firestore, Hecho #20; login y roles en Firebase, Hecho #19; guía de migración en la sección 11; simulación de torneo completo en Hecho #14 y los arreglos posteriores en #15, #16, #17 y #18)
 **Cliente:** Joaquín Coria, secretario de deportes del centro de estudiantes — EEST Nro 4 "Ing. Emilio Mitre".
 **Qué es:** sitio web estático del torneo escolar de fútbol 5 "Mitre League". Formato tipo mundial (grupos → playoffs → final), dos ciclos: **Superior** (4° a 7°) y **Básico** (1° a 3°). Público: chicos de secundaria, padres, visitantes. Tono: serio pero atrevido, pensado para que un alumno le saque captura y la comparta.
 **Doble objetivo de Joaquín:** reemplazar la carga manual en Excel/papel del staff, y usar la web como pieza de portfolio freelance.
@@ -14,7 +14,7 @@
 - **Solo dos HTML:** `index.html` (público) y `admin.html` (staff). No crear otros HTML.
 - **Todo JS en archivos `.js` separados** (carpeta `JAVASCRIPT/`). Nada de `<script>` inline con lógica.
 - **Todo CSS en `estilo.css`.** Nada de `<style>` inline (el de `admin.html` ya se migró).
-- **Persistencia actual = `localStorage`** (claves `liga_*`). Firebase (Fase 2) **fue pedido por Joaquín el 20/09/2026, pero condicionado a que se cierre el checklist de la sección 11.1**: no empieces sin confirmarlo con él.
+- **Persistencia = Firestore desde el 26/09/2026** (Hecho #20). El código sigue hablando con las claves `liga_*` de la sección 4, pero a través de `almacen` (`JAVASCRIPT/almacen.js`), que las carga desde Firestore y guarda cada cambio ahí. **Nunca uses `localStorage` para datos del torneo** (solo para preferencias del dispositivo, como los avisos leídos de la campanita).
 - **Los números de equipos son de datos de ejemplo, no constantes.** Cada edición puede tener más o menos equipos por ciclo, y Ciclo Básico puede no jugarse. Nada debe asumir 20/9 equipos ni 16/8/4 llaves.
 - **Colores e identidad visual:** se mantienen. Si querés proponer otra paleta, **preguntá antes**.
 - **Debajo de cada sponsor:** Instagram **y** teléfono, cada uno si lo cargó (decisión de Joaquín, 22/09/2026; antes era uno u otro). Si además cargó una ubicación (dirección o link de mapa), se muestra aparte; lo que no se cargó no aparece.
@@ -36,10 +36,13 @@ estilo.css                → hoja única (~4.400 líneas)
 JAVASCRIPT/
   data.js                 → datos semilla (equipos, partidos, sponsors, álbumes). Global `ligaData`
   playoffs.js             → lógica pura y compartida del bracket (se carga antes de main.js y admin.js)
+  almacen.js              → claves liga_* en memoria, misma interfaz que localStorage (global `almacen`)
   firebase-config.js      → claves del proyecto de Firebase (no son secretas)
   firebase-sdk.js         → carga perezosa del SDK desde el CDN (cargarFirebase / cargarFirestore)
+  datos-firestore.js      → capa de datos: Firestore ↔ almacen (ESQUEMA de colecciones, códigos de DNI, guardado por documento)
+  datos-publicos.js       → carga los datos públicos en index.html y dispara 'liga:datos-listos' (módulo)
   auth-login.js           → login de index.html (módulo)
-  auth-admin.js           → sesión y rol de admin.html (módulo)
+  auth-admin.js           → sesión, rol y carga de datos de admin.html (módulo)
   main.js                 → lógica de index.html (~2.180 líneas)
   admin.js                → lógica de admin.html (~2.890 líneas)
 Recursos/                 → imágenes/SVG, fuentes (Audiowide, Michroma, Oswald), SPONSORS/, Fotos/, Reglamento PDF
@@ -49,7 +52,8 @@ LISTA DE TAREAS PAGINA.pdf → roadmap propio de Joaquín (el Módulo E quedó c
 
 Carpetas hermanas fuera del repo (en `Proyectos/`): `MITRE LEAGUE - copia/` es una copia de respaldo, **no la edites**. `ClaudePruebas/` contiene skills de revisión de diseño (`revisor-design-landing`, `revisor-design-mobile`, en `1er Caso/Skills`) que algunas sesiones usan.
 
-- Scripts planos (sin módulos ES): `data.js` y `playoffs.js` exponen globales que `main.js`/`admin.js` consumen.
+- Scripts planos (sin módulos ES): `data.js`, `almacen.js` y `playoffs.js` exponen globales que `main.js`/`admin.js` consumen. Los módulos (`type="module"`) son solo los de Firebase.
+- **`main.js` y `admin.js` arrancan con el evento `liga:datos-listos`**, no con `DOMContentLoaded`: lo disparan `datos-publicos.js` (index) y `auth-admin.js` (admin, después de verificar sesión y rol) cuando los datos ya están en `almacen`.
 - Ocultar/mostrar: clases `seccion-oculta` (público) y `seccion-oculta-staff` (admin). Las pestañas de admin usan `data-target` → `id="sec-..."`.
 - Títulos "TABLA DE POSICIONES" / "PLAY-OFFS" (`#toggle-titulo-tablas`, `#toggle-titulo-playoffs`): JS solo alterna `active`/`opaco`; el desplazamiento es CSS con override en `@media (max-width:768px)`.
 - Breakpoints usados: 480, 600, 650, 768, 800 px. La franja 769–799 no se revisó visualmente.
@@ -65,9 +69,9 @@ Tablas/fase de grupos (`#vista-fase-grupos`), Playoffs (`#vista-playoffs`), Trib
 - `.recent-results` no define color y hereda negro; varias secciones lo usan así, y `index.html` tiene otros `h2` con estilos inline. Revisá el contraste si ponés texto ahí.
 - Tipografías: nombres de equipo (`.team-name`, `.teso-team-name`) en Michroma; los inputs de plata (`.input-monto-teso`) siguen en Oswald bold porque Michroma desborda.
 
-## 4. Modelo de datos (localStorage)
+## 4. Modelo de datos (claves `liga_*`, guardadas en Firestore)
 
-Regla general: la semilla de `data.js` solo se usa si la clave no existe; una vez que el staff guarda algo, **manda localStorage**.
+Desde el 26/09/2026 estas claves viven en Firestore y el código las lee/escribe con `almacen.getItem/setItem` (misma forma de datos que antes). Qué colección usa cada una, quién puede leerla y cómo se reparte está en el `ESQUEMA` de `JAVASCRIPT/datos-firestore.js` y en `firestore.rules`. Regla general: la semilla de `data.js` solo se usa si la clave no existe; una vez que el staff guarda algo, **manda Firestore**.
 
 | Clave | Contenido |
 |---|---|
@@ -90,7 +94,7 @@ Regla general: la semilla de `data.js` solo se usa si la clave no existe; una ve
 | `liga_egresos` | Egresos generales |
 | `liga_caja_movimientos` | `{id, equipo, concepto, detalle, medio, monto, fechaHora}` |
 
-**Para cualquier agente que necesite estos datos** (por ejemplo para armar un Excel): viven en el `localStorage` **del navegador de Joaquín**, no en un archivo del repo, así que una terminal no los puede leer. Opciones: (a) la semilla de `data.js`, (b) un export desde el navegador (`JSON.stringify(localStorage)` en la consola, que Joaquín te pasa), (c) un botón de exportación en admin (es un cambio de la web y se acuerda antes). Los datos de tesorería son sensibles: no los publiques ni los muevas fuera del repo sin pedirlo.
+**Para cualquier agente que necesite estos datos** (por ejemplo para armar un Excel): viven en Firestore (proyecto `mitre-league`), no en el repo. Una terminal no los puede leer sin credenciales; las opciones son que Joaquín exporte desde la consola de Firebase, o un botón de exportación en admin (es un cambio de la web y se acuerda antes). Los datos de tesorería y de los jugadores (DNI, ficha médica, contactos) son sensibles: no los publiques ni los muevas fuera del repo sin pedirlo.
 
 ## 5. Playoffs (módulo construido)
 
@@ -113,7 +117,7 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
 - **Coordinador general (Joaquín):** ve todo, incluida recaudación total, egresos y balance.
 - **Staff:** entra a Tesorería para marcar qué equipo pagó, pero **no** ve totales, egresos, balance ni "Caja por Fecha".
 - **Desde el 24/09/2026 el rol sale de Firebase** (Hecho #19): el login de `#pantalla-admin` autentica con Firebase Auth y `JAVASCRIPT/auth-admin.js` lee `usuarios/{uid}` en Firestore (`rol: "coordinador"` → `rol-admin`, `rol: "staff"` → `rol-staff` en `<body>`); el CSS sigue ocultando `.solo-admin` con `rol-staff`. El `<select id="selector-rol-usuario">` **se eliminó**. `admin.html` arranca tapado (`body.auth-pendiente` + `#auth-gate`) y sin sesión vuelve a `index.html#pantalla-admin`.
-- **Límite actual:** mientras los datos sigan en `localStorage`, esto protege la **entrada** al panel, no los datos (viven en el navegador de cada uno). La seguridad de los datos llega con la migración y las Security Rules (sección 11).
+- **Desde el 26/09/2026 lo hacen cumplir las Security Rules** (`firestore.rules`, hay que pegarlas en la consola cada vez que cambian): el visitante solo lee lo público; el Staff lee y escribe planteles con datos personales, tesorería del día y avisos internos, y solo **agrega** movimientos de Caja; egresos, Caja por Fecha y la calculadora son solo del Coordinador. Ojo: el Staff sí lee los pagos por partido e inscripción (los necesita para marcar quién pagó), así que con conocimientos técnicos podría sumar totales; lo que no ve es la Caja ni los egresos.
 
 ## 7. Estado del proyecto
 
@@ -164,7 +168,7 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
     - **No probado en navegador.** Comportamiento esperado: completar los dos campos → mensaje rojo "El acceso todavía no está activado..." → el botón vuelve a su estado normal.
     - **Relacionado, encontrado y NO tocado (avisado a Joaquín):** `#selector-rol-usuario` de `admin.html` sigue siendo cosmético (ver sección 6 y 11.4 punto 12). Reemplazarlo depende de que el login ya autentique de verdad, así que queda para cuando se conecte Firebase.
 
-19. **Proyecto de Firebase creado y login real conectado (24/09/2026).** Joaquín creó el proyecto `mitre-league` con su **cuenta de trabajo** (no la personal): Auth con Email/contraseña (sin "Acceder con Google"), Firestore **Standard** en `southamerica-east1` en modo producción, Storage (obligó a pasar a plan **Blaze**; se le recomendó una alerta de presupuesto), sin Analytics ni Gemini. **Todavía no hay usuarios creados, ni colección `usuarios`, ni Security Rules escritas.**
+19. **Proyecto de Firebase creado y login real conectado (24/09/2026).** Joaquín creó el proyecto `mitre-league` con su **cuenta de trabajo** (no la personal): Auth con Email/contraseña (sin "Acceder con Google"), Firestore **Standard** en `southamerica-east1` en modo producción, Storage (obligó a pasar a plan **Blaze**; se le recomendó una alerta de presupuesto), sin Analytics ni Gemini. El 25/09 Joaquín creó su usuario y confirmó que el login anda en Netlify.
     - `JAVASCRIPT/firebase-config.js`: claves reales cargadas (no son secretas).
     - `JAVASCRIPT/auth-login.js`: `signInWithEmailAndPassword` real, mensajes de error en español por código (`mensajeError`) y redirección a `admin.html` al entrar. **El SDK se importa con `import()` dinámico recién al tocar "Iniciar Sesión"**, desde el CDN (`gstatic.com/firebasejs/12.19.0/`, sin npm): un import estático demoraba el `DOMContentLoaded` de `index.html` —del que depende todo `main.js`— hasta que respondiera el CDN, y la web pública quedaba en blanco. Se carga con `<script type="module">`, así que **el login no anda abriendo `index.html` como archivo (`file://`)**: hace falta un servidor o Netlify.
     - `index.html`: se sacó el cartel "Acceso todavía no activado" (y su regla `.login-staff-nota` de `estilo.css`).
@@ -172,7 +176,7 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
     - **Segundo lote (mismo día): control de acceso en `admin.html`.** `JAVASCRIPT/firebase-sdk.js` (nuevo) centraliza la carga perezosa del SDK: `cargarFirebase()` (app + auth) y `cargarFirestore()` (con `persistentLocalCache`, para que el rol ya leído se sirva sin señal en la cancha); `auth-login.js` lo usa. `JAVASCRIPT/auth-admin.js` (nuevo, módulo, se carga después de `admin.js`): sin sesión → `index.html#pantalla-admin`; sin documento en `usuarios/{uid}` o con un rol desconocido → pantalla "tu cuenta no tiene rol" con "Cerrar sesión"; `permission-denied` → aviso de reglas; sin red → "Reintentar". Encabezado: nombre (o email) · rol y botón **"Cerrar sesión"** en lugar del selector (clases `staff-sesion*` y `auth-gate*` en `estilo.css`; se borraron las de `.staff-modo-vista`). En `admin.js` se sacó el bloque "2. SELECTOR DE ROL". `firestore.rules` (nuevo, raíz del repo): cada usuario lee solo su `usuarios/{uid}`, nadie escribe desde la web, todo lo demás cerrado. **Hay que pegarlo a mano** en la consola (Firestore → Reglas).
     - **Verificado en Edge headless con un Firebase simulado** (el real no es alcanzable desde esta máquina): 27 PASS / 0 FAIL — sin sesión, sin rol, rol desconocido, permiso denegado, sin red (SDK y rol), coordinador (ve `.solo-admin`), staff (los 7 `.solo-admin` ocultos), cerrar sesión, login correcto/incorrecto/sin red, sin errores de JS y sin desborde a 390 px. **Falta la prueba de Joaquín con Firebase real.**
     - **Formato del documento `usuarios/{uid}`:** el id del documento es el **UID** del usuario (columna "User UID" de Authentication → Users, no el email); campos `rol` (`"coordinador"` o `"staff"`, en minúscula) y `nombre` (opcional, se muestra en el encabezado).
-    - **Se rompió a propósito, sin arreglar:** el banco de simulación (`Claude outputs/banco-simulacion-torneo/banco.js` ~639) cambia el rol con `#selector-rol-usuario`, que ya no existe, y además `admin.html` ahora queda tapado sin sesión real. Para volver a correrlo hace falta darle un modo de prueba (por ejemplo, un `firebase-sdk.js` falso como el de esta sesión). Avisado a Joaquín.
+    - **Banco de simulación: roto por este cambio y ARREGLADO el 26/09/2026** (Hecho #20): ahora corre con `firebase-sdk-falso.js` y el rol se cambia con `localStorage.fake_rol`.
     - **Pendiente de Joaquín:** agregar el dominio de Netlify en Authentication → Settings → Authorized domains, o el login falla ahí con `auth/unauthorized-domain` (`localhost` ya viene autorizado).
 
 
@@ -183,6 +187,20 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
     - **Sin cambios en los datos:** `liga_tesoreria_inscripciones` sigue por nombre de equipo con `{ef, tr}`, y cada cambio sigue registrando el movimiento en la Caja y recalculando el balance.
     - **Probado en el DOM real, no sólo por captura:** el foco se mantiene (`document.activeElement` intacto), el scroll no salta, la tarjeta es el mismo nodo, el movimiento de Caja registra la diferencia correcta y las otras tarjetas no se tocan. A 390 px, `scrollWidth` 382 y ningún elemento desborda.
     - **Truco de verificación que dejó esa sesión, útil para el futuro:** `--window-size` de Edge headless no siempre da el ancho real; para medir de verdad conviene forzar un `<iframe>` del ancho exacto dentro de una ventana ancha y recorrer los elementos buscando cuál desborda.
+
+20. **Migración de los datos a Firestore, lote 1 (26/09/2026).** Joaquín dio luz verde ("comenzá con la migración de datos"). Del checklist 11.1 siguen abiertos el PDF del reglamento y la prueba con impresora, que no dependen de los datos.
+    - **Enfoque (paso 1 de 11.3):** no se reescribieron las ~100 lecturas y escrituras de `main.js`/`admin.js`. Hay una capa con la misma forma de datos: `JAVASCRIPT/almacen.js` (claves `liga_*` en memoria, interfaz de `localStorage`) y `JAVASCRIPT/datos-firestore.js` (`ESQUEMA`: qué colección usa cada clave y quién la lee). Cambio mecánico: `localStorage.getItem/setItem('liga_…')` → `almacen.getItem/setItem(…)` en `main.js`, `admin.js` y `playoffs.js`, y los dos arrancan con el evento `liga:datos-listos` en vez de `DOMContentLoaded`.
+    - **Lectura:** `index.html` lee solo lo público (`datos-publicos.js`). `admin.html` lee después de verificar el rol (`auth-admin.js`, gate "Cargando datos del torneo..."): el Staff no recibe egresos, Caja por Fecha ni la calculadora.
+    - **Escritura (solo el panel):** cada `setItem` se compara con el último estado conocido y se escribe **solo lo que cambió**, documento por documento y campo por campo. La asistencia de la lista de buena fe usa `arrayUnion/arrayRemove`: dos planilleros tildando el mismo partido no se pisan. Cada escritura va sola (si una falla, no arrastra a las demás) y no espera al servidor: sin señal queda en la cola de la caché persistente y sale cuando vuelve la conexión. Si el servidor rechaza algo aparece "No se pudo guardar un cambio en el servidor… Recargá la página". Si se cierra la pestaña mientras se prepara un cambio (milisegundos), el navegador pregunta antes de salir. El orden de los arrays se guarda en `_pos`.
+    - **Datos personales (11.4 punto 4):** cada equipo se guarda en `equipos` (público: equipo y, por jugador, nombre, dorsal, foto, goles, Instagram) y `equiposPrivado` (DNI, ficha médica, nacimiento, celular, contactos: solo staff). **El DNI nunca llega a una colección pública:** en jugadores, asistencia, tarjetas y `jugadorId` de sanciones va un código (HMAC-SHA256 de los dígitos del DNI con una sal guardada en `privado/claves`, que crea el primer ingreso de staff o coordinador y no se puede cambiar). El panel lo traduce de vuelta a DNI al cargar, así que `admin.js` sigue viendo DNIs; la web pública compara códigos entre sí (PJ y tarjetas del modal funcionan igual).
+    - **Campanita pública (11.4 punto 1):** "Marcar leídos" y "Limpiar" se guardan solo en el dispositivo (`localStorage`: `liga_avisos_leidos_dispositivo` / `liga_avisos_ocultos_dispositivo`), sin tocar los avisos compartidos. Antes cualquier visitante borraba los avisos para todos.
+    - **Sacado (11.4 punto 11 ya lo había decidido):** el medidor "Espacio de Almacenamiento" del Resumen, `guardarClaveConAviso` y sus estilos `.storage-*`.
+    - `firebase-sdk.js`: la web pública ya no baja el módulo de login (solo base + Firestore).
+    - `firestore.rules`: reglas para **todas** las colecciones (ver sección 6, Roles). **Hay que pegarlas en la consola.**
+    - **Verificado con el banco de simulación del torneo completo**, adaptado para correr contra un Firestore simulado con los límites del real y las mismas reglas por rol (`Claude outputs/banco-simulacion-torneo/firebase-sdk-falso.js`, ver sección 8): **242 PASS / 0 FAIL**, sin errores de JS (`resultado-7-2026-09-26.txt`). Se sumaron controles de rol Staff (no recibe egresos ni Caja, sí DNIs reales), de la campanita local y de que la web pública no escriba. El control de Inscripciones se actualizó a las tarjetas del 24/09 (antes buscaba la tabla vieja y abortaba los casos borde).
+    - **No verificado:** contra el Firebase real (el Edge headless de esta máquina no llega al CDN). Lo tiene que probar Joaquín.
+    - **Comportamiento distinto al de antes que conviene saber:** (1) los datos son los mismos para todos los dispositivos, pero **todavía no en tiempo real**: para ver lo que cargó otra persona hay que recargar; (2) el primer ingreso de cada celular al panel necesita señal (después funciona sin señal con lo guardado en la caché); (3) abrir los HTML con doble clic (`file://`) ya no funciona.
+    - **Costo a vigilar:** cada visita a la web pública lee todos los documentos públicos (uno por partido, equipo, sanción, noticia, etc.) y baja las fotos que van dentro de ellos. Con unos 250 documentos y 500 visitas por día son ~125.000 lecturas diarias; el plan incluye 50.000 gratis por día y el resto cuesta centavos de dólar. La alerta de presupuesto cubre sorpresas; si crece, mover las fotos a Storage y/o publicar un resumen único para la web.
 
 ### Pendiente
 - **CAMBIO DE PLAN (20/09/2026): se descarta el agente que volcaba datos a una plantilla de Excel.** En su lugar se **digitaliza la planilla de buena fe** (ya hecho en gran parte, ver Hecho #12). Un Excel exportado solo sirve de respaldo, y solo si Joaquín lo vuelve a pedir. Lo que falta para dar la lista digital por terminada, en orden de urgencia:
@@ -215,7 +233,7 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
 - **Bug de goleadores al editar un partido: ARREGLADO (20/09/2026, aprobado por Joaquín).** Antes los campos "Dorsales Goleadores" (`#dorsales-goles-local` / `#dorsales-goles-visitante`) no se rellenaban al editar, y guardar sin volver a escribirlos borraba los goleadores y restaba los goles. Ahora se rellenan desde `goleadoresLocal/Visitante` (`dorsalesDeGoleadores` en `admin.js`). Sigue en pie el diseño de fondo (11.4 punto 5: los goles son un contador mutable sobre el jugador). **Sin decidir con Joaquín:** hoy, si en el campo de goleadores se escribe un dorsal que no existe en el plantel, `procesarDorsales` lo ignora en silencio (el gol no se asigna a nadie, no hay aviso); las tarjetas sí lo rechazan.
 - **Avisos internos del staff: HECHO (22/09/2026, ver Hecho #16).** Extensible a otros avisos futuros (por ejemplo, si más adelante el Art. 8 o algo similar necesita avisar sin bloquear); hoy solo está conectado el caso del dorsal inválido en goles.
 - **Módulo C (control de calidad): HECHO en gran parte con el banco (Hecho #14):** tablas, desempates (PTS → DIF → GF), saldo arrastrado y caja real ($1.415.000 contra $1.415.000). Falta el responsive (franja 769–799 px, celular real) y Tabla Única.
-- **Fase 2 — Migración a Firebase: pedida por Joaquín el 20/09/2026 para apenas se cierre lo pendiente (no iniciada).** Guía completa, inventario de datos y trampas en la **sección 11**. Confirmar con Joaquín que se cerró el checklist 11.1 antes de arrancar.
+- **Fase 2 — Migración a Firebase: EN CURSO.** Login y roles (Hecho #19) y datos (lote 1, Hecho #20) ya están en Firebase. **Faltan, en este orden sugerido:** (1) **tiempo real** con `onSnapshot` en partidos, cruces y tablas: hoy la web y el panel cargan los datos una vez y hay que recargar para ver lo que cargó otra persona (Joaquín preguntó por esto el 25/09); (2) **fotos a Storage** (hoy van como dataURL dentro de cada documento y cada visita las vuelve a bajar); (3) goles derivados de los partidos en vez de contador sobre el jugador (11.4 punto 5); (4) claves de tesorería por id en vez de por nombre (11.4 punto 7); (5) id determinístico para las sanciones automáticas (11.4 punto 8); (6) validaciones del lado del servidor (DNI único, dorsal, 11.5). Guía y trampas en la **sección 11**.
 - **Excluido por decisión del cliente:** Módulo E ("Plantilla de Pre..." cortado en el PDF).
 
 **Respuestas de Joaquín (22/09/2026) a lo que dejó la simulación:**
@@ -243,9 +261,10 @@ Se evaluó permitir cargar un partido de playoff con día/hora/cancha y los equi
 
 ## 8. Cómo correr y probar
 
-- Es estático: abrí `index.html` / `admin.html` directo, o serví la carpeta (`python -m http.server 8080` → `http://localhost:8080`).
+- Es estático, pero **hay que servirlo** (`python -m http.server 8080` → `http://localhost:8080`): abrir el archivo con doble clic (`file://`) no carga los módulos de Firebase y la página queda sin datos.
 - No hay build ni dependencias. **No hay `node` en el PATH.** Una sesión probó lógica con `Code.exe` y `ELECTRON_RUN_AS_NODE=1`; otra usó Edge headless para comprobar pantallas.
-- Para probar con datos limpios, borrá las claves `liga_*` desde DevTools → Application → Local Storage.
+- **Los datos son los de Firestore de verdad**: probar cargando cosas en el sitio real las deja cargadas para todos. Para borrar datos de prueba, desde la consola de Firebase (Firestore → Datos).
+- **Banco de simulación sin tocar Firebase** (`Claude outputs/banco-simulacion-torneo/`): en una copia del sitio en el scratchpad, reemplazar `JAVASCRIPT/firebase-sdk.js` por `firebase-sdk-falso.js` (Firestore y Auth simulados en el `localStorage` de la página, con los mismos límites y reglas que el real) y abrir `banco.html` servido por HTTP. El Edge headless de esta máquina no llega al CDN de Firebase, así que el real no se puede probar desde acá.
 - Todo cambio de UI hay que verlo en el navegador (desktop y ancho mobile ≤ 600 px) antes de darlo por terminado, o decir explícitamente que no se pudo.
 
 ## 9. Trabajo en paralelo con otros agentes
@@ -266,7 +285,7 @@ Al crear un agente, pasale esto más el objetivo concreto:
 
 ## 11. Guía de migración a Firebase (para el agente que la ejecute)
 
-**Autorización:** Joaquín pidió el 20/09/2026 migrar todo a Firebase apenas no falte nada. Es un pedido condicionado: antes de arrancar, confirmá con él que se cerró el checklist 11.1 y que da luz verde. Todo lo de abajo sale de leer el código real (no de suposiciones); las líneas son aproximadas y cambian, buscá por nombre de función.
+**Estado (26/09/2026):** Joaquín dio luz verde el 26/09 ("comenzá con la migración de datos"). **Hechos:** login y roles (Hecho #19) y lote 1 de datos (Hecho #20: todas las claves `liga_*` en Firestore, reglas por rol, datos personales separados). **Falta:** ver "Fase 2" en Pendiente (tiempo real, Storage, y las trampas 5, 7, 8 y 11.5 que quedan). Las tablas 11.2 y 11.4 describen el código de antes de la migración: sirven para entender por qué la capa de datos es como es. Las líneas son aproximadas y cambian, buscá por nombre de función.
 
 ### 11.1 Checklist previo (cerrar antes de migrar, o acordar con Joaquín que va después)
 1. Validación de jugadores: DNI obligatorio y único en todo el torneo, dorsal obligatorio 0–99 y único por equipo (Pendiente, ítem 2). **HECHO en la web**; en Firebase hay que volver a hacerla cumplir en el servidor.
@@ -316,6 +335,7 @@ Campos de sanciones automáticas: `origenAuto`, `claveTeso`, `levantada`, `fecha
 - Usar la persistencia offline de Firestore: la lista de buena fe se usa en la cancha con señal mala.
 
 ### 11.4 Trampas que rompen la migración si se copian tal cual
+**Estado al 26/09/2026 (Hecho #20):** resueltas la 1 (el público no escribe), 4 (datos personales separados y DNI codificado), 6 (guardado por documento y campo, asistencia con `arrayUnion`), 9 (con el guardado por diferencias, `migrarCrucesConSlot` ya no escribe si no cambió nada), 12 (reglas de todas las colecciones) y 14. Parcial: la 11 (se sacó el medidor de espacio, pero las fotos siguen dentro de los documentos). **Pendientes:** 5, 7, 8 y 10 (tiempo real).
 1. **El público no debe escribir nunca.** Hoy `main.js` escribe: siembra `liga_sponsors` y `liga_fotos_albumes` (~616, ~654) y "Marcar leídos" / "Limpiar" (~1917, ~1928) **modifican el array global de avisos**. (Los avisos por defecto ya no se siembran desde el 21/09/2026.) En Firebase, "leído" y "limpiar" del visitante tienen que ser **estado local del dispositivo** (una clave nueva de localStorage), no cambios en el documento compartido.
 2. **Semilla y fallback a `ligaData`:** hoy, si una clave no existe, se usa `data.js`. Desde el 21/09/2026 `data.js` trae equipos y partidos vacíos, pero sigue trayendo sponsors y álbumes. Definir una carga inicial única explícita, y quitar el fallback del público o dejarlo vacío. `main.js` reasigna `ligaData.cicloSuperior/cicloBasico/partidos/sanciones` en cada `procesarLiga()`: la capa de datos tiene que alimentar `ligaData` o hay que refactorizar esas lecturas.
 3. **Las posiciones se calculan en el cliente**, no se guardan: `procesarLiga()` resetea `pj,g,e,p,gf,gc,dif,pts` de cada equipo y recalcula desde `liga_partidos` (`jugado` y no `esPlayoff`) más las sanciones de tipo "Quita de Puntos". Los `pj/pts` guardados en el documento del equipo **no son fuente de verdad**; no los migres como si lo fueran. Cada visitante lee todos los partidos: con ~100 partidos está bien, pero es lo que consume la cuota gratis (Spark).

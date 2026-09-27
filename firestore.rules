@@ -2,15 +2,60 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Rol de cada persona del staff ("coordinador" o "staff"). Se carga a mano
-    // desde la consola de Firebase, que no pasa por estas reglas: desde la web
-    // nadie escribe acá, y cada usuario solo puede leer su propio documento.
+    // Rol de quien hace el pedido, leído de usuarios/{uid} ("coordinador" o "staff").
+    // Sin sesión o sin documento de rol, get() falla y la regla deniega.
+    function rol() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
+    }
+    function esStaff() {
+      return request.auth != null && rol() in ['staff', 'coordinador'];
+    }
+    function esCoordinador() {
+      return request.auth != null && rol() == 'coordinador';
+    }
+
+    // Rol de cada persona. Se carga a mano desde la consola de Firebase (que no pasa por
+    // estas reglas): desde la web nadie escribe acá y cada uno lee solo su documento.
     match /usuarios/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
 
-    // Todo lo demás queda cerrado hasta que se migren los datos
-    // (CLAUDE.md, sección 11).
+    // Lo que ve cualquier visitante de la web. Los jugadores acá solo tienen nombre,
+    // dorsal, foto, goles e Instagram; el DNI va reemplazado por un código.
+    match /equipos/{id} { allow read: if true; allow write: if esStaff(); }
+    match /partidos/{id} { allow read: if true; allow write: if esStaff(); }
+    match /sanciones/{id} { allow read: if true; allow write: if esStaff(); }
+    match /noticias/{id} { allow read: if true; allow write: if esStaff(); }
+    match /albumes/{id} { allow read: if true; allow write: if esStaff(); }
+    match /sponsors/{id} { allow read: if true; allow write: if esStaff(); }
+    match /notificaciones/{id} { allow read: if true; allow write: if esStaff(); }
+    match /crucesPlayoffs/{id} { allow read: if true; allow write: if esStaff(); }
+    match /config/{id} { allow read: if true; allow write: if esStaff(); }
+
+    // Datos personales de los jugadores (DNI, ficha médica, contactos de emergencia),
+    // tesorería del día a día y avisos internos: solo staff y coordinador.
+    match /equiposPrivado/{id} { allow read, write: if esStaff(); }
+    match /tesoreriaPartidos/{id} { allow read, write: if esStaff(); }
+    match /tesoreriaInscripciones/{id} { allow read, write: if esStaff(); }
+    match /configStaff/{id} { allow read, write: if esStaff(); }
+    match /avisosStaff/{id} { allow read, write: if esStaff(); }
+
+    // Sal para los códigos de DNI: se crea una sola vez y no se cambia (si cambiara,
+    // los códigos ya guardados en partidos y sanciones dejarían de coincidir).
+    match /privado/claves {
+      allow read, create: if esStaff();
+      allow update, delete: if false;
+    }
+
+    // Solo el coordinador: egresos, balance y la calculadora de arancel.
+    match /egresos/{id} { allow read, write: if esCoordinador(); }
+    match /configCoordinador/{id} { allow read, write: if esCoordinador(); }
+
+    // Caja por Fecha: el staff registra cada pago que marca, pero solo el coordinador la ve.
+    match /cajaMovimientos/{id} {
+      allow create: if esStaff();
+      allow read, update, delete: if esCoordinador();
+    }
   }
 }

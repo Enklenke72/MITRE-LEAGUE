@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="stylesheet" href="estilo.css">
-    <title>Mitre League 2026 — Torneo de Fútbol 5 entre Cursos</title>
-    <meta name="description" content="Mitre League: torneo de fútbol 5 entre cursos, con fase de grupos, playoffs y dos categorías (Ciclo Básico y Ciclo Superior). Mirá la tabla de posiciones, el fixture y los resultados.">
+    <title>Mitre League 2026 — Torneo escolar con más pasión del país</title>
+    <meta name="description"
+        content="Mitre League: torneo de fútbol 5 entre cursos, con fase de grupos, playoffs y dos categorías (Ciclo Básico y Ciclo Superior). Mirá la tabla de posiciones, el fixture y los resultados.">
     <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
 </head>
+
 <body>
-    
+
     <!-- 1. HEADER (CHASIS FIJO SUPERIOR) -->
     <header class="top-bar">
         <div class="inicio">
@@ -25,76 +28,82 @@
         </div>
         <div class="header-sectionRight">
             <a href="https://www.instagram.com/mitre.league" target="_blank" class="ig-link">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ig-icon"><path d="M224.3 141a115 115 0 1 0 -.6 230 115 115 0 1 0 .6-230zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1 -.6-149.2zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1 -53.6 0zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ig-icon">
+                    <path
+                        d="M224.3 141a115 115 0 1 0 -.6 230 115 115 0 1 0 .6-230zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1 -.6-149.2zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1 -53.6 0zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z" />
+                </svg>
             </a>
             <div class="notifications" id="btn-notificaciones-header" style="position: relative; cursor: pointer;">
-            <img src="Recursos/notificaciones fut.png" alt="Notificaciones">
-            <!-- Puntito rojo para alertas no leídas -->
-            <span id="badge-notificacion" class="notif-badge-dot"></span>
+                <img src="Recursos/notificaciones fut.png" alt="Notificaciones">
+                <!-- Puntito rojo para alertas no leídas -->
+                <span id="badge-notificacion" class="notif-badge-dot"></span>
 
-            <!-- MENÚ DESPLEGABLE DE ALERTAS -->
-            <div id="dropdown-notificaciones" class="notif-dropdown seccion-oculta">
-                <div class="notif-header">
-                    <span>AVISOS </span>
-                    <div style="display: flex; gap: 8px;">
-                        <span id="btn-marcar-leido" style="font-size: 9px; color: #2edae3; cursor: pointer;">Leídos</span>
-                        <span id="btn-limpiar-notifs" style="font-size: 9px; color: #f43f5e; cursor: pointer;"> Limpiar</span>
+                <!-- MENÚ DESPLEGABLE DE ALERTAS -->
+                <div id="dropdown-notificaciones" class="notif-dropdown seccion-oculta">
+                    <div class="notif-header">
+                        <span>AVISOS </span>
+                        <div style="display: flex; gap: 8px;">
+                            <span id="btn-marcar-leido"
+                                style="font-size: 9px; color: #2edae3; cursor: pointer;">Leídos</span>
+                            <span id="btn-limpiar-notifs" style="font-size: 9px; color: #f43f5e; cursor: pointer;">
+                                Limpiar</span>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Lista con Scroll Interno -->
-                <div id="contenedor-lista-notificaciones" class="notif-body"></div>
+                    <!-- Lista con Scroll Interno -->
+                    <div id="contenedor-lista-notificaciones" class="notif-body"></div>
+                </div>
             </div>
-        </div>
         </div>
     </header>
 
     <!-- CUERPO DE LA APP -->
     <div class="showman">
-        
+
         <!-- REEMPLAZÁ EL <aside class="sidebar"...> COMPLETO EN index.html -->
 
-<aside class="sidebar" style="background-color:#0a1d54;">
+        <aside class="sidebar" style="background-color:#0a1d54;">
 
-    <!-- ① LOGO (siempre visible arriba) -->
-    <div class="sidebar-logo-section">
-        <img src="Recursos/logonormal (1)sinaper.svg" alt="Logo" class="logoa">
-        <span class="sidebar-logo-text">MITRE LEAGUE</span>
-    </div>
+            <!-- ① LOGO (siempre visible arriba) -->
+            <div class="sidebar-logo-section">
+                <img src="Recursos/logonormal (1)sinaper.svg" alt="Logo" class="logoa">
+                <span class="sidebar-logo-text">MITRE LEAGUE</span>
+            </div>
 
-    <!-- ② NAV CENTRAL -->
-    <nav class="side-nav">
-        <a href="#home" class="nav-item active">
-            <img src="Recursos/home.svg" alt="Inicio">
-            <span class="nav-label">Inicio</span>
-        </a>
-        <a href="#pantalla-tablas" class="nav-item">
-            <img src="Recursos/Tabla fut.svg" alt="Tabla">
-            <span class="nav-label">Posiciones</span>
-        </a>
-        <a href="#pantalla-fixture" class="nav-item">
-            <img src="Recursos/logo pelota fut.svg" alt="Partidos">
-            <span class="nav-label">Partidos</span>
-        </a>
-        <a href="#pantalla-fotos" class="nav-item">
-            <img src="Recursos/camara.svg" alt="Fotos">
-            <span class="nav-label">Fotos</span>
-        </a>
-        <a href="#pantalla-reglamento" class="nav-item">
-            <img src="Recursos/reglamento.svg" alt="Reglamento"> <!-- Podés cambiar la imagen por un icono de libro o documento -->
-            <span class="nav-label">Reglamento</span>
-        </a>
-        <a href="#pantalla-admin" class="nav-item">
-            <img src="Recursos/admin.svg" alt="Admin">
-            <span class="nav-label">Admin</span>
-        </a>
-    </nav>
+            <!-- ② NAV CENTRAL -->
+            <nav class="side-nav">
+                <a href="#home" class="nav-item active">
+                    <img src="Recursos/home.svg" alt="Inicio">
+                    <span class="nav-label">Inicio</span>
+                </a>
+                <a href="#pantalla-tablas" class="nav-item">
+                    <img src="Recursos/Tabla fut.svg" alt="Tabla">
+                    <span class="nav-label">Posiciones</span>
+                </a>
+                <a href="#pantalla-fixture" class="nav-item">
+                    <img src="Recursos/logo pelota fut.svg" alt="Partidos">
+                    <span class="nav-label">Partidos</span>
+                </a>
+                <a href="#pantalla-fotos" class="nav-item">
+                    <img src="Recursos/camara.svg" alt="Fotos">
+                    <span class="nav-label">Fotos</span>
+                </a>
+                <a href="#pantalla-reglamento" class="nav-item">
+                    <img src="Recursos/reglamento.svg" alt="Reglamento">
+                    <!-- Podés cambiar la imagen por un icono de libro o documento -->
+                    <span class="nav-label">Reglamento</span>
+                </a>
+                <a href="#pantalla-admin" class="nav-item">
+                    <img src="Recursos/admin.svg" alt="Admin">
+                    <span class="nav-label">Admin</span>
+                </a>
+            </nav>
 
-    <!-- ③ SECCIÓN INFERIOR (search + IG + notificaciones) -->
-    <div class="sidebar-bottom">
+            <!-- ③ SECCIÓN INFERIOR (search + IG + notificaciones) -->
+            <div class="sidebar-bottom">
 
-        <!-- Buscador -->
-        <!-- <div class="sidebar-bottom-item" id="sidebar-search-wrapper">
+                <!-- Buscador -->
+                <!-- <div class="sidebar-bottom-item" id="sidebar-search-wrapper">
             <img src="Recursos/search.svg" alt="Buscar" style="width:22px; height:22px; flex-shrink:0; opacity:0.75;">
             <input
                 type="text"
@@ -105,54 +114,63 @@
             >
         </div> -->
 
-        <!-- Instagram -->
-        <a href="https://www.instagram.com/mitre.league" target="_blank" class="sidebar-bottom-item">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ig-icon-sidebar">
-                <path d="M224.3 141a115 115 0 1 0-.6 230 115 115 0 1 0 .6-230zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1-.6-149.2zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1-53.6 0zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/>
-            </svg>
-            <span class="sidebar-bottom-label">Instagram</span>
-        </a>
+                <!-- Instagram -->
+                <a href="https://www.instagram.com/mitre.league" target="_blank" class="sidebar-bottom-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ig-icon-sidebar">
+                        <path
+                            d="M224.3 141a115 115 0 1 0-.6 230 115 115 0 1 0 .6-230zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1-.6-149.2zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1-53.6 0zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z" />
+                    </svg>
+                    <span class="sidebar-bottom-label">Instagram</span>
+                </a>
 
-        <!-- Notificaciones -->
-        <!-- Notificaciones en la Sidebar -->
-<div class="sidebar-bottom-item" id="btn-notificaciones" style="position: relative; cursor: pointer;">
-    <img src="Recursos/notificaciones fut.png" alt="Notificaciones" style="width:24px; height:24px; flex-shrink:0; opacity:0.8;">
-    <span id="badge-notificacion-sidebar" class="notif-badge-dot"></span>
-    <span class="sidebar-bottom-label">Alertas</span>
+                <!-- Notificaciones -->
+                <!-- Notificaciones en la Sidebar -->
+                <div class="sidebar-bottom-item" id="btn-notificaciones" style="position: relative; cursor: pointer;">
+                    <img src="Recursos/notificaciones fut.png" alt="Notificaciones"
+                        style="width:24px; height:24px; flex-shrink:0; opacity:0.8;">
+                    <span id="badge-notificacion-sidebar" class="notif-badge-dot"></span>
+                    <span class="sidebar-bottom-label">Alertas</span>
 
-    <!-- MENÚ DESPLEGABLE SIDEBAR -->
-    <div id="dropdown-notificaciones-sidebar" class="notif-dropdown-sidebar seccion-oculta">
-        <div class="notif-header">
-            <span>AVISOS</span>
-            <div style="display: flex; gap: 8px;">
-                <span id="btn-marcar-leido-sidebar" style="font-size: 9px; color: #2edae3; cursor: pointer;">Leídos</span>
-                <span id="btn-limpiar-notifs-sidebar" style="font-size: 9px; color: #f43f5e; cursor: pointer;">Limpiar</span>
+                    <!-- MENÚ DESPLEGABLE SIDEBAR -->
+                    <div id="dropdown-notificaciones-sidebar" class="notif-dropdown-sidebar seccion-oculta">
+                        <div class="notif-header">
+                            <span>AVISOS</span>
+                            <div style="display: flex; gap: 8px;">
+                                <span id="btn-marcar-leido-sidebar"
+                                    style="font-size: 9px; color: #2edae3; cursor: pointer;">Leídos</span>
+                                <span id="btn-limpiar-notifs-sidebar"
+                                    style="font-size: 9px; color: #f43f5e; cursor: pointer;">Limpiar</span>
+                            </div>
+                        </div>
+                        <div id="contenedor-lista-notificaciones-sidebar" class="notif-body"></div>
+                    </div>
+                </div>
+
             </div>
-        </div>
-        <div id="contenedor-lista-notificaciones-sidebar" class="notif-body"></div>
-    </div>
-</div>
 
-    </div>
-
-</aside>
+        </aside>
 
         <!-- 3. CONTENEDOR DE CONTENIDO (MÓDULOS VERTICALES) -->
         <main class="dashboard-container">
 
             <!-- SECCIÓN 1: INICIO -->
             <div id="home" class="tab-content active init" style="width: 100%; max-width: 1200px;">
-                <div style="background: radial-gradient(circle, rgba(10, 29, 84,0.8) 0%, rgba(4, 12, 38,0.6) 100%); padding: 60px 0 40px; border-radius: 6px; text-align: center; font-family: Michroma; height: 110%;">
-                    <h1 style="font-size: 26px; color: #2edae3; text-shadow: 0 0 12px #2edae3; margin: 0; letter-spacing: 2px;">MITRE LEAGUE</h1>
-                    <p style="font-family: Oswald; font-size: 13px; color: #869bd8; margin: 12px 0 0 0; text-transform: uppercase; letter-spacing: 4px;">Clausura 2026</p>
+                <div
+                    style="background: radial-gradient(circle, rgba(10, 29, 84,0.8) 0%, rgba(4, 12, 38,0.6) 100%); padding: 60px 0 40px; border-radius: 6px; text-align: center; font-family: Michroma; height: 110%;">
+                    <h1
+                        style="font-size: 26px; color: #2edae3; text-shadow: 0 0 12px #2edae3; margin: 0; letter-spacing: 2px;">
+                        MITRE LEAGUE</h1>
+                    <p
+                        style="font-family: Oswald; font-size: 13px; color: #869bd8; margin: 12px 0 0 0; text-transform: uppercase; letter-spacing: 4px;">
+                        Clausura 2026</p>
                 </div>
             </div>
 
 
 
-<!-- HERO SECTION (ESTRUCTURA 3D LIMPIA) -->
+            <!-- HERO SECTION (ESTRUCTURA 3D LIMPIA) -->
             <div id="hero-wrapper">
-                
+
                 <!-- Flechas Navegación -->
                 <button class="hero-btn-nav prev" id="prev-hero">&#10094;</button>
                 <button class="hero-btn-nav next" id="next-hero">&#10095;</button>
@@ -161,7 +179,9 @@
                 <div id="hero-track-3d">
                     <!-- NOTICIA 1 -->
                     <div class="hero-card-3d">
-                        <div class="hero-card-bg" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url('Recursos/Fotos/DSC05325.JPG');"></div>
+                        <div class="hero-card-bg"
+                            style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url('Recursos/Fotos/DSC05325.JPG');">
+                        </div>
                         <div class="hero-card-content">
                             <h2>¡Y SE FUE!...</h2>
                             <p>Tras un partido muy friccionado, 5to 2da supo plantarse por 2-1 ante 6to 2da.</p>
@@ -177,15 +197,16 @@
 
             <!-- SECCIÓN SPONSORS (Carrusel Interactivo) -->
             <section class="sponsors-section" style="width: 100%; max-width: 1200px;">
-                
+
                 <div class="sponsors-header">
                     <h3>APOYAN A LA MITRE LEAGUE</h3>
                     <!-- Botón mágico para desplegar todo -->
-                    <button id="btn-toggle-sponsors" class="tab-btn" style="border: 1px solid rgba(46, 218, 227, 0.4); margin-bottom: 20px;">
+                    <button id="btn-toggle-sponsors" class="tab-btn"
+                        style="border: 1px solid rgba(46, 218, 227, 0.4); margin-bottom: 20px;">
                         Mostrar todos los sponsors
                     </button>
                 </div>
-                
+
                 <div class="sponsors-wrapper" id="sponsors-wrapper">
                     <!-- Flecha Izquierda -->
                     <button class="carousel-btn prev-btn" id="prev-sponsor">&#10094;</button>
@@ -206,212 +227,255 @@
             <!--TABLA DE POSICIONES Y TRIBUNAL DE DISCIPLINA-->
 
             <!-- En index.html: Malla principal centrada en las Posiciones -->
-<div class="main-grid" style="width: 100%;">
-    
-    <section id="pantalla-tablas" class="table-container" style="width: 100%;">
-        
-        
-        <!-- 1. BARRA DE SWITCH DE TORNEO (Fase de Grupos vs Playoffs) -->
+            <div class="main-grid" style="width: 100%;">
 
-        
+                <section id="pantalla-tablas" class="table-container" style="width: 100%;">
+
+
+                    <!-- 1. BARRA DE SWITCH DE TORNEO (Fase de Grupos vs Playoffs) -->
 
 
 
 
 
-<!-- ENCABEZADO CON BOTÓN TRIBUNAL -->
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <!-- ENCABEZADO UNIFICADO TIPO CARRUSEL -->
-<div class="encabezado-carrusel-header">
-    
-    <!-- TÍTULOS CONMUTABLES (TABLA POSICIONES / PLAYOFFS) -->
-     <button id="btn-toggle-tribunal" class="tab-btn" style="background: rgba(244,63,94,0.15); border: 1px solid #f43f5e; color: rgba(255, 76, 76, 0.86); font-size: 11px; padding: 8px 16px;  cursor: pointer; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(244,63,94,0.2);font-family: Michroma;">
-    Tribunal de Disciplina
-</button>
-    <div class="titulos-toggle-container">
-        <h2 id="toggle-titulo-tablas" class="titulo-toggle active">TABLA DE POSICIONES</h2>
-        <h2 id="toggle-titulo-playoffs" class="titulo-toggle opaco">PLAY-OFFS</h2>
-    </div>
-    
-        </div>
-    </div>
 
-<!-- En index.html dentro de #pantalla-tablas -->
 
-<!-- ESTRUCTURA PRINCIPAL EN GRILLA DOS COLUMNAS -->
- <div id="vista-fase-grupos"> 
-<div class="posiciones-grid-layout" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
-    
-    <!-- COLUMNA IZQUIERDA: TABLAS DE GRUPOS (70% Ancho) -->
-    <div class="borde-con-vistaAncha" style="flex: 1 1 600px;
+                    <!-- ENCABEZADO CON BOTÓN TRIBUNAL -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <!-- ENCABEZADO UNIFICADO TIPO CARRUSEL -->
+                        <div class="encabezado-carrusel-header">
+
+                            <!-- TÍTULOS CONMUTABLES (TABLA POSICIONES / PLAYOFFS) -->
+                            <button id="btn-toggle-tribunal" class="tab-btn"
+                                style="background: rgba(244,63,94,0.15); border: 1px solid #f43f5e; color: rgba(255, 76, 76, 0.86); font-size: 11px; padding: 8px 16px;  cursor: pointer; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(244,63,94,0.2);font-family: Michroma;">
+                                Tribunal de Disciplina
+                            </button>
+                            <div class="titulos-toggle-container">
+                                <h2 id="toggle-titulo-tablas" class="titulo-toggle active">TABLA DE POSICIONES</h2>
+                                <h2 id="toggle-titulo-playoffs" class="titulo-toggle opaco">PLAY-OFFS</h2>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- En index.html dentro de #pantalla-tablas -->
+
+                    <!-- ESTRUCTURA PRINCIPAL EN GRILLA DOS COLUMNAS -->
+                    <div id="vista-fase-grupos">
+                        <div class="posiciones-grid-layout"
+                            style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+
+                            <!-- COLUMNA IZQUIERDA: TABLAS DE GRUPOS (70% Ancho) -->
+                            <div class="borde-con-vistaAncha" style="flex: 1 1 600px;
 ">
-        
-        
-
-        <!-- PANEL DESPLEGABLE TRIBUNAL -->
-        <div id="panel-tribunal-desplegable" class="seccion-oculta" style="background: rgba(4, 12, 38,0.95); border: 1px solid #f43f5e; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(244,63,94,0.3); padding-bottom: 8px; margin-bottom: 12px;">
-                <h3 style="font-family: 'Michroma', sans-serif; font-size: 13px; color: #f43f5e; margin: 0;">BOLETÍN OFICIAL DE DISCIPLINA</h3>
-                <span id="close-panel-tribunal" class="close-panel">&times;</span>
-            </div>
-            <div id="selector-fechas-tribunal" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;"></div>
-            <div id="contenido-acta-detalle"></div>
-        </div>
-
-        <!-- TABLA CICLO SUPERIOR -->
-        <div class="group-selector">
-            <p class="cycle-label">Ciclo Superior</p>
-            <div class="tabs-sup">
-                <button class="tab-btn active" data-grupo="A">Grupo A</button>
-                <button class="tab-btn" data-grupo="B">Grupo B</button>
-                <button class="tab-btn" data-grupo="C">Grupo C</button>
-                <button class="tab-btn" data-grupo="D">Grupo D</button>
-                <button class="tab-btn" data-grupo="E">Grupo E</button>
-            </div>
-
-            <div class="group-title-container">
-                <h3 class="group-name-sup">Grupo A</h3>
-                <p class="group-category">Clasifican los 3 primeros de cada grupo + el mejor 4° puesto</p>
-            </div>
-            
-            <div class="table-wrapper">
-                <table class="table-style">
-                    <thead>
-                        <tr class="table-head-row" style="background-color: #1a3274;"> 
-                            <th class="th-pos">Pos</th>
-                            <th class="th-team">Equipo</th>
-                            <th>PJ</th><th>G</th><th>E</th><th>P</th>
-                            <th class="col-gf-gc" >GF</th>
-                            <th class="col-gf-gc" >GC</th>
-                            <th>+/-</th>
-                            <th class="th-pts">PTS</th>
-                        </tr>
-                    </thead>
-                    <tbody class="tbody-sup"></tbody>
-                </table>
-            </div>
-            
-            <br><hr style="border:0; border-top:1px dashed #1a3274;">
-            
-            <!-- TABLA CICLO BÁSICO -->
-            <div class="basic-section-margin">
-                <p class="cycle-label">Ciclo Básico</p>
-                <div class="tabs-bas">
-                    <button class="tab-btn active" data-grupo-bas="A">Grupo A</button>
-                    <button class="tab-btn" data-grupo-bas="B">Grupo B</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="group-title-container">
-            <h3 class="group-name-bas">Grupo A</h3>
-            <p class="group-category">Clasifican los 2 primeros y los 3 mejores 3ros</p>
-        </div>
-
-        <div class="table-wrapper">
-            <table class="table-style">
-                <thead>
-                    <tr style="background-color: #1a3274;"> 
-                        <th>Pos</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th>
-                        <th class="col-gf-gc">GF</th>
-                        <th class="col-gf-gc">GC</th>
-                        <th>+/-</th><th>PTS</th>
-                    </tr>
-                </thead>
-                <tbody class="tbody-bas"></tbody>
-            </table>
-        </div>
-    </div>
-    
-
-    <!-- COLUMNA DERECHA: GOLEADORES CON FILTRO DE CICLO (30% Ancho) -->
-    <div class="columna-goleadores seccion-oculta" style="flex: 1 1 280px; background: rgba(10, 29, 84,0.4); padding: 15px; border-radius: 5px; border: 1px solid rgba(26, 50, 116,0.5); align-self: flex-start;">
-        <h3 style="font-size: 12px; color: #fff; margin-top: 0; text-align: center; font-family: Oswald;">GOLEADORES</h3>
-        
-        <!-- Pestañas Ciclo para Goleadores -->
-        <div  style="display: flex; gap: 5px; justify-content: center; margin-bottom: 12px;">
-            <button class="tab-btn active btn-gol-ciclo" data-ciclo-gol="superior" style="font-size: 10px; padding: 4px 8px;">Superior</button>
-            <button class="tab-btn btn-gol-ciclo" data-ciclo-gol="basico" style="font-size: 10px; padding: 4px 8px;">Básico</button>
-        </div>
-
-        <div class="table-wrapper">
-            <table class="table-style" style="font-size: 11px;">
-                <thead>
-                    <tr style="background-color: #0a1d54;"> 
-                        <th>#</th>
-                        <th>Jugador</th>
-                        <th>Equipo</th>
-                        <th style="color: #2edae3;">Goles</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-goleadores">
-                    <!-- Dinámico por JS -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-</div>
 
 
-<!-- SECCIÓN INFERIOR: ESTADÍSTICAS Y TABLA ANUAL COMPLETA -->
-<div class="seccion-tabla-anual seccion-oculta" style="margin-top: 40px; background: rgba(4, 12, 38,0.8); border: 1px solid #1a3274; padding: 20px; border-radius: 6px;">
-    <h2 style="font-family: 'Michroma', sans-serif; font-size: 14px; color: #fff; text-align: center; margin-top: 0; margin-bottom: 15px;"> TABLA GENERAL <br><span style="color: rgba(35, 177, 240, .8); border-top: 1px solid rgba(255,255,255,0.5);display: inline-block;
+
+                                <!-- PANEL DESPLEGABLE TRIBUNAL -->
+                                <div id="panel-tribunal-desplegable" class="seccion-oculta"
+                                    style="background: rgba(4, 12, 38,0.95); border: 1px solid #f43f5e; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(244,63,94,0.3); padding-bottom: 8px; margin-bottom: 12px;">
+                                        <h3
+                                            style="font-family: 'Michroma', sans-serif; font-size: 13px; color: #f43f5e; margin: 0;">
+                                            BOLETÍN OFICIAL DE DISCIPLINA</h3>
+                                        <span id="close-panel-tribunal" class="close-panel">&times;</span>
+                                    </div>
+                                    <div id="selector-fechas-tribunal"
+                                        style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;"></div>
+                                    <div id="contenido-acta-detalle"></div>
+                                </div>
+
+                                <!-- TABLA CICLO SUPERIOR -->
+                                <div class="group-selector">
+                                    <p class="cycle-label">Ciclo Superior</p>
+                                    <div class="tabs-sup">
+                                        <button class="tab-btn active" data-grupo="A">Grupo A</button>
+                                        <button class="tab-btn" data-grupo="B">Grupo B</button>
+                                        <button class="tab-btn" data-grupo="C">Grupo C</button>
+                                        <button class="tab-btn" data-grupo="D">Grupo D</button>
+                                        <button class="tab-btn" data-grupo="E">Grupo E</button>
+                                    </div>
+
+                                    <div class="group-title-container">
+                                        <h3 class="group-name-sup">Grupo A</h3>
+                                        <p class="group-category">Clasifican los 3 primeros de cada grupo + el mejor 4°
+                                            puesto</p>
+                                    </div>
+
+                                    <div class="table-wrapper">
+                                        <table class="table-style">
+                                            <thead>
+                                                <tr class="table-head-row" style="background-color: #1a3274;">
+                                                    <th class="th-pos">Pos</th>
+                                                    <th class="th-team">Equipo</th>
+                                                    <th>PJ</th>
+                                                    <th>G</th>
+                                                    <th>E</th>
+                                                    <th>P</th>
+                                                    <th class="col-gf-gc">GF</th>
+                                                    <th class="col-gf-gc">GC</th>
+                                                    <th>+/-</th>
+                                                    <th class="th-pts">PTS</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="tbody-sup"></tbody>
+                                        </table>
+                                    </div>
+
+                                    <br>
+                                    <hr style="border:0; border-top:1px dashed #1a3274;">
+
+                                    <!-- TABLA CICLO BÁSICO -->
+                                    <div class="basic-section-margin">
+                                        <p class="cycle-label">Ciclo Básico</p>
+                                        <div class="tabs-bas">
+                                            <button class="tab-btn active" data-grupo-bas="A">Grupo A</button>
+                                            <button class="tab-btn" data-grupo-bas="B">Grupo B</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="group-title-container">
+                                    <h3 class="group-name-bas">Grupo A</h3>
+                                    <p class="group-category">Clasifican los 2 primeros y los 3 mejores 3ros</p>
+                                </div>
+
+                                <div class="table-wrapper">
+                                    <table class="table-style">
+                                        <thead>
+                                            <tr style="background-color: #1a3274;">
+                                                <th>Pos</th>
+                                                <th>Equipo</th>
+                                                <th>PJ</th>
+                                                <th>G</th>
+                                                <th>E</th>
+                                                <th>P</th>
+                                                <th class="col-gf-gc">GF</th>
+                                                <th class="col-gf-gc">GC</th>
+                                                <th>+/-</th>
+                                                <th>PTS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="tbody-bas"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+
+                            <!-- COLUMNA DERECHA: GOLEADORES CON FILTRO DE CICLO (30% Ancho) -->
+                            <div class="columna-goleadores seccion-oculta"
+                                style="flex: 1 1 280px; background: rgba(10, 29, 84,0.4); padding: 15px; border-radius: 5px; border: 1px solid rgba(26, 50, 116,0.5); align-self: flex-start;">
+                                <h3
+                                    style="font-size: 12px; color: #fff; margin-top: 0; text-align: center; font-family: Oswald;">
+                                    GOLEADORES</h3>
+
+                                <!-- Pestañas Ciclo para Goleadores -->
+                                <div style="display: flex; gap: 5px; justify-content: center; margin-bottom: 12px;">
+                                    <button class="tab-btn active btn-gol-ciclo" data-ciclo-gol="superior"
+                                        style="font-size: 10px; padding: 4px 8px;">Superior</button>
+                                    <button class="tab-btn btn-gol-ciclo" data-ciclo-gol="basico"
+                                        style="font-size: 10px; padding: 4px 8px;">Básico</button>
+                                </div>
+
+                                <div class="table-wrapper">
+                                    <table class="table-style" style="font-size: 11px;">
+                                        <thead>
+                                            <tr style="background-color: #0a1d54;">
+                                                <th>#</th>
+                                                <th>Jugador</th>
+                                                <th>Equipo</th>
+                                                <th style="color: #2edae3;">Goles</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tbody-goleadores">
+                                            <!-- Dinámico por JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+
+
+                        <!-- SECCIÓN INFERIOR: ESTADÍSTICAS Y TABLA ANUAL COMPLETA -->
+                        <div class="seccion-tabla-anual seccion-oculta"
+                            style="margin-top: 40px; background: rgba(4, 12, 38,0.8); border: 1px solid #1a3274; padding: 20px; border-radius: 6px;">
+                            <h2
+                                style="font-family: 'Michroma', sans-serif; font-size: 14px; color: #fff; text-align: center; margin-top: 0; margin-bottom: 15px;">
+                                TABLA GENERAL <br><span style="color: rgba(35, 177, 240, .8); border-top: 1px solid rgba(255,255,255,0.5);display: inline-block;
 margin-top: 3px;"> Mitre League 2026</span></h2>
 
-    <!-- FILTRO 1: CICLO -->
-    <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 12px;">
-        <button class="tab-btn active btn-anual-ciclo" data-anual-ciclo="superior" style="font-size: 11px;">Ciclo Superior</button>
-        <button class="tab-btn btn-anual-ciclo" data-anual-ciclo="basico" style="font-size: 11px;">Ciclo Básico</button>
-    </div>
+                            <!-- FILTRO 1: CICLO -->
+                            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 12px;">
+                                <button class="tab-btn active btn-anual-ciclo" data-anual-ciclo="superior"
+                                    style="font-size: 11px;">Ciclo Superior</button>
+                                <button class="tab-btn btn-anual-ciclo" data-anual-ciclo="basico"
+                                    style="font-size: 11px;">Ciclo Básico</button>
+                            </div>
 
-    <!-- FILTRO 2: MODO / METRICA -->
-    <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 20px;">
-        <button class="tab-btn active btn-anual-criterio" data-criterio="puntos" style="font-size: 10px; border-color: #f2c00e; color: #f2c00e;">Tabla General (Puntos)</button>
-        <button class="tab-btn btn-anual-criterio" data-criterio="gf" style="font-size: 10px; border-color: #4ade80; color: #4ade80;">Más Goles a Favor</button>
-        <button class="tab-btn btn-anual-criterio" data-criterio="gc" style="font-size: 10px; border-color: #23b1f0; color: #23b1f0;">Valla Menos Vencida (Menos GC)</button>
-    </div>
+                            <!-- FILTRO 2: MODO / METRICA -->
+                            <div
+                                style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 20px;">
+                                <button class="tab-btn active btn-anual-criterio" data-criterio="puntos"
+                                    style="font-size: 10px; border-color: #f2c00e; color: #f2c00e;">Tabla General
+                                    (Puntos)</button>
+                                <button class="tab-btn btn-anual-criterio" data-criterio="gf"
+                                    style="font-size: 10px; border-color: #4ade80; color: #4ade80;">Más Goles a
+                                    Favor</button>
+                                <button class="tab-btn btn-anual-criterio" data-criterio="gc"
+                                    style="font-size: 10px; border-color: #23b1f0; color: #23b1f0;">Valla Menos Vencida
+                                    (Menos GC)</button>
+                            </div>
 
-    <!-- CONTENEDOR DE LA TABLA ANUAL / ESTADÍSTICA -->
-    <div class="table-wrapper">
-        <table class="table-style">
-            <thead>
-                <tr id="thead-anual" style="background-color: #1a3274;">
-                    <!-- Dinámico según criterio -->
-                </tr>
-            </thead>
-            <tbody id="tbody-anual">
-                <!-- Dinámico por JS -->
-            </tbody>
-        </table>
-    </div>
-</div>
-                   
-                    
-</div>
+                            <!-- CONTENEDOR DE LA TABLA ANUAL / ESTADÍSTICA -->
+                            <div class="table-wrapper">
+                                <table class="table-style">
+                                    <thead>
+                                        <tr id="thead-anual" style="background-color: #1a3274;">
+                                            <!-- Dinámico según criterio -->
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-anual">
+                                        <!-- Dinámico por JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
-    <!-- A) BANNER DE AVISO (Para cuando el torneo está en Fase Regular) -->
-    <!-- VISTA PLAYOFFS COMPLETA -->
-<!-- VISTA PLAYOFFS CON SWITCH COMPACTO/EXTENDIDO -->
-<div id="vista-playoffs" class="vista-carrusel-slide seccion-oculta">
-                        <div id="playoffs-banner-espera" class="seccion-oculta" style="background: linear-gradient(135deg, rgba(26, 50, 116,0.4) 0%, rgba(10, 29, 84,0.8) 100%); border: 1px dashed #f2c00e; border-radius: 5px; padding: 30px 20px; text-align: center; margin: 20px auto; max-width: 600px;">
-                            <h3 style="font-family: 'Michroma', sans-serif; color: #f2c00e; font-size: 16px; margin: 0 0 8px 0;">PLAY-OFFS EN ESPERA</h3>
-                            <p style="font-family: 'Oswald', sans-serif; color: #cbd5e1; font-size: 11px; line-height: 1.6; margin: 0;">
-                                Los cruces de eliminación directa se publicarán automáticamente una vez finalizada la Fase Regular y realizado el sorteo oficial en Instagram.
+
+                    </div>
+
+                    <!-- A) BANNER DE AVISO (Para cuando el torneo está en Fase Regular) -->
+                    <!-- VISTA PLAYOFFS COMPLETA -->
+                    <!-- VISTA PLAYOFFS CON SWITCH COMPACTO/EXTENDIDO -->
+                    <div id="vista-playoffs" class="vista-carrusel-slide seccion-oculta">
+                        <div id="playoffs-banner-espera" class="seccion-oculta"
+                            style="background: linear-gradient(135deg, rgba(26, 50, 116,0.4) 0%, rgba(10, 29, 84,0.8) 100%); border: 1px dashed #f2c00e; border-radius: 5px; padding: 30px 20px; text-align: center; margin: 20px auto; max-width: 600px;">
+                            <h3
+                                style="font-family: 'Michroma', sans-serif; color: #f2c00e; font-size: 16px; margin: 0 0 8px 0;">
+                                PLAY-OFFS EN ESPERA</h3>
+                            <p
+                                style="font-family: 'Oswald', sans-serif; color: #cbd5e1; font-size: 11px; line-height: 1.6; margin: 0;">
+                                Los cruces de eliminación directa se publicarán automáticamente una vez finalizada la
+                                Fase Regular y realizado el sorteo oficial en Instagram.
                             </p>
                         </div>
 
                         <div id="playoffs-contenido-activo">
                             <div class="playoffs-controls-bar">
                                 <div class="tabs-ciclo-playoff">
-                                    <button class="tab-btn active btn-playoff-ciclo" data-ciclo-playoff="superior">Ciclo Superior</button>
-                                    <button class="tab-btn btn-playoff-ciclo" data-ciclo-playoff="basico">Ciclo Básico</button>
+                                    <button class="tab-btn active btn-playoff-ciclo" data-ciclo-playoff="superior">Ciclo
+                                        Superior</button>
+                                    <button class="tab-btn btn-playoff-ciclo" data-ciclo-playoff="basico">Ciclo
+                                        Básico</button>
                                 </div>
                             </div>
 
                             <div class="fechas-carousel-container" style="margin-bottom: 15px;">
                                 <div class="tabs-fechas" style="justify-content: center; gap: 6px;">
-                                    <button class="tab-btn active btn-ronda-nav" data-ronda-target="octavos">Octavos</button>
+                                    <button class="tab-btn active btn-ronda-nav"
+                                        data-ronda-target="octavos">Octavos</button>
                                     <button class="tab-btn btn-ronda-nav" data-ronda-target="cuartos">Cuartos</button>
                                     <button class="tab-btn btn-ronda-nav" data-ronda-target="semis">Semis</button>
                                     <button class="tab-btn btn-ronda-nav" data-ronda-target="final">Final</button>
@@ -425,22 +489,22 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                     </div>
 
 
-    </section>
+                </section>
 
-                    
-                    
+
+
 
                 <!-- Reemplazá la sección #pantalla-fixture dentro del main-grid por esto: -->
-<section id="pantalla-fixture" class="recent-results">
-    <h2>ÚLTIMOS RESULTADOS</h2>
-    <!-- Este contenedor solo recibirá 3 o 4 partidos acotados -->
-    <div id="ultimos-partidos-home" class="resultados-lista"></div>
-</section>
+                <section id="pantalla-fixture" class="recent-results">
+                    <h2>ÚLTIMOS RESULTADOS</h2>
+                    <!-- Este contenedor solo recibirá 3 o 4 partidos acotados -->
+                    <div id="ultimos-partidos-home" class="resultados-lista"></div>
+                </section>
 
             </div> <!-- CIERRA MAIN-GRID -->
 
             <!-- FIXTURE / RECIENTES -->
-                <!--<section id="pantalla-fixture" class="recent-results">
+            <!--<section id="pantalla-fixture" class="recent-results">
                     <h2>PARTIDOS</h2>
                     <div class="fechas-carousel-container">
                         <div class="tabs-fechas">
@@ -456,46 +520,53 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                 </section>-->
 
             <!-- PLAYOFFS (Sección separada, fuera del main-grid) -->
-            
+
             <!-- PANTALLA COMPLETA DE PARTIDOS (FIXTURE & FECHAS) -->
-<section id="pantalla-fixture-completo" class="recent-results seccion-oculta" style="width: 100%; max-width: 1200px; margin-top: 20px;">
-    
-    <!-- Encabezado de la Sección -->
-    <div style="text-align: center; border-bottom: 1px dashed rgba(46, 218, 227,0.2); padding-bottom: 15px; margin-bottom: 20px;">
-        <h2 style="color: #fff; font-family: 'Michroma', sans-serif; font-size: 20px; margin: 0;">FIXTURE Y RESULTADOS</h2>
-        <p style="color: #869bd8; font-family: 'Oswald', sans-serif; font-size: 11px; margin-top: 5px;">
-            Consultá los horarios, canchas y marcadores de cada fecha
-        </p>
-    </div>
+            <section id="pantalla-fixture-completo" class="recent-results seccion-oculta"
+                style="width: 100%; max-width: 1200px; margin-top: 20px;">
 
-    <!-- 1. CARRUSEL / SELECTOR DE FECHAS (F1, F2, F3...) -->
-    <div class="fechas-carousel-container" style="margin-bottom: 20px;">
-        <!-- Botones generados por main.js desde las fechas de fase de grupos cargadas -->
-        <div class="tabs-fechas" id="botones-fecha-fixture" style="justify-content: center; gap: 8px;"></div>
-    </div>
+                <!-- Encabezado de la Sección -->
+                <div
+                    style="text-align: center; border-bottom: 1px dashed rgba(46, 218, 227,0.2); padding-bottom: 15px; margin-bottom: 20px;">
+                    <h2 style="color: #fff; font-family: 'Michroma', sans-serif; font-size: 20px; margin: 0;">FIXTURE Y
+                        RESULTADOS</h2>
+                    <p style="color: #869bd8; font-family: 'Oswald', sans-serif; font-size: 11px; margin-top: 5px;">
+                        Consultá los horarios, canchas y marcadores de cada fecha
+                    </p>
+                </div>
 
-    <!-- IDEAS PARA POTENCIAR LA PANTALLA DE PARTIDOS: -->
+                <!-- 1. CARRUSEL / SELECTOR DE FECHAS (F1, F2, F3...) -->
+                <div class="fechas-carousel-container" style="margin-bottom: 20px;">
+                    <!-- Botones generados por main.js desde las fechas de fase de grupos cargadas -->
+                    <div class="tabs-fechas" id="botones-fecha-fixture" style="justify-content: center; gap: 8px;">
+                    </div>
+                </div>
 
-    <!-- A) TARJETA DATO RÁPIDO / PARTIDO DE LA FECHA -->
-    <!--<div id="partido-destacado-banner" style="background: linear-gradient(135deg, rgba(26, 50, 116,0.4) 0%, rgba(10, 29, 84,0.8) 100%); border: 1px solid rgba(46, 218, 227,0.3); border-radius: 5px; padding: 15px; margin-bottom: 20px; text-align: center;">
+                <!-- IDEAS PARA POTENCIAR LA PANTALLA DE PARTIDOS: -->
+
+                <!-- A) TARJETA DATO RÁPIDO / PARTIDO DE LA FECHA -->
+                <!--<div id="partido-destacado-banner" style="background: linear-gradient(135deg, rgba(26, 50, 116,0.4) 0%, rgba(10, 29, 84,0.8) 100%); border: 1px solid rgba(46, 218, 227,0.3); border-radius: 5px; padding: 15px; margin-bottom: 20px; text-align: center;">
         <span style="background: #2edae3; color: #040c26; font-family: 'Oswald'; font-size: 9px; padding: 3px 8px; border-radius: 4px; font-weight: bold; text-transform: uppercase;">Partido de la Fecha</span>
         <h4 id="destacado-titulo" style="font-family: 'Michroma'; color: #fff; font-size: 14px; margin: 10px 0 5px 0;">5to 1ra VS 6to 2da</h4>
         <p id="destacado-desc" style="font-family: 'Oswald'; color: #cbd5e1; font-size: 11px; margin: 0;">Duelo directo por la punta del Grupo A — Cancha 1 (16:30 hs)</p>
     </div>-->
 
-    <!-- B) FILTRO RÁPIDO POR CICLO (Opcional) -->
-    <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
-        <button class="tab-btn active btn-filtro-fixture-ciclo" data-ciclo-fix="todos" style="font-size: 10px;">Todos los partidos</button>
-        <button class="tab-btn btn-filtro-fixture-ciclo" data-ciclo-fix="superior" style="font-size: 10px;">Solo Superior</button>
-        <button class="tab-btn btn-filtro-fixture-ciclo" data-ciclo-fix="basico" style="font-size: 10px;">Solo Básico</button>
-    </div>
+                <!-- B) FILTRO RÁPIDO POR CICLO (Opcional) -->
+                <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
+                    <button class="tab-btn active btn-filtro-fixture-ciclo" data-ciclo-fix="todos"
+                        style="font-size: 10px;">Todos los partidos</button>
+                    <button class="tab-btn btn-filtro-fixture-ciclo" data-ciclo-fix="superior"
+                        style="font-size: 10px;">Solo Superior</button>
+                    <button class="tab-btn btn-filtro-fixture-ciclo" data-ciclo-fix="basico"
+                        style="font-size: 10px;">Solo Básico</button>
+                </div>
 
-    <!-- C) LISTADO DINÁMICO DE PARTIDOS SELECCIONADOS -->
-    <div id="contenedor-partidos-fecha" class="resultados-lista">
-        <!-- Renderizado dinámicamente por JavaScript -->
-    </div>
+                <!-- C) LISTADO DINÁMICO DE PARTIDOS SELECCIONADOS -->
+                <div id="contenedor-partidos-fecha" class="resultados-lista">
+                    <!-- Renderizado dinámicamente por JavaScript -->
+                </div>
 
-</section>
+            </section>
 
 
 
@@ -503,128 +574,187 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 
 
             <!-- SECCIÓN 4: FOTOS -->
-            <section id="pantalla-fotos" class="recent-results seccion-app" style="width: 100%; max-width: 1200px; margin-top: 20px;">
-                 <h2 style="color: #fff; font-family: 'Michroma', sans-serif; border-bottom: 1px dashed rgba(46, 218, 227,0.3); padding-bottom: 15px; margin-bottom: 20px;">Fotos</h2>
-                 
-                 <div class="galeria-grid" id="galeria-fotos-grid"></div>
+            <section id="pantalla-fotos" class="recent-results seccion-app"
+                style="width: 100%; max-width: 1200px; margin-top: 20px;">
+                <h2
+                    style="color: #fff; font-family: 'Michroma', sans-serif; border-bottom: 1px dashed rgba(46, 218, 227,0.3); padding-bottom: 15px; margin-bottom: 20px;">
+                    Fotos</h2>
+
+                <div class="galeria-grid" id="galeria-fotos-grid"></div>
             </section>
 
-        <!-- SECCIÓN REGLAMENTO OFICIAL -->
-<section id="pantalla-reglamento" class="recent-results seccion-oculta" style="width: 100%; max-width: 1200px; margin-top: 10px;">
-    
-    <!-- Encabezado y Descarga de PDF -->
-    <div style="text-align: center; margin-bottom: 25px; border-bottom: 1px dashed rgba(46, 218, 227,0.2); padding-bottom: 20px;">
-        <h2 style="color: #fff; font-family: 'Michroma', sans-serif; font-size: 20px; margin-bottom: 8px;">REGLAMENTO OFICIAL</h2>
-        <p style="color: #869bd8; font-family: 'Oswald', sans-serif; font-size: 11px; max-width: 600px; margin: 0 auto 15px auto; line-height: 1.6;">
-            Mitre League Clausura 2026. Torneo organizado por estudiantes para estudiantes.
-        </p>
-        <a href="Recursos/Reglamento%20MITRE%20LEAGUE%202026.pdf" download="Reglamento_Mitre_League_2026.pdf" class="sponsor-link-btn" style="padding: 10px 20px; font-size: 11px;">
-            DESCARGAR REGLAMENTO COMPLETO (PDF)
-        </a>
-    </div>
+            <!-- SECCIÓN REGLAMENTO OFICIAL -->
+            <section id="pantalla-reglamento" class="recent-results seccion-oculta"
+                style="width: 100%; max-width: 1200px; margin-top: 10px;">
 
-    <!-- ACORDEÓN DE REGLAS RÁPIDAS -->
-    <div class="reglamento-acordeon-container">
+                <!-- Encabezado y Descarga de PDF -->
+                <div
+                    style="text-align: center; margin-bottom: 25px; border-bottom: 1px dashed rgba(46, 218, 227,0.2); padding-bottom: 20px;">
+                    <h2 style="color: #fff; font-family: 'Michroma', sans-serif; font-size: 20px; margin-bottom: 8px;">
+                        REGLAMENTO OFICIAL</h2>
+                    <p
+                        style="color: #869bd8; font-family: 'Oswald', sans-serif; font-size: 11px; max-width: 600px; margin: 0 auto 15px auto; line-height: 1.6;">
+                        Mitre League Clausura 2026. Torneo organizado por estudiantes para estudiantes.
+                    </p>
+                    <a href="Recursos/Reglamento%20MITRE%20LEAGUE%202026.pdf"
+                        download="Reglamento_Mitre_League_2026.pdf" class="sponsor-link-btn"
+                        style="padding: 10px 20px; font-size: 11px;">
+                        DESCARGAR REGLAMENTO COMPLETO (PDF)
+                    </a>
+                </div>
 
-        <!-- BLOQUE 1: INSCRIPCIÓN Y JUGADORES -->
-        <div class="acordeon-item">
-            <button class="acordeon-header">
-                <span>Lista de Buena Fe y Jugadores</span>
-                <span class="acordeon-icon">+</span>
-            </button>
-            <div class="acordeon-content">
-                <ul>
-                    <li><strong>Alumnos del Colegio:</strong> Todos los jugadores deben ser estudiantes del Colegio Emilio Mitre. Excepción: Se permite 1 único jugador del mismo año pero distinta división por equipo.</li>
-                    <li><strong>Mínimo y Máximo:</strong> Mínimo 4 jugadores para presentarse y comenzar el partido, máximo 10 inscriptos en lista.</li>
-                    <li><strong>Ficha Médica:</strong> Obligatoria antes de la Fecha 2, firmada por adulto responsable (o por el alumno si es mayor de 18).</li>
-                    <li><strong>Acreditación:</strong> En cada partido se debe presentar el DNI (físico o digital) antes de jugar. La asistencia la registra el staff de la Organización en su lista digital de buena fe; ya no se firma planilla.</li>
-                    <li><strong>Aceptación del Reglamento:</strong> Participar en el torneo implica haber leído y aceptado este reglamento. Se acepta una única vez, al firmar la ficha médica (el adulto responsable, o el alumno si es mayor de 18).</li>
-                </ul>
-            </div>
-        </div>
+                <!-- ACORDEÓN DE REGLAS RÁPIDAS -->
+                <div class="reglamento-acordeon-container">
 
-        <!-- BLOQUE 2: PARTIDOS Y TIEMPOS -->
-        <div class="acordeon-item">
-            <button class="acordeon-header">
-                <span>Tiempos, Puntaje y Citación</span>
-                <span class="acordeon-icon">+</span>
-            </button>
-            <div class="acordeon-content">
-                <ul>
-                    <li><strong>Puntaje:</strong> Victoria = 3 pts | Empate = 1 pt | Derrota = 0 pts | Ausencia sin abonar el 50% del derecho de partido = -2 pts.</li>
-                    <li><strong>Duración Fase de Grupos:</strong> 30 minutos (2 tiempos de 15 min, con 5 min de descanso).</li>
-                    <li><strong>Duración Play-Offs:</strong> 30 minutos (2 tiempos de 15 min, con 5 min de descanso), igual que en fase de grupos.</li>
-                    <li><strong>Citación y W.O.:</strong> Presentarse 15 minutos antes del horario pautado. Si un equipo no avisa que no asiste, se suma 1 gol al rival por cada 5 minutos de demora y, al llegar al minuto 15, el partido se suspende con un 3-0 para el equipo que sí se presentó. Si avisa que no asiste, el 3-0 se asigna directamente.</li>
-                    <li><strong>Ausencia:</strong> El equipo que no se presenta pierde 3-0. Para no perder puntos debe abonar como mínimo el 50% del derecho de partido antes de su siguiente encuentro; si no abona nada o menos del 50%, se le restan 2 puntos hasta completar ese 50%. Con el 50% alcanza: pierde el partido pero conserva sus puntos, y lo que pague de más queda como saldo a favor para su siguiente partido. El rival que sí se presentó debe abonar el 100% para obtener los puntos (y se le asigna otro rival para un amistoso). Si abona entre el 50% y el 100%, el partido queda suspendido y sin puntos para ninguno de los dos; si abona menos del 50%, queda como equipo no presentado: pierde los puntos del partido y se le restan 2 puntos de la tabla. En Play-Offs, el equipo que no se presenta queda eliminado y no abona el derecho de partido.</li>
-                </ul>
-            </div>
-        </div>
+                    <!-- BLOQUE 1: INSCRIPCIÓN Y JUGADORES -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Lista de Buena Fe y Jugadores</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Alumnos del Colegio:</strong> Todos los jugadores deben ser estudiantes del
+                                    Colegio Emilio Mitre. Excepción: Se permite 1 único jugador del mismo año pero
+                                    distinta división por equipo.</li>
+                                <li><strong>Mínimo y Máximo:</strong> Mínimo 4 jugadores para presentarse y comenzar el
+                                    partido, máximo 10 inscriptos en lista.</li>
+                                <li><strong>Ficha Médica:</strong> Obligatoria antes de la Fecha 2, firmada por adulto
+                                    responsable (o por el alumno si es mayor de 18).</li>
+                                <li><strong>Acreditación:</strong> En cada partido se debe presentar el DNI (físico o
+                                    digital) antes de jugar. La asistencia la registra el staff de la Organización en su
+                                    lista digital de buena fe; ya no se firma planilla.</li>
+                                <li><strong>Aceptación del Reglamento:</strong> Participar en el torneo implica haber
+                                    leído y aceptado este reglamento. Se acepta una única vez, al firmar la ficha médica
+                                    (el adulto responsable, o el alumno si es mayor de 18).</li>
+                            </ul>
+                        </div>
+                    </div>
 
-        <!-- BLOQUE 3: TARJETAS Y SANCIONES -->
-        <div class="acordeon-item">
-            <button class="acordeon-header">
-                <span>Tarjetas y Disciplina</span>
-                <span class="acordeon-icon">+</span>
-            </button>
-            <div class="acordeon-content">
-                <ul>
-                    <li><strong>Amarilla:</strong> Conducta antideportiva, palabras o acciones discriminatorias, reclamos muy insistentes, incumplir las reglas del juego o las distancias. No se acumulan de un partido a otro.</li>
-                    <li><strong>Azul (Expulsión temporal):</strong> Por doble amarilla o último recurso. El equipo juega con uno menos por 3 minutos (o hasta recibir un gol). El jugador no vuelve al partido pero NO suspende para la fecha que viene.</li>
-                    <li><strong>Roja (Expulsión definitiva):</strong> Conducta violenta, juego brusco grave, agresiones (verbales o físicas) o cortar una chance clara de gol con falta o mano. El staff de la Organización define las fechas de sanción según el informe del árbitro.</li>
-                </ul>
-            </div>
-        </div>
+                    <!-- BLOQUE 2: PARTIDOS Y TIEMPOS -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Tiempos, Puntaje y Citación</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Puntaje:</strong> Victoria = 3 pts | Empate = 1 pt | Derrota = 0 pts |
+                                    Ausencia sin abonar el 50% del derecho de partido = -2 pts.</li>
+                                <li><strong>Duración Fase de Grupos:</strong> 30 minutos (2 tiempos de 15 min, con 5 min
+                                    de descanso).</li>
+                                <li><strong>Duración Play-Offs:</strong> 30 minutos (2 tiempos de 15 min, con 5 min de
+                                    descanso), igual que en fase de grupos.</li>
+                                <li><strong>Citación y W.O.:</strong> Presentarse 15 minutos antes del horario pautado.
+                                    Si un equipo no avisa que no asiste, se suma 1 gol al rival por cada 5 minutos de
+                                    demora y, al llegar al minuto 15, el partido se suspende con un 3-0 para el equipo
+                                    que sí se presentó. Si avisa que no asiste, el 3-0 se asigna directamente.</li>
+                                <li><strong>Ausencia:</strong> El equipo que no se presenta pierde 3-0. Para no perder
+                                    puntos debe abonar como mínimo el 50% del derecho de partido antes de su siguiente
+                                    encuentro; si no abona nada o menos del 50%, se le restan 2 puntos hasta completar
+                                    ese 50%. Con el 50% alcanza: pierde el partido pero conserva sus puntos, y lo que
+                                    pague de más queda como saldo a favor para su siguiente partido. El rival que sí se
+                                    presentó debe abonar el 100% para obtener los puntos (y se le asigna otro rival para
+                                    un amistoso). Si abona entre el 50% y el 100%, el partido queda suspendido y sin
+                                    puntos para ninguno de los dos; si abona menos del 50%, queda como equipo no
+                                    presentado: pierde los puntos del partido y se le restan 2 puntos de la tabla. En
+                                    Play-Offs, el equipo que no se presenta queda eliminado y no abona el derecho de
+                                    partido.</li>
+                            </ul>
+                        </div>
+                    </div>
 
-        <!-- BLOQUE 4: REGLAS DE JUEGO CLAVE -->
-        <div class="acordeon-item">
-            <button class="acordeon-header">
-                <span>Reglas Clave dentro de la Cancha</span>
-                <span class="acordeon-icon">+</span>
-            </button>
-            <div class="acordeon-content">
-                <ul>
-                    <li><strong>Prohibido Piso:</strong> Barrerse a menos de 1 metro en disputa suma falta colectiva y es Tiro Libre Directo (o Penal si es dentro del área).</li>
-                    <li><strong>Límite de Faltas (Sexta Falta):</strong> A la 6ª falta colectiva por tiempo, se cobra "Tiro Castigo" (penal con carrera a 11 pasos).</li>
-                    <li><strong>Arquero:</strong> Solo puede agarrar con la mano los pases de compañeros hechos con la cabeza o de la cintura para arriba (si no, tiro libre indirecto). Saque de meta siempre con la mano. Máximo 5 segundos con el balón.</li>
-                    <li><strong>Indumentaria:</strong> Prohibido botines de 11 (tapones altos) y accesorios (aros, cadenas, anillos). Amonestación directa sin previo aviso.</li>
-                </ul>
-            </div>
-        </div>
+                    <!-- BLOQUE 3: TARJETAS Y SANCIONES -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Tarjetas y Disciplina</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Amarilla:</strong> Conducta antideportiva, palabras o acciones
+                                    discriminatorias, reclamos muy insistentes, incumplir las reglas del juego o las
+                                    distancias. No se acumulan de un partido a otro.</li>
+                                <li><strong>Azul (Expulsión temporal):</strong> Por doble amarilla o último recurso. El
+                                    equipo juega con uno menos por 3 minutos (o hasta recibir un gol). El jugador no
+                                    vuelve al partido pero NO suspende para la fecha que viene.</li>
+                                <li><strong>Roja (Expulsión definitiva):</strong> Conducta violenta, juego brusco grave,
+                                    agresiones (verbales o físicas) o cortar una chance clara de gol con falta o mano.
+                                    El staff de la Organización define las fechas de sanción según el informe del
+                                    árbitro.</li>
+                            </ul>
+                        </div>
+                    </div>
 
-        <!-- BLOQUE 5: PAGOS Y DEUDA -->
-        <div class="acordeon-item">
-            <button class="acordeon-header">
-                <span>Pagos y Deuda</span>
-                <span class="acordeon-icon">+</span>
-            </button>
-            <div class="acordeon-content">
-                <ul>
-                    <li><strong>Arancel:</strong> Todos los equipos abonan el derecho de partido antes de cada encuentro, en el horario de citación.</li>
-                    <li><strong>Deuda:</strong> Si un equipo no puede abonar el total, queda con deuda hasta el próximo encuentro, donde debe abonar ambas fechas. Si no la cancela, se le quita 1 punto.</li>
-                    <li><strong>Sin reintegros:</strong> El derecho de partido no se devuelve bajo ningún concepto. El 50% por ausencia (ver "Tiempos, Puntaje y Citación") no es un reintegro: es el pago que evita la quita de puntos. Si se paga más del 50%, el excedente se descuenta del derecho de partido de la siguiente fecha que se dispute.</li>
-                    <li><strong>Entrada del público:</strong> Se puede cobrar según la fase del torneo, con aviso previo de la Organización. Menores de 10 años no pagan.</li>
-                </ul>
-            </div>
-        </div>
+                    <!-- BLOQUE 4: REGLAS DE JUEGO CLAVE -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Reglas Clave dentro de la Cancha</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Prohibido Piso:</strong> Barrerse a menos de 1 metro en disputa suma falta
+                                    colectiva y es Tiro Libre Directo (o Penal si es dentro del área).</li>
+                                <li><strong>Límite de Faltas (Sexta Falta):</strong> A la 6ª falta colectiva por tiempo,
+                                    se cobra "Tiro Castigo" (penal con carrera a 11 pasos).</li>
+                                <li><strong>Arquero:</strong> Solo puede agarrar con la mano los pases de compañeros
+                                    hechos con la cabeza o de la cintura para arriba (si no, tiro libre indirecto).
+                                    Saque de meta siempre con la mano. Máximo 5 segundos con el balón.</li>
+                                <li><strong>Indumentaria:</strong> Prohibido botines de 11 (tapones altos) y accesorios
+                                    (aros, cadenas, anillos). Amonestación directa sin previo aviso.</li>
+                            </ul>
+                        </div>
+                    </div>
 
-        <!-- BLOQUE 6: LLUVIA Y SUSPENSIONES -->
-        <div class="acordeon-item">
-            <button class="acordeon-header">
-                <span>Lluvia y Suspensiones</span>
-                <span class="acordeon-icon">+</span>
-            </button>
-            <div class="acordeon-content">
-                <ul>
-                    <li><strong>Antes del partido:</strong> Si hay probabilidad de lluvia o inestabilidad, el capitán debe contactar a la Organización para confirmar si se juega la fecha. Si la Organización suspende la fecha, avisa a los equipos antes de la jornada.</li>
-                    <li><strong>Tormenta eléctrica:</strong> El árbitro puede suspender el partido. Si no se retoma ese día, se reprograma, sin reintegro del arancel.</li>
-                    <li><strong>Cómo se retoma:</strong> Se respeta el resultado y el tiempo al momento de la suspensión, y el tiempo restante se divide en 2 tiempos.</li>
-                    <li><strong>Otras causas:</strong> El árbitro también puede suspender por agresiones al árbitro o entre público o jugadores, daños a la sede, o cancha sin condiciones de seguridad.</li>
-                </ul>
-            </div>
-        </div>
+                    <!-- BLOQUE 5: PAGOS Y DEUDA -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Pagos y Deuda</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Arancel:</strong> Todos los equipos abonan el derecho de partido antes de
+                                    cada encuentro, en el horario de citación.</li>
+                                <li><strong>Deuda:</strong> Si un equipo no puede abonar el total, queda con deuda hasta
+                                    el próximo encuentro, donde debe abonar ambas fechas. Si no la cancela, se le quita
+                                    1 punto.</li>
+                                <li><strong>Sin reintegros:</strong> El derecho de partido no se devuelve bajo ningún
+                                    concepto. El 50% por ausencia (ver "Tiempos, Puntaje y Citación") no es un
+                                    reintegro: es el pago que evita la quita de puntos. Si se paga más del 50%, el
+                                    excedente se descuenta del derecho de partido de la siguiente fecha que se dispute.
+                                </li>
+                                <li><strong>Entrada del público:</strong> Se puede cobrar según la fase del torneo, con
+                                    aviso previo de la Organización. Menores de 10 años no pagan.</li>
+                            </ul>
+                        </div>
+                    </div>
 
-    </div>
-</section>
+                    <!-- BLOQUE 6: LLUVIA Y SUSPENSIONES -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Lluvia y Suspensiones</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Antes del partido:</strong> Si hay probabilidad de lluvia o inestabilidad,
+                                    el capitán debe contactar a la Organización para confirmar si se juega la fecha. Si
+                                    la Organización suspende la fecha, avisa a los equipos antes de la jornada.</li>
+                                <li><strong>Tormenta eléctrica:</strong> El árbitro puede suspender el partido. Si no se
+                                    retoma ese día, se reprograma, sin reintegro del arancel.</li>
+                                <li><strong>Cómo se retoma:</strong> Se respeta el resultado y el tiempo al momento de
+                                    la suspensión, y el tiempo restante se divide en 2 tiempos.</li>
+                                <li><strong>Otras causas:</strong> El árbitro también puede suspender por agresiones al
+                                    árbitro o entre público o jugadores, daños a la sede, o cancha sin condiciones de
+                                    seguridad.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
 
 
 
@@ -632,18 +762,36 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
             <section id="pantalla-admin" class="login-staff-section">
                 <div class="login-staff-card">
                     <div class="login-staff-icono" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="4" y="10.5" width="16" height="10" rx="2" />
+                            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+                            <circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+                        </svg>
                     </div>
                     <h2 class="login-staff-titulo">Panel de Control</h2>
                     <p class="login-staff-intro">Acceso exclusivo para Staff y Coordinación General del torneo.</p>
                     <form id="form-login-staff" class="login-staff-form" novalidate>
                         <div class="form-group">
                             <label for="login-email">Email</label>
-                            <input type="email" id="login-email" name="login-email" placeholder="tu-email@ejemplo.com" autocomplete="username" required>
+                            <input type="email" id="login-email" name="login-email" placeholder="tu-email@ejemplo.com"
+                                autocomplete="username" required>
                         </div>
                         <div class="form-group">
                             <label for="login-password">Contraseña</label>
-                            <input type="password" id="login-password" name="login-password" placeholder="••••••••" autocomplete="current-password" required>
+                            <div class="login-staff-password-wrap">
+                                <input type="password" id="login-password" name="login-password" placeholder="••••••••"
+                                    autocomplete="current-password" required>
+                                <button type="button" id="btn-ver-password" class="login-staff-ver-password"
+                                    aria-label="Mostrar contraseña" aria-pressed="false">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                                        <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <p id="login-staff-error" class="login-staff-error" role="alert"></p>
                         <button type="submit" class="btn-submit-admin">Iniciar Sesión</button>
@@ -657,13 +805,20 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                 <p>
                     Diseñado y Desarrollado por
                     <span class="footer-firma-wrapper">
-                        <button type="button" id="footer-firma-trigger" class="autor-firma" aria-haspopup="true" aria-expanded="false">Joaquín Augusto Coria</button>
+                        <button type="button" id="footer-firma-trigger" class="autor-firma" aria-haspopup="true"
+                            aria-expanded="false">Joaquín Augusto Coria</button>
                         <span class="footer-contacto-popover">
-                            <span class="footer-contacto-texto">¿Querés un sitio así para tu equipo, torneo o proyecto?</span>
+                            <span class="footer-contacto-texto">¿Querés un sitio así para tu equipo, torneo o
+                                proyecto?</span>
                             <span class="footer-contacto-links">
-                                <a href="mailto:jcoria.dev@gmail.com?subject=Consulta%20por%20un%20sitio%20web&amp;body=Hola%20Joaqu%C3%ADn%2C%20vi%20Mitre%20League%20y%20quiero%20consultarte%20por%20un%20proyecto%20similar." class="sponsor-link-btn">Escribime</a>
-                                <a href="https://www.instagram.com/joacooria_/" target="_blank" rel="noopener" class="ig-link" aria-label="Instagram de Joaquín Coria">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ig-icon"><path d="M224.3 141a115 115 0 1 0 -.6 230 115 115 0 1 0 .6-230zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1 -.6-149.2zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1 -53.6 0zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/></svg>
+                                <a href="mailto:jcoria.dev@gmail.com?subject=Consulta%20por%20un%20sitio%20web&amp;body=Hola%20Joaqu%C3%ADn%2C%20vi%20Mitre%20League%20y%20quiero%20consultarte%20por%20un%20proyecto%20similar."
+                                    class="sponsor-link-btn">Escribime</a>
+                                <a href="https://www.instagram.com/joacooria_/" target="_blank" rel="noopener"
+                                    class="ig-link" aria-label="Instagram de Joaquín Coria">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ig-icon">
+                                        <path
+                                            d="M224.3 141a115 115 0 1 0 -.6 230 115 115 0 1 0 .6-230zm-.6 40.4a74.6 74.6 0 1 1 .6 149.2 74.6 74.6 0 1 1 -.6-149.2zm93.4-45.1a26.8 26.8 0 1 1 53.6 0 26.8 26.8 0 1 1 -53.6 0zm129.7 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM399 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z" />
+                                    </svg>
                                 </a>
                             </span>
                         </span>
@@ -674,101 +829,104 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
         </main>
     </div>
 
-<script src="JAVASCRIPT/data.js"></script>
-<script src="JAVASCRIPT/playoffs.js"></script>
-<script src="JAVASCRIPT/main.js"></script>
-<script type="module" src="JAVASCRIPT/auth-login.js"></script>
-<!-- ==========================================
+    <script src="JAVASCRIPT/data.js"></script>
+    <script src="JAVASCRIPT/almacen.js"></script>
+    <script src="JAVASCRIPT/playoffs.js"></script>
+    <script src="JAVASCRIPT/main.js"></script>
+    <script type="module" src="JAVASCRIPT/auth-login.js"></script>
+    <script type="module" src="JAVASCRIPT/datos-publicos.js"></script>
+    <!-- ==========================================
      MODAL LIGHTBOX DE NOTICIA AMPLIADA
      ========================================== -->
-<div id="modal-noticia" class="modal-noticia-overlay seccion-oculta">
-    <div class="modal-noticia-card">
-        <span class="close-modal-noticia">&times;</span>
-        
-        <!-- Foto completa sin recortar -->
-        <img id="modal-noticia-img" src="" alt="Foto noticia completa">
-        
-        <!-- Texto superpuesto sobre la imagen -->
-        <div class="modal-noticia-content">
-            <h3 id="modal-noticia-titulo"></h3>
-            <p id="modal-noticia-texto"></p>
-            <div id="modal-noticia-link-container" style="margin-top: 12px;"></div>
+    <div id="modal-noticia" class="modal-noticia-overlay seccion-oculta">
+        <div class="modal-noticia-card">
+            <span class="close-modal-noticia">&times;</span>
+
+            <!-- Foto completa sin recortar -->
+            <img id="modal-noticia-img" src="" alt="Foto noticia completa">
+
+            <!-- Texto superpuesto sobre la imagen -->
+            <div class="modal-noticia-content">
+                <h3 id="modal-noticia-titulo"></h3>
+                <p id="modal-noticia-texto"></p>
+                <div id="modal-noticia-link-container" style="margin-top: 12px;"></div>
+            </div>
         </div>
     </div>
-</div>
-<!-- ==========================================
+    <!-- ==========================================
      MODAL DE FICHA TÉCNICA DEL EQUIPO (PALETA SITIO)
      ========================================== -->
-<div id="modal-equipo" class="modal-noticia-overlay seccion-oculta">
-    <div class="modal-equipo-card">
-        <span class="close-modal-equipo" id="btn-cerrar-modal-equipo">&times;</span>
-        
-        <!-- Nombre y Categoría -->
-        <div class="equipo-modal-header">
-            <div>
-                <h2 id="modal-equipo-nombre">6TO 2DA</h2>
-                <span id="modal-equipo-categoria" class="badge-categoria">Ciclo Superior — Grupo A</span>
-            </div>
-        </div>
-        <!-- Métrica Horizontal (Boceto) -->
-        <div class="equipo-stats-grid">
-            <div class="stat-box">
-                <span class="stat-label">POSICIÓN</span>
-                <span id="modal-equipo-pos" class="stat-val highlight">1°</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-label">GOLES</span>
-                <span id="modal-equipo-gf" class="stat-val green">20</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-label">PUNTOS</span>
-                <span id="modal-equipo-pts" class="stat-val gold">6</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-label">PJ</span>
-                <span id="modal-equipo-pj" class="stat-val">2</span>
-            </div>
-        </div>
+    <div id="modal-equipo" class="modal-noticia-overlay seccion-oculta">
+        <div class="modal-equipo-card">
+            <span class="close-modal-equipo" id="btn-cerrar-modal-equipo">&times;</span>
 
-        <!-- Selector de Pestañas (JUGADORES / PARTIDOS) -->
-        <div class="equipo-tabs-nav">
-            <button class="tab-btn active btn-tab-modal" data-modal-target="tab-modal-jugadores">JUGADORES</button>
-            <button class="tab-btn btn-tab-modal" data-modal-target="tab-modal-partidos">PARTIDOS</button>
-        </div>
-
-        <!-- VISTA 1: TABLA DE JUGADORES (Misma estética de Posiciones) -->
-        <div id="tab-modal-jugadores" class="tab-modal-content">
-            <div class="table-wrapper">
-                <table class="table-style">
-                    <thead>
-                        <tr class="table-head-row">
-                            <th></th>
-                            <th>N°</th>
-                            <th style="text-align: left;">JUGADOR</th>
-                            <th>PJ</th>
-                            <th style="color: #2edae3;">GOLES</th>
-                            <th style="color: #f2c00e;">A</th>
-                            <th style="color: #f43f5e;">R</th>
-                            <th>INSTAGRAM</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modal-equipo-tbody-jugadores">
-                        <!-- Carga dinámica por JS -->
-                    </tbody>
-                </table>
+            <!-- Nombre y Categoría -->
+            <div class="equipo-modal-header">
+                <div>
+                    <h2 id="modal-equipo-nombre">6TO 2DA</h2>
+                    <span id="modal-equipo-categoria" class="badge-categoria">Ciclo Superior — Grupo A</span>
+                </div>
             </div>
-        </div>
-
-        <!-- VISTA 2: LISTA DE PARTIDOS -->
-        <div id="tab-modal-partidos" class="tab-modal-content seccion-oculta">
-            <div id="modal-equipo-lista-partidos" class="resultados-lista">
-                <!-- Carga dinámica por JS -->
+            <!-- Métrica Horizontal (Boceto) -->
+            <div class="equipo-stats-grid">
+                <div class="stat-box">
+                    <span class="stat-label">POSICIÓN</span>
+                    <span id="modal-equipo-pos" class="stat-val highlight">1°</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">GOLES</span>
+                    <span id="modal-equipo-gf" class="stat-val green">20</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">PUNTOS</span>
+                    <span id="modal-equipo-pts" class="stat-val gold">6</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">PJ</span>
+                    <span id="modal-equipo-pj" class="stat-val">2</span>
+                </div>
             </div>
-        </div>
 
+            <!-- Selector de Pestañas (JUGADORES / PARTIDOS) -->
+            <div class="equipo-tabs-nav">
+                <button class="tab-btn active btn-tab-modal" data-modal-target="tab-modal-jugadores">JUGADORES</button>
+                <button class="tab-btn btn-tab-modal" data-modal-target="tab-modal-partidos">PARTIDOS</button>
+            </div>
+
+            <!-- VISTA 1: TABLA DE JUGADORES (Misma estética de Posiciones) -->
+            <div id="tab-modal-jugadores" class="tab-modal-content">
+                <div class="table-wrapper">
+                    <table class="table-style">
+                        <thead>
+                            <tr class="table-head-row">
+                                <th></th>
+                                <th>N°</th>
+                                <th style="text-align: left;">JUGADOR</th>
+                                <th>PJ</th>
+                                <th style="color: #2edae3;">GOLES</th>
+                                <th style="color: #f2c00e;">A</th>
+                                <th style="color: #f43f5e;">R</th>
+                                <th>INSTAGRAM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-equipo-tbody-jugadores">
+                            <!-- Carga dinámica por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VISTA 2: LISTA DE PARTIDOS -->
+            <div id="tab-modal-partidos" class="tab-modal-content seccion-oculta">
+                <div id="modal-equipo-lista-partidos" class="resultados-lista">
+                    <!-- Carga dinámica por JS -->
+                </div>
+            </div>
+
+        </div>
     </div>
-</div>
 </body>
+
 </html>
 
 

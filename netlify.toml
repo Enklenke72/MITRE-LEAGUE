@@ -1,0 +1,10 @@
+[[redirects]]
+  from = "/staff"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin.html"
+  to = "/staff"
+  status = 301
+  force = true

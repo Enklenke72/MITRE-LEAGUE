@@ -4259,6 +4259,46 @@ body.rol-staff .solo-admin {
     box-shadow: 0 0 0 3px rgba(46, 218, 227, 0.15);
 }
 
+.login-staff-password-wrap {
+    position: relative;
+}
+
+.login-staff-password-wrap input {
+    width: 100%;
+    padding-right: 42px;
+}
+
+.login-staff-ver-password {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #5b6f9f;
+    cursor: pointer;
+}
+
+.login-staff-ver-password svg {
+    width: 19px;
+    height: 19px;
+}
+
+.login-staff-ver-password:hover,
+.login-staff-ver-password:focus-visible {
+    color: #2edae3;
+}
+
+.login-staff-ver-password.mostrando {
+    color: #2edae3;
+}
+
 .login-staff-form .btn-submit-admin {
     margin-top: 6px;
     padding: 13px;
@@ -4384,6 +4424,35 @@ body.auth-pendiente .auth-gate {
 .auth-gate-acciones {
     display: flex;
     gap: 10px;
+}
+
+/* Otra persona cargó cambios: el panel no se redibuja solo, avisa arriba y queda fijo al hacer scroll */
+.aviso-cambios-ajenos {
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    width: 100%;
+    max-width: 1000px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-bottom: 15px;
+    padding: 10px 14px;
+    background: #0a1d54;
+    border: 1px solid #2edae3;
+    border-radius: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    color: #cbd5e1;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.aviso-cambios-ajenos[hidden] {
+    display: none;
 }
 
 .staff-title {
@@ -4737,61 +4806,6 @@ body.auth-pendiente .auth-gate {
     border-radius: 2px;
     cursor: pointer;
 }
-
-/* ==========================================
-   MEDIDOR DE ESPACIO DE ALMACENAMIENTO (RESUMEN)
-   ========================================== */
-.storage-total {
-    font-family: 'Oswald', sans-serif;
-    font-size: 13px;
-    color: #fff;
-    display: block;
-    margin-bottom: 6px;
-}
-
-.storage-barra {
-    height: 10px;
-    background: #040c26;
-    border: 1px solid #1a3274;
-    border-radius: 5px;
-    overflow: hidden;
-    margin-bottom: 10px;
-}
-
-.storage-barra-fill {
-    height: 100%;
-    background: #2edae3;
-    transition: width 0.3s ease;
-}
-
-.storage-barra-fill.alerta { background: #f2c00e; }
-.storage-barra-fill.critico { background: #f43f5e; }
-
-.storage-detalle {
-    font-family: 'Oswald', sans-serif;
-    font-size: 10px;
-    color: #869bd8;
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 2px 0;
-}
-
-.storage-detalle strong {
-    color: #cbd5e1;
-    font-weight: normal;
-}
-
-.storage-aviso {
-    font-family: 'Oswald', sans-serif;
-    font-size: 10px;
-    color: #f2c00e;
-    display: block;
-    margin-top: 10px;
-    line-height: 1.4;
-}
-
-.storage-aviso.critico { color: #f43f5e; }
 
 /* Día de calendario del partido en el fixture público */
 .match-meta-dia {
