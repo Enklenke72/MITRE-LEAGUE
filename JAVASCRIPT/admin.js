@@ -758,30 +758,8 @@ document.addEventListener('liga:datos-listos', () => {
                 tarjetas[campo] = resuelto.ids;
             }
 
-            function revertirGolesPartido(partidoViejo) {
-                if (!partidoViejo) return;
-                const revertirEquipo = (golesArray, equipoIdRef, nombreEquipo) => {
-                    if (!golesArray || !golesArray.length) return;
-                    // Prioriza el ID estable (sobrevive a un cambio de nombre); si el partido es viejo y no tiene ID guardado, cae al nombre como antes.
-                    const equipoObj = (equipoIdRef != null ? poolEquipos.find(e => e.id === equipoIdRef) : null)
-                        || poolEquipos.find(e => e.nombre.trim().toLowerCase() === nombreEquipo.trim().toLowerCase());
-                    if (!equipoObj || !equipoObj.jugadores) return;
-                    golesArray.forEach(g => {
-                        const match = g.nombre.match(/#(\d+)/);
-                        if (!match) return;
-                        const numDorsal = parseInt(match[1]);
-                        const jugador = equipoObj.jugadores.find(j => j.dorsal == numDorsal);
-                        if (jugador) jugador.goles = Math.max(0, (jugador.goles || 0) - g.cantidad);
-                    });
-                };
-                revertirEquipo(partidoViejo.goleadoresLocal, partidoViejo.localId, partidoViejo.local);
-                revertirEquipo(partidoViejo.goleadoresVisitante, partidoViejo.visitanteId, partidoViejo.visitante);
-            }
-
-            if (idPartidoEnEdicion !== null) {
-                revertirGolesPartido(partidos.find(p => p.id === idPartidoEnEdicion));
-            }
-
+            // Los goles de cada jugador se cuentan desde los partidos (main.js, golesDeJugador): acá solo se
+            // arma la lista del partido. Cada goleador lleva el DNI del jugador (id) además de la etiqueta.
             function procesarDorsales(txtDorsales, equipoObj, rivalNombre) {
                 if (!txtDorsales || !equipoObj || !equipoObj.jugadores) return [];
                 const listaDorsales = txtDorsales.split(',').map(d => d.trim()).filter(d => d !== '');
@@ -791,9 +769,9 @@ document.addEventListener('liga:datos-listos', () => {
                     const numDorsal = parseInt(dorsalStr);
                     const jugadorEncontrado = equipoObj.jugadores.find(j => j.dorsal == numDorsal);
                     if (jugadorEncontrado) {
-                        jugadorEncontrado.goles = (jugadorEncontrado.goles || 0) + 1;
                         const clave = `${jugadorEncontrado.nombre} (#${numDorsal})`;
-                        conteoGoles[clave] = (conteoGoles[clave] || 0) + 1;
+                        if (!conteoGoles[clave]) conteoGoles[clave] = { cantidad: 0, id: idJugadorBF(jugadorEncontrado) };
+                        conteoGoles[clave].cantidad++;
                     } else {
                         // El gol no se asigna a nadie (decisión de Joaquín, 22/09/2026): el resto del resultado
                         // se guarda igual, pero queda un aviso para que el staff lo revise y corrija después.
@@ -802,10 +780,10 @@ document.addEventListener('liga:datos-listos', () => {
                     }
                 });
 
-                guardarEquiposEnStorage();
                 return Object.keys(conteoGoles).map(nombreLabel => ({
                     nombre: nombreLabel,
-                    cantidad: conteoGoles[nombreLabel]
+                    cantidad: conteoGoles[nombreLabel].cantidad,
+                    id: conteoGoles[nombreLabel].id
                 }));
             }
 
@@ -1498,9 +1476,9 @@ document.addEventListener('liga:datos-listos', () => {
         return { equipo, jugador };
     }
 
-    // Los partidos y las sanciones reconocen al jugador por su DNI (asistencia, tarjetas, suspensión) y sus goles por la
-    // etiqueta 'Nombre (#N)'. Al corregir esos datos hay que reescribirlos ahí también: si no, pierde PJ, tarjetas,
-    // suspensión y goles de sus partidos. (El diseño de los goles queda como está: es tema de la migración, CLAUDE.md 11.4.)
+    // Los partidos y las sanciones reconocen al jugador por su DNI (asistencia, tarjetas, goles, suspensión) y sus goles
+    // también muestran la etiqueta 'Nombre (#N)'. Al corregir esos datos hay que reescribirlos ahí también: si no,
+    // pierde PJ, tarjetas, suspensión y goles de sus partidos.
     function propagarCambioJugador(equipo, antes, despues) {
         const cambioDni = String(antes.dni) !== String(despues.dni);
         const cambioNombreODorsal = antes.nombre !== despues.nombre || String(antes.dorsal) !== String(despues.dorsal);
@@ -1525,16 +1503,15 @@ document.addEventListener('liga:datos-listos', () => {
                     });
                 });
             }
-            if (cambioNombreODorsal) {
-                ladosGoles.forEach(([lado, ladoId, campo]) => {
-                    if (!Array.isArray(p[campo]) || !esDelEquipo(p[lado], p[ladoId])) return;
-                    p[campo].forEach(g => {
-                        if (g.nombre !== etiquetaAntes) return;
-                        g.nombre = etiquetaDespues;
-                        partidosTocados = true;
-                    });
+            ladosGoles.forEach(([lado, ladoId, campo]) => {
+                if (!Array.isArray(p[campo]) || !esDelEquipo(p[lado], p[ladoId])) return;
+                p[campo].forEach(g => {
+                    const esEl = g.id != null ? String(g.id) === String(antes.dni) : g.nombre === etiquetaAntes;
+                    if (!esEl) return;
+                    if (cambioNombreODorsal && g.nombre !== etiquetaDespues) { g.nombre = etiquetaDespues; partidosTocados = true; }
+                    if (cambioDni && g.id != null) { g.id = despues.dni; partidosTocados = true; }
                 });
-            }
+            });
         });
         if (partidosTocados) almacen.setItem('liga_partidos', JSON.stringify(partidos));
 
@@ -2448,11 +2425,11 @@ document.addEventListener('liga:datos-listos', () => {
         `;
     }
 
-    function htmlCardInscripcion(idEq, cantJugadores, totalExigido, pagoData) {
+    function htmlCardInscripcion(idEq, nombreEq, cantJugadores, totalExigido, pagoData) {
         return `
-            <div class="teso-team-box teso-insc-card" data-eq="${attrSeguro(idEq)}" data-exigido="${totalExigido}">
+            <div class="teso-team-box teso-insc-card" data-eq="${attrSeguro(idEq)}" data-nombre="${attrSeguro(nombreEq)}" data-exigido="${totalExigido}">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                    <span class="teso-team-name">${attrSeguro(idEq)}</span>
+                    <span class="teso-team-name">${attrSeguro(nombreEq)}</span>
                     <span style="font-family:'Oswald',sans-serif; font-size:11px; color:#869bd8;">${cantJugadores} jug. — Exigido $${totalExigido.toLocaleString()}</span>
                 </div>
                 <div class="teso-inputs-row">
@@ -2506,9 +2483,9 @@ document.addEventListener('liga:datos-listos', () => {
         pool.forEach(eq => {
             const cantJugadores = eq.jugadores ? eq.jugadores.length : 0;
             const totalExigido = cantJugadores * valorIndividual;
-            const idEq = eq.nombre.trim();
+            const idEq = claveInscripcion(eq);
             const pagoData = tesoreriaInscripciones[idEq] || { ef: 0, tr: 0 };
-            contenedor.innerHTML += htmlCardInscripcion(idEq, cantJugadores, totalExigido, pagoData);
+            contenedor.innerHTML += htmlCardInscripcion(idEq, eq.nombre.trim(), cantJugadores, totalExigido, pagoData);
         });
 
         document.querySelectorAll('.in-insc-ef').forEach(inpt => {
@@ -2519,7 +2496,7 @@ document.addEventListener('liga:datos-listos', () => {
                 const valorNuevo = parseFloat(e.target.value) || 0;
                 tesoreriaInscripciones[idEq].ef = valorNuevo;
                 almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
-                registrarMovimientoCaja({ equipo: idEq, concepto: 'Inscripción', medio: 'Efectivo', monto: valorNuevo - valorAnterior });
+                registrarMovimientoCaja({ equipo: e.target.closest('.teso-insc-card').dataset.nombre, concepto: 'Inscripción', medio: 'Efectivo', monto: valorNuevo - valorAnterior });
                 actualizarCardInscripcion(e.target.closest('.teso-insc-card'));
                 calcularBalanceGeneral();
             });
@@ -2533,7 +2510,7 @@ document.addEventListener('liga:datos-listos', () => {
                 const valorNuevo = parseFloat(e.target.value) || 0;
                 tesoreriaInscripciones[idEq].tr = valorNuevo;
                 almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
-                registrarMovimientoCaja({ equipo: idEq, concepto: 'Inscripción', medio: 'Transferencia', monto: valorNuevo - valorAnterior });
+                registrarMovimientoCaja({ equipo: e.target.closest('.teso-insc-card').dataset.nombre, concepto: 'Inscripción', medio: 'Transferencia', monto: valorNuevo - valorAnterior });
                 actualizarCardInscripcion(e.target.closest('.teso-insc-card'));
                 calcularBalanceGeneral();
             });
@@ -2577,20 +2554,72 @@ document.addEventListener('liga:datos-listos', () => {
         return `FECHA ${fecha}`;
     }
 
-    function claveTesoreria(p, lado) {
-        const nombre = lado === 'local' ? p.local : p.visitante;
-        return `F${p.fecha}_${p.id}_${lado === 'local' ? 'local' : 'visita'}_${nombre.trim().toLowerCase()}`;
+    // Tesorería identifica a cada equipo por su id, que sobrevive a un cambio de nombre (antes era por nombre y
+    // renombrar un equipo le "borraba" los pagos). Solo los partidos viejos sin id caen al nombre.
+    function equipoTeso(p, lado) {
+        const id = buscarEquipoIdTeso(p, lado);
+        return id != null ? `eq${id}` : ((lado === 'local' ? p.local : p.visitante) || '').trim().toLowerCase();
     }
+
+    function claveTesoreria(p, lado) {
+        return `F${p.fecha}_${p.id}_${lado === 'local' ? 'local' : 'visita'}_${equipoTeso(p, lado)}`;
+    }
+
+    function claveInscripcion(eq) {
+        return eq.id != null ? `eq${eq.id}` : eq.nombre.trim();
+    }
+
+    // Claves con el nombre (hasta el 27/09/2026): se pasan una sola vez a las claves con id. Si ya se
+    // pasaron, no hace nada. También actualiza la clave que guardan las sanciones automáticas.
+    function migrarClavesTesoreria() {
+        let pagos = false, sanciones = false, inscripciones = false;
+        partidos.forEach(p => {
+            if (!p || !p.local || !p.visitante) return;
+            ['local', 'visita'].forEach(lado => {
+                const nombre = (lado === 'local' ? p.local : p.visitante).trim().toLowerCase();
+                const vieja = `F${p.fecha}_${p.id}_${lado}_${nombre}`;
+                const nueva = claveTesoreria(p, lado);
+                if (vieja === nueva || !(vieja in tesoreriaPartidos)) return;
+                if (!(nueva in tesoreriaPartidos)) tesoreriaPartidos[nueva] = tesoreriaPartidos[vieja];
+                delete tesoreriaPartidos[vieja];
+                pagos = true;
+                listaSanciones.forEach(s => {
+                    if (s.claveTeso !== vieja) return;
+                    s.claveTeso = nueva;
+                    sanciones = true;
+                });
+            });
+        });
+        [...(poolSuperior || []), ...(poolBasico || [])].forEach(eq => {
+            const vieja = eq.nombre.trim();
+            const nueva = claveInscripcion(eq);
+            if (vieja === nueva || !(vieja in tesoreriaInscripciones)) return;
+            if (!(nueva in tesoreriaInscripciones)) tesoreriaInscripciones[nueva] = tesoreriaInscripciones[vieja];
+            delete tesoreriaInscripciones[vieja];
+            inscripciones = true;
+        });
+        if (pagos) guardarTesoreriaPartidos();
+        if (sanciones) almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+        if (inscripciones) almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+    }
+    migrarClavesTesoreria();
 
     function fechaHoyTexto() {
         const d = new Date();
         return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     }
 
-    let ultimoIdSancionAuto = 0;
-    function generarIdSancion() {
-        ultimoIdSancionAuto = Math.max(Date.now(), ultimoIdSancionAuto + 1);
-        return ultimoIdSancionAuto;
+    // Id fijo para la sanción automática de un pago (partido + equipo): si dos personas la generan a la vez
+    // cae en el mismo documento en vez de duplicarse. Es un número (como los demás ids, que se leen con
+    // parseInt) muy por encima de Date.now() para no chocar con las sanciones cargadas a mano.
+    function idSancionAutomatica(claveTeso) {
+        let a = 2166136261, b = 5381;
+        for (let i = 0; i < claveTeso.length; i++) {
+            const c = claveTeso.charCodeAt(i);
+            a = Math.imul(a ^ c, 16777619) >>> 0;
+            b = (Math.imul(b, 33) ^ c) >>> 0;
+        }
+        return 1e15 + a * 1024 + (b & 1023);
     }
 
     function buscarEquipoIdTeso(p, lado) {
@@ -2624,7 +2653,7 @@ document.addEventListener('liga:datos-listos', () => {
         ordenados.forEach(p => {
             ['local', 'visita'].forEach(lado => {
                 const nombre = lado === 'local' ? p.local : p.visitante;
-                const nombreKey = nombre.trim().toLowerCase();
+                const equipoKey = equipoTeso(p, lado);
                 const clave = claveTesoreria(p, lado);
                 const data = tesoreriaPartidos[clave] || {};
                 const arancelBase = data.arancel || p.arancelExigido || ARANCEL_PARTIDO_DEFECTO;
@@ -2634,13 +2663,13 @@ document.addEventListener('liga:datos-listos', () => {
                 // El ausente debe el 50 % del derecho de partido; el que se presenta, el 100 %.
                 // En Play-Offs el ausente queda eliminado y no juega: no debe nada.
                 const exigidoBruto = ausente ? (Number(p.fecha) >= 100 ? 0 : arancelBase * 0.5) : arancelBase;
-                const saldoPrevio = saldos[nombreKey] || 0;
+                const saldoPrevio = saldos[equipoKey] || 0;
                 const saldoAplicado = Math.min(saldoPrevio, exigidoBruto);
                 const exigido = exigidoBruto - saldoAplicado;
                 const pagado = (data.ef || 0) + (data.tr || 0);
                 const falta = Math.max(0, exigido - pagado);
                 const saldoGenerado = Math.max(0, pagado - exigido);
-                saldos[nombreKey] = saldoPrevio - saldoAplicado + saldoGenerado;
+                saldos[equipoKey] = saldoPrevio - saldoAplicado + saldoGenerado;
 
                 const cubierto = pagado + saldoAplicado;
                 porClave[clave] = {
@@ -2648,17 +2677,18 @@ document.addEventListener('liga:datos-listos', () => {
                     exigidoBruto, saldoAplicado, exigido, pagado, falta, saldoGenerado, cubierto,
                     porcentaje: arancelBase > 0 ? cubierto / arancelBase : 1
                 };
-                if (!historial[nombreKey]) historial[nombreKey] = [];
-                historial[nombreKey].push({ orden: ordenCronologicoFecha(p.fecha), fecha: p.fecha, falta });
+                if (!historial[equipoKey]) historial[equipoKey] = [];
+                historial[equipoKey].push({ orden: ordenCronologicoFecha(p.fecha), fecha: p.fecha, falta });
             });
         });
 
         return { porClave, historial };
     }
 
-    function obtenerDeudaHistorica(calc, nombreEquipo, fechaActual) {
+    // equipoKey = equipoTeso(partido, lado)
+    function obtenerDeudaHistorica(calc, equipoKey, fechaActual) {
         const ordenActual = ordenCronologicoFecha(fechaActual);
-        const pendientes = (calc.historial[nombreEquipo.trim().toLowerCase()] || [])
+        const pendientes = (calc.historial[equipoKey] || [])
             .filter(h => h.orden < ordenActual && h.falta > 0);
         return {
             deudaTotal: pendientes.reduce((acc, h) => acc + h.falta, 0),
@@ -2748,7 +2778,7 @@ document.addEventListener('liga:datos-listos', () => {
                 if (s.activa) {
                     if (!existente) {
                         listaSanciones.push({
-                            id: generarIdSancion(),
+                            id: idSancionAutomatica(clave),
                             acta: p.fecha,
                             fecha: p.fecha,
                             ciclo: p.ciclo || 'superior',
@@ -3321,8 +3351,8 @@ document.addEventListener('liga:datos-listos', () => {
                     </div>
 
                     <div class="teso-match-teams-grid">
-                        ${htmlCajaEquipoTeso(ev.L, ev, faseLabel, obtenerDeudaHistorica(calc, p.local, p.fecha), p)}
-                        ${htmlCajaEquipoTeso(ev.V, ev, faseLabel, obtenerDeudaHistorica(calc, p.visitante, p.fecha), p)}
+                        ${htmlCajaEquipoTeso(ev.L, ev, faseLabel, obtenerDeudaHistorica(calc, equipoTeso(p, 'local'), p.fecha), p)}
+                        ${htmlCajaEquipoTeso(ev.V, ev, faseLabel, obtenerDeudaHistorica(calc, equipoTeso(p, 'visita'), p.fecha), p)}
                     </div>
                     ${avisosHtml ? `<div class="teso-avisos-partido">${avisosHtml}</div>` : ''}
                 </div>
@@ -3951,7 +3981,7 @@ document.addEventListener('liga:datos-listos', () => {
             const pendientesPago = equiposTotal.filter(eq => {
                 const cant = eq.jugadores ? eq.jugadores.length : 0;
                 const exigido = cant * valorIndividual;
-                const pago = tesoreriaInscripciones[eq.nombre.trim()] || { ef: 0, tr: 0 };
+                const pago = tesoreriaInscripciones[claveInscripcion(eq)] || { ef: 0, tr: 0 };
                 const pagado = (pago.ef || 0) + (pago.tr || 0);
                 return exigido > 0 && pagado < exigido;
             });

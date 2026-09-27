@@ -20,7 +20,9 @@ import { cargarFirestore } from './firebase-sdk.js';
 
 const NIVEL = { publico: 0, staff: 1, coordinador: 2 };
 const CAMPOS_PUBLICOS_JUGADOR = ['nombre', 'dorsal', 'instagram', 'foto', 'goles', 'amarillas', 'rojas'];
-const CAMPOS_DNI_PARTIDO = ['asistentesLocal', 'asistentesVisitante', 'amarillasLocal', 'rojasLocal', 'amarillasVisitante', 'rojasVisitante'];
+// 'lista.campo' = el campo de cada objeto de esa lista (el id de cada goleador).
+const CAMPOS_DNI_PARTIDO = ['asistentesLocal', 'asistentesVisitante', 'amarillasLocal', 'rojasLocal', 'amarillasVisitante', 'rojasVisitante',
+    'goleadoresLocal.id', 'goleadoresVisitante.id'];
 const PATRON_CODIGO = /^j[A-Za-z0-9_-]{16}$/;
 
 // nivel = quién puede leerla. escribeStaff: el staff solo agrega (la Caja registra cada pago que marca).
@@ -114,26 +116,37 @@ function dniDe(valor) {
     return dniPorCodigo.has(valor) ? dniPorCodigo.get(valor) : valor;
 }
 
+// Devuelve una copia de obj con traducir (sincrónica) aplicada a cada campo de def.dnis.
+function mapearDnis(def, obj, traducir) {
+    const copia = { ...obj };
+    const valido = v => v !== undefined && v !== null && v !== '';
+    def.dnis.forEach(ruta => {
+        const [campo, sub] = ruta.split('.');
+        const v = copia[campo];
+        if (sub) {
+            if (Array.isArray(v)) copia[campo] = v.map(x => (x && valido(x[sub]) ? { ...x, [sub]: traducir(x[sub]) } : x));
+        } else if (Array.isArray(v)) {
+            copia[campo] = v.map(traducir);
+        } else if (valido(v)) {
+            copia[campo] = traducir(v);
+        }
+    });
+    return copia;
+}
+
 async function codificarDnis(def, obj) {
     if (!def.dnis) return obj;
-    const copia = { ...obj };
-    for (const campo of def.dnis) {
-        const v = copia[campo];
-        if (Array.isArray(v)) copia[campo] = await Promise.all(v.map(codigoDe));
-        else if (v !== undefined && v !== null && v !== '') copia[campo] = await codigoDe(v);
-    }
-    return copia;
+    // codigoDe es asíncrona (HMAC): se calculan antes todos los códigos y después se traduce de una.
+    const dnis = [];
+    mapearDnis(def, obj, v => { dnis.push(v); return v; });
+    const codigos = new Map();
+    for (const d of dnis) codigos.set(d, await codigoDe(d));
+    return mapearDnis(def, obj, v => codigos.get(v));
 }
 
 function decodificarDnis(def, obj) {
     if (!def.dnis || rolActual === 'publico') return obj;
-    const copia = { ...obj };
-    def.dnis.forEach(campo => {
-        const v = copia[campo];
-        if (Array.isArray(v)) copia[campo] = v.map(dniDe);
-        else if (v !== undefined && v !== null && v !== '') copia[campo] = dniDe(v);
-    });
-    return copia;
+    return mapearDnis(def, obj, dniDe);
 }
 
 // ------------------------------------------------------------

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>banco integridad</title></head>
+<body>
+<pre id="res">corriendo...</pre>
+<!-- Goles calculados desde los partidos, claves de Tesorería por id (con migración de las claves viejas por nombre)
+     e id fijo de las sanciones automáticas (27/09/2026). Corre sobre el Firestore simulado. -->
+<iframe id="admin1" style="width:1100px;height:700px"></iframe>
+<iframe id="admin2" style="width:1100px;height:700px"></iframe>
+<iframe id="publico" style="width:1100px;height:900px"></iframe>
+<script>
+const salida = [];
+let pases = 0, fallas = 0;
+const out = s => { salida.push(s); document.getElementById('res').textContent = salida.join('\n'); };
+function check(cond, msg, det) {
+    cond ? pases++ : fallas++;
+    out((cond ? 'PASS ' : 'FAIL ') + msg + (det !== undefined ? '  → ' + JSON.stringify(det) : ''));
+}
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+const marcos = { admin1: document.getElementById('admin1'), admin2: document.getElementById('admin2'), publico: document.getElementById('publico') };
+const W = n => marcos[n].contentWindow;
+const D = n => marcos[n].contentDocument;
+
+async function cargar(nombre, url) {
+    await esperar(200);
+    await new Promise(res => {
+        marcos[nombre].onload = () => {
+            const w = marcos[nombre].contentWindow;
+            w.alert = m => out('  [' + nombre + ' alert] ' + m);
+            w.confirm = () => true;
+            w.onerror = (m, s, l) => out('JS ERROR [' + nombre + '] ' + m + ' @' + s + ':' + l);
+            res();
+        };
+        marcos[nombre].src = url;
+    });
+    for (let i = 0; i < 400; i++) {
+        const d = D(nombre);
+        const listo = /admin/.test(url)
+            ? d.body && !d.body.classList.contains('auth-pendiente')
+            : ((d.getElementById('contenedor-lista-notificaciones') || {}).innerHTML || '').trim() !== '';
+        if (listo) break;
+        await esperar(25);
+    }
+    await esperar(200);
+}
+
+const guardar = (nombre, clave, valor) => W(nombre).almacen.setItem(clave, JSON.stringify(valor));
+const leer = (nombre, clave) => JSON.parse(W(nombre).almacen.getItem(clave));
+const fakefs = () => JSON.parse(localStorage.getItem('fakefs') || '{}');
+const ids = col => Object.keys(fakefs()[col] || {}).map(decodeURIComponent);
+const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', foto: '', goles: 0, amarillas: 0, rojas: 0, fichaMedica: 'si', celular: '' });
+const partido = (id, fecha, jugado, gl, gv, extra) => ({ id, fecha, dia: '', horario: '10:00', cancha: 'Cancha 1', local: 'Rojo FC', visitante: 'Azul FC', localId: 1, visitanteId: 2, golesLocal: gl, golesVisitante: gv, ciclo: 'superior', grupo: 'A', jugado, asistentesLocal: [], asistentesVisitante: [], goleadoresLocal: [], goleadoresVisitante: [], ...extra });
+const goleadores = () => [...D('publico').querySelectorAll('#tbody-goleadores tr')].map(tr => tr.cells.length > 3 ? tr.cells[1].textContent.trim() + ':' + tr.cells[3].textContent.trim() : tr.textContent.trim());
+async function abrirTeso(nombre, fecha) {
+    D(nombre).querySelector('.staff-tab-btn[data-target="sec-tesoreria"]').click();
+    D(nombre).getElementById('btn-sub-teso-partidos').click();
+    const f = D(nombre).getElementById('filtro-tesoreria-fecha');
+    f.value = String(fecha); f.dispatchEvent(new Event('change', { bubbles: true }));
+    await esperar(50);
+}
+
+(async () => {
+  try {
+    localStorage.clear();
+    out('=== Preparación: datos guardados con el formato anterior (claves de Tesorería por nombre) ===');
+    await cargar('admin1', 'admin.html');
+    guardar('admin1', 'liga_grupos', { superior: ['A'], basico: ['A'] });
+    guardar('admin1', 'liga_cicloSuperior', [
+        { id: 1, nombre: 'Rojo FC', grupo: 'A', pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, dif: 0, pts: 0, jugadores: [jugador('Ana Uno', '40111222', 9), jugador('Beto Dos', '40333444', 10)] },
+        { id: 2, nombre: 'Azul FC', grupo: 'A', pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, dif: 0, pts: 0, jugadores: [jugador('Carla Tres', '40555666', 7)] }
+    ]);
+    guardar('admin1', 'liga_partidos', [
+        // Goleador de Azul sin id: partido cargado antes del cambio, se reconoce por el dorsal.
+        partido(100, 1, true, 2, 1, { goleadoresLocal: [{ nombre: 'Ana Uno (#9)', cantidad: 2, id: '40111222' }], goleadoresVisitante: [{ nombre: 'Carla Tres (#7)', cantidad: 1 }] }),
+        partido(101, 1, true, 1, 0, { goleadoresLocal: [{ nombre: 'Beto Dos (#10)', cantidad: 1, id: '40333444' }] }),
+        partido(102, 2, false, null, null),
+        partido(103, 3, false, null, null)
+    ]);
+    guardar('admin1', 'liga_tesoreria_partidos_v2', {
+        'F1_100_local_rojo fc': { ef: 30000, tr: 0 },
+        'F1_100_visita_azul fc': { ef: 15000, tr: 0 },
+        'F2_102_visita_azul fc': { ef: 0, tr: 0, asistencia: 'sin_aviso' }
+    });
+    guardar('admin1', 'liga_tesoreria_inscripciones', { 'Rojo FC': { ef: 9000, tr: 0 } });
+    guardar('admin1', 'liga_sanciones', [{ id: 555, acta: 2, fecha: 2, ciclo: 'superior', equipo: 'Azul FC', equipoId: 2, jugador: '', tipo: 'Quita de Puntos', puntosRestados: 2, motivo: 'Ausencia sin abonar el 50%', origenAuto: true, claveTeso: 'F2_102_visita_azul fc' }]);
+
+    out('\n=== Al abrir el panel se migran las claves viejas ===');
+    await cargar('admin1', 'admin.html');
+    const teso = ids('tesoreriaPartidos');
+    check(teso.includes('F1_100_local_eq1') && teso.includes('F1_100_visita_eq2') && teso.includes('F2_102_visita_eq2') && !teso.some(k => /fc$/.test(k)), 'Pagos por partido: claves pasadas a id de equipo, sin restos de las viejas', teso);
+    check(fakefs().tesoreriaPartidos[encodeURIComponent('F1_100_local_eq1')].valor.ef === 30000, 'El pago migrado conserva el monto ($30.000)');
+    check(JSON.stringify(ids('tesoreriaInscripciones')) === '["eq1"]' && fakefs().tesoreriaInscripciones.eq1.valor.ef === 9000, 'Inscripción migrada a id de equipo con su monto', ids('tesoreriaInscripciones'));
+    const sancF2 = Object.values(fakefs().sanciones || {}).filter(s => s.origenAuto && /^F2_102_visita/.test(s.claveTeso));
+    check(sancF2.length === 1 && sancF2[0].claveTeso === 'F2_102_visita_eq2', 'La sanción automática sigue siendo una sola y apunta a la clave nueva', sancF2.map(s => s.id + ' ' + s.claveTeso));
+
+    out('\n=== Goles calculados desde los partidos ===');
+    await cargar('publico', 'index.html');
+    check(JSON.stringify(goleadores()) === JSON.stringify(['Ana Uno:2', 'Beto Dos:1', 'Carla Tres:1']), 'Goleadores: salen de los partidos (Carla, de un partido viejo sin id, por su dorsal)', goleadores());
+    check(/^j/.test(fakefs().partidos['100'].goleadoresLocal[0].id), 'En Firestore el goleador va con código, no con DNI', fakefs().partidos['100'].goleadoresLocal[0].id);
+    check(leer('admin1', 'liga_partidos').find(p => p.id === 100).goleadoresLocal[0].id === '40111222', 'El panel lo vuelve a ver con el DNI real');
+    guardar('admin1', 'liga_partidos', leer('admin1', 'liga_partidos').filter(p => p.id !== 101));
+    await esperar(1000);
+    check(JSON.stringify(goleadores()) === JSON.stringify(['Ana Uno:2', 'Carla Tres:1']), 'Al borrar un partido, sus goles desaparecen de la tabla (antes el contador los dejaba)', goleadores());
+
+    out('\n=== Renombrar un equipo no le borra los pagos ===');
+    await cargar('admin1', 'admin.html');
+    const eqs = leer('admin1', 'liga_cicloSuperior'); eqs[0].nombre = 'Rojo FC Campeón';
+    guardar('admin1', 'liga_cicloSuperior', eqs);
+    guardar('admin1', 'liga_partidos', leer('admin1', 'liga_partidos').map(p => ({ ...p, local: p.local === 'Rojo FC' ? 'Rojo FC Campeón' : p.local })));
+    await cargar('admin1', 'admin.html');
+    await abrirTeso('admin1', 1);
+    const inpRojo = D('admin1').querySelector('.in-p-ef[data-key="F1_100_local_eq1"]');
+    check(inpRojo && inpRojo.value === '30000', 'Tesorería del partido: el equipo renombrado conserva su pago de $30.000', inpRojo && inpRojo.value);
+    D('admin1').getElementById('btn-sub-teso-inscripciones').click();
+    await esperar(50);
+    const card = [...D('admin1').querySelectorAll('.teso-insc-card')].find(c => c.dataset.nombre === 'Rojo FC Campeón');
+    check(card && /Total pagado: \$9[.,]000/.test(card.textContent), 'Inscripción: el equipo renombrado conserva lo pagado ($9.000)', card && card.textContent.replace(/\s+/g, ' ').trim().slice(0, 120));
+
+    out('\n=== Dos paneles marcan la misma ausencia: una sola sanción ===');
+    await cargar('admin2', 'admin.html');
+    for (const panel of ['admin1', 'admin2']) {
+        await abrirTeso(panel, 3);
+        const sel = D(panel).querySelector('.in-p-asist[data-key="F3_103_visita_eq2"]');
+        if (!sel) { out('  no encontré el selector de asistencia en ' + panel); continue; }
+        sel.value = 'sin_aviso'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+        await esperar(300);
+    }
+    await esperar(500);
+    const sancF3 = Object.values(fakefs().sanciones || {}).filter(s => s.origenAuto && s.claveTeso === 'F3_103_visita_eq2');
+    check(sancF3.length === 1 && sancF3[0].id >= 1e15, 'Una sola sanción automática, con id fijo derivado de la clave', sancF3.map(s => s.id));
+    check(Object.values(fakefs().sanciones || {}).filter(s => s.origenAuto).length === 2, 'En total quedan 2 sanciones automáticas (F2 migrada y F3), sin duplicados');
+  } catch (e) {
+    out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
+  }
+  out(`\nRESUMEN: ${pases} PASS, ${fallas} FAIL.`);
+  document.title = 'LISTO';
+})();
+</script>
+</body></html>

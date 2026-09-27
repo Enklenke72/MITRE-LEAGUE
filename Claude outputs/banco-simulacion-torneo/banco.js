@@ -17,8 +17,18 @@ const W = () => marco.contentWindow;
 // Para correrlo, JAVASCRIPT/firebase-sdk.js de la copia de prueba se reemplaza por firebase-sdk-falso.js.
 const LS = k => { const a = W() && W().almacen; return a ? JSON.parse(a.getItem(k)) : null; };
 const docsFS = col => Object.keys((JSON.parse(localStorage.getItem('fakefs') || '{}'))[col] || {}).length;
+// Desde el 27/09/2026 los goles no se guardan en el jugador: se cuentan desde los partidos (cada goleador lleva el DNI).
+const golesDe = (nombreEquipo, dni) => (LS('liga_partidos') || []).filter(p => p.jugado).reduce((total, p) =>
+    total + [['local', 'goleadoresLocal'], ['visitante', 'goleadoresVisitante']].reduce((suma, [lado, campo]) =>
+        suma + (p[lado] === nombreEquipo ? (p[campo] || []).filter(g => g.id === dni).reduce((s, g) => s + g.cantidad, 0) : 0), 0), 0);
 const ultimaAlerta = () => alertas[alertas.length - 1] || '';
 
+// Borrar la base con un panel abierto es un cambio externo real (como borrar desde la consola) y le muestra el aviso:
+// se descarga la página antes de vaciar el Firestore simulado.
+async function vaciarFirestore() {
+    await new Promise(res => { marco.onload = () => res(); marco.src = 'about:blank'; });
+    localStorage.clear();
+}
 let avisosFalsos = 0; // con una sola persona cargando, el aviso "otra persona cargó cambios" nunca debería aparecer
 async function cargar(url) {
     await esperar(150); // que terminen de salir las escrituras de la página anterior
@@ -90,7 +100,7 @@ const suma = (m, dni, n = 1) => { m[dni] = (m[dni] || 0) + n; };
 // ---------------- Fase 0: arranque "limpio" con la semilla real de data.js ----------------
 async function fase0() {
     out('\n=== FASE 0: arranque limpio con la semilla real (data.js sin tocar) ===');
-    localStorage.clear();
+    await vaciarFirestore();
     await cargar('admin.html?semilla=1');
     const partidosAlCargar = (LS('liga_partidos') || []).length;
     check(partidosAlCargar === 0, 'Abrir admin con localStorage vacío NO debería guardar los partidos del torneo anterior', { partidosGuardados: partidosAlCargar });
@@ -102,11 +112,11 @@ async function fase0() {
     await enviar('form-nuevo-equipo');
     const eqs = LS('liga_cicloSuperior') || [];
     check(eqs.length === 1, 'Crear el primer equipo del torneo nuevo debería dejar 1 solo equipo guardado', { equiposGuardados: eqs.length, ejemplos: eqs.slice(0, 3).map(e => e.nombre) });
-    localStorage.clear();
+    await vaciarFirestore();
     await cargar('index.html?semilla=1');
     const filas = D().querySelectorAll('.tbody-sup tr').length;
     out('  info: web pública con localStorage vacío y semilla real muestra ' + filas + ' filas en la tabla del Grupo A (equipos del torneo anterior).');
-    localStorage.clear();
+    await vaciarFirestore();
 }
 
 // ---------------- Fase 1: grupos, equipos y jugadores ----------------
@@ -451,14 +461,14 @@ async function fase3extra() {
     await tab('sec-jornada');
     // F1: 4to 1ra vs 5to 2da
     const pA = P(1, '4to 1ra', '5to 2da');
-    check(JSON.stringify(pA.goleadoresLocal) === JSON.stringify([{ nombre: `${jug('4to 1ra', 0).nombre} (#0)`, cantidad: 2 }, { nombre: `${jug('4to 1ra', 5).nombre} (#5)`, cantidad: 1 }]), 'Goleadores con dorsal 0 repetido se agrupan: "(#0)" x2 y "(#5)" x1', pA.goleadoresLocal);
+    check(JSON.stringify(pA.goleadoresLocal) === JSON.stringify([{ nombre: `${jug('4to 1ra', 0).nombre} (#0)`, cantidad: 2, id: jug('4to 1ra', 0).dni }, { nombre: `${jug('4to 1ra', 5).nombre} (#5)`, cantidad: 1, id: jug('4to 1ra', 5).dni }]), 'Goleadores con dorsal 0 repetido se agrupan: "(#0)" x2 y "(#5)" x1', pA.goleadoresLocal);
     check(pA.amarillasLocal.length === 2 && pA.amarillasLocal.every(d => d === jug('4to 1ra', 5).dni), 'Dos amarillas al mismo dorsal = dos entradas con su DNI', pA.amarillasLocal);
     check(pA.rojasVisitante[0] === jug('5to 2da', 9).dni, 'Roja guardada con el DNI del jugador', pA.rojasVisitante);
     // Editar sin tocar los campos: tienen que venir rellenos
     editarPartido(pA);
     check(el('dorsales-goles-local').value === '0, 0, 5' && el('dorsales-amarillas-local').value === '5, 5' && el('dorsales-rojas-visitante').value === '9', 'Al editar, goleadores y tarjetas se rellenan', { gol: el('dorsales-goles-local').value, am: el('dorsales-amarillas-local').value, roja: el('dorsales-rojas-visitante').value });
     await enviar('form-partido');
-    const golesJ0 = LS('liga_cicloSuperior').find(e => e.nombre === '4to 1ra').jugadores.find(j => j.dorsal === 0).goles;
+    const golesJ0 = golesDe('4to 1ra', jug('4to 1ra', 0).dni);
     check(golesJ0 === 2, 'Guardar la edición sin cambios no duplica ni borra goles del #0', golesJ0);
 
     // Editar resultado 2-1 -> 3-1
@@ -469,7 +479,7 @@ async function fase3extra() {
     const r2 = RESULTADOS.find(r => r.fecha === 1 && r.L === '4to 2da');
     suma(esperado.goles, jug('4to 2da', 7).dni, 1); r2.gl = 3; r2.dl = [7, 7, 9];
     const eq42 = LS('liga_cicloSuperior').find(e => e.nombre === '4to 2da');
-    check(eq42.jugadores.find(j => j.dorsal === 7).goles === esperado.goles[jug('4to 2da', 7).dni] && P(1, '4to 2da', '5to 3ra').golesLocal === 3, 'Editar 2-1 → 3-1 con un goleador más: contador correcto', { g7: eq42.jugadores.find(j => j.dorsal === 7).goles, esperado: esperado.goles[jug('4to 2da', 7).dni] });
+    check(golesDe('4to 2da', jug('4to 2da', 7).dni) === esperado.goles[jug('4to 2da', 7).dni] && P(1, '4to 2da', '5to 3ra').golesLocal === 3, 'Editar 2-1 → 3-1 con un goleador más: goles correctos', { g7: golesDe('4to 2da', jug('4to 2da', 7).dni), esperado: esperado.goles[jug('4to 2da', 7).dni] });
 
     // Dorsal inexistente en goleadores (F2 4to 3ra vs 6to 2da con "5, 88")
     const pC = P(2, '4to 3ra', '6to 2da');
@@ -1535,7 +1545,7 @@ async function bordes() {
     el('btn-sub-teso-inscripciones').click();
     setv('monto-inscripcion-individual', '3500');
     // Desde el 24/09/2026 Inscripciones son tarjetas (.teso-insc-card), no filas de tabla.
-    const cardInsc = () => [...D().querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')].find(c => c.dataset.eq === '4to 1ra');
+    const cardInsc = () => [...D().querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')].find(c => c.dataset.nombre === '4to 1ra');
     const card1 = cardInsc();
     check(card1 && card1.dataset.exigido === '21000', 'Inscripciones: 6 jugadores x $3.500 = $21.000', card1 && card1.dataset.exigido);
     if (card1) { const inpInsc = card1.querySelector('.in-insc-ef'); inpInsc.value = '21000'; inpInsc.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -1570,7 +1580,7 @@ async function bordes() {
     const campo = el('dorsales-goles-local').value;
     await enviar('form-partido');
     const pB2 = P(1, '4to 2da', '5to 3ra');
-    const golesJ = LS('liga_cicloSuperior').find(e => e.nombre === '4to 2da').jugadores.find(j => j.dni === j7.dni).goles;
+    const golesJ = golesDe('4to 2da', j7.dni);
     const suma2 = pB2.goleadoresLocal.reduce((a, g) => a + g.cantidad, 0);
     check(suma2 === 3, 'Cambiar el dorsal de un goleador (7→17) y re-guardar su partido conserva los 3 goles del partido', { campoRelleno: campo, goleadoresGuardados: pB2.goleadoresLocal, golesDelJugador: golesJ });
 

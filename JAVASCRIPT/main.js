@@ -187,15 +187,17 @@ document.addEventListener('liga:datos-listos', () => {
             ? (JSON.parse(almacen.getItem('liga_cicloSuperior')) || ligaData.cicloSuperior) 
             : (JSON.parse(almacen.getItem('liga_cicloBasico')) || ligaData.cicloBasico);
 
+        const partidos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
         let listaJugadores = [];
         pool.forEach(eq => {
             if (eq.jugadores) {
                 eq.jugadores.forEach(j => {
-                    if (j.goles && j.goles > 0) {
+                    const goles = golesDeJugador(j, eq, partidos);
+                    if (goles > 0) {
                         listaJugadores.push({
                             nombre: j.nombre,
                             equipo: eq.nombre,
-                            goles: j.goles
+                            goles
                         });
                     }
                 });
@@ -2043,6 +2045,28 @@ document.addEventListener('liga:datos-listos', () => {
         return total;
     }
 
+    // Goles del jugador: se cuentan desde los partidos jugados (antes eran un contador guardado en el jugador, que se
+    // desfasaba al borrar un partido o si dos personas guardaban a la vez). Cada goleador guarda el DNI del jugador;
+    // los partidos cargados antes del 27/09/2026 no lo tienen y se reconoce al jugador por su número de camiseta.
+    function golesDeJugador(jugador, equipo, partidos) {
+        const tieneDorsal = jugador.dorsal !== undefined && jugador.dorsal !== null && String(jugador.dorsal).trim() !== '';
+        let total = 0;
+        partidos.forEach(p => {
+            if (!p.jugado) return;
+            const { esLocal, esVisita } = ladosDelEquipoEnPartido(p, equipo);
+            const contar = lista => (lista || []).forEach(g => {
+                const dorsalEtiqueta = ((g.nombre || '').match(/#(\d+)/) || [])[1];
+                const esEl = g.id != null
+                    ? g.id === jugador.dni
+                    : tieneDorsal && dorsalEtiqueta !== undefined && Number(dorsalEtiqueta) === Number(jugador.dorsal);
+                if (esEl) total += g.cantidad || 0;
+            });
+            if (esLocal) contar(p.goleadoresLocal);
+            if (esVisita) contar(p.goleadoresVisitante);
+        });
+        return total;
+    }
+
     // Las fechas de playoffs son números >= 100 (108 octavos, 104 cuartos, 102 semis, 100 final): van después de las fechas de grupos y en ese orden.
     function ordenCronologicoFechaPublico(fecha) {
         const f = Number(fecha);
@@ -2108,8 +2132,9 @@ document.addEventListener('liga:datos-listos', () => {
         tbodyJugadores.innerHTML = '';
 
         if (equipo.jugadores && equipo.jugadores.length > 0) {
-            equipo.jugadores.sort((a, b) => (b.goles || 0) - (a.goles || 0));
             const partidosParaPJ = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
+            const golesDe = new Map(equipo.jugadores.map(j => [j, golesDeJugador(j, equipo, partidosParaPJ)]));
+            equipo.jugadores.sort((a, b) => golesDe.get(b) - golesDe.get(a));
 
             equipo.jugadores.forEach((j, idx) => {
                 const fotoUrl = j.foto || 'Recursos/search.svg';
@@ -2124,7 +2149,7 @@ document.addEventListener('liga:datos-listos', () => {
                         <td style="color: #869bd8; font-size: 11px; text-align: center;">${dorsal}</td>
                         <td style="text-align: left !important; color: #fff; font-weight: bold;">${j.nombre}</td>
                         <td style="text-align: center; color:#fff;">${partidosJugadosDeJugador(j, equipo, partidosParaPJ)}</td>
-                        <td style="color: #2edae3; font-weight: bold; text-align: center;">${j.goles || 0}</td>
+                        <td style="color: #2edae3; font-weight: bold; text-align: center;">${golesDe.get(j)}</td>
                         <td style="color: #f2c00e; text-align: center;">${tarjetasDeJugador(j, equipo, partidosParaPJ).amarillas}</td>
                         <td style="color: #f43f5e; text-align: center;">${tarjetasDeJugador(j, equipo, partidosParaPJ).rojas}</td>
                         <td style="text-align: center;">${igUser}</td>
