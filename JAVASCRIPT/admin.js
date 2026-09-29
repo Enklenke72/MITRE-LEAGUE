@@ -89,9 +89,9 @@ document.addEventListener('liga:datos-listos', () => {
     // ============================================================
     // 2 BIS. IMÁGENES
     // ============================================================
-    // Las fotos se guardan como dataURL dentro del documento de Firestore (tope de 1 MB por
-    // documento, y cada visitante las descarga): una sacada con el celular pesa varios MB,
-    // así que cada imagen que sube el staff se redimensiona y recomprime en el navegador.
+    // Las fotos se suben a Cloudinary (JAVASCRIPT/cloudinary-config.js) y en Firestore queda solo
+    // la URL. Antes se redimensionan y recomprimen en el navegador: una sacada con el celular pesa
+    // varios MB y el plan gratis de Cloudinary cuenta el espacio y el tráfico.
     const MAX_LADO_FOTO_JUGADOR = 250;
     const MAX_LADO_FOTO_NOTICIA = 1000;
     const MAX_LADO_LOGO_SPONSOR = 500;
@@ -134,6 +134,35 @@ document.addEventListener('liga:datos-listos', () => {
         });
     }
 
+    // Una ruta o URL escrita a mano, o una foto ya subida, se devuelve igual. Un dataURL recién
+    // comprimido se sube a Cloudinary y se devuelve su URL. Si falla, avisa y devuelve null.
+    async function subirImagen(imagen, boton) {
+        if (!imagen || imagen.indexOf('data:') !== 0) return imagen;
+        const textoBoton = boton ? boton.textContent : '';
+        if (boton) { boton.disabled = true; boton.textContent = 'Subiendo foto...'; }
+        try {
+            if (!CLOUDINARY_CONFIG.cloudName || !CLOUDINARY_CONFIG.uploadPreset) {
+                throw new Error('falta configurar Cloudinary (JAVASCRIPT/cloudinary-config.js).');
+            }
+            const datos = new FormData();
+            datos.append('file', imagen);
+            datos.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+            const resp = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUDINARY_CONFIG.cloudName)}/image/upload`, {
+                method: 'POST', body: datos, signal: AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined
+            }).catch(() => { throw new Error('no hay conexión o tardó demasiado.'); });
+            const json = await resp.json().catch(() => ({}));
+            if (!resp.ok || !json.secure_url) {
+                throw new Error((json.error && json.error.message) || 'Cloudinary respondió con error ' + resp.status + '.');
+            }
+            return json.secure_url;
+        } catch (err) {
+            alert('No se pudo subir la foto: ' + err.message + '\nNo se guardó nada, probá de nuevo.');
+            return null;
+        } finally {
+            if (boton) { boton.disabled = false; boton.textContent = textoBoton; }
+        }
+    }
+
     function pesoDeTexto(txt) {
         return new Blob([txt || '']).size;
     }
@@ -144,28 +173,28 @@ document.addEventListener('liga:datos-listos', () => {
         return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     }
 
-    // Conecta un <input type="file"> con su vista previa. El objeto devuelto expone
-    // .dataURL con la imagen ya comprimida (o null si no se subió ninguna).
+    // Conecta un <input type="file"> con su vista previa. El objeto devuelto expone .imagen:
+    // la recién comprimida (dataURL, se sube al guardar), la URL de una ya subida, o null.
     function conectarSubidaFoto(config) {
         const input = document.getElementById(config.inputId);
         const wrap = document.getElementById(config.previewWrapId);
         const img = document.getElementById(config.previewImgId);
         const peso = document.getElementById(config.pesoId);
         const btnQuitar = document.getElementById(config.btnQuitarId);
-        const estado = { dataURL: null };
+        const estado = { imagen: null };
 
         estado.limpiar = function () {
-            estado.dataURL = null;
+            estado.imagen = null;
             if (input) input.value = '';
             if (img) img.removeAttribute('src');
             if (peso) peso.textContent = '';
             if (wrap) wrap.classList.add('seccion-oculta-staff');
         };
 
-        estado.mostrar = function (dataURL) {
-            estado.dataURL = dataURL;
-            if (img) img.src = dataURL;
-            if (peso) peso.textContent = 'Comprimida: ' + pesoLegible(pesoDeTexto(dataURL));
+        estado.mostrar = function (imagen) {
+            estado.imagen = imagen;
+            if (img) img.src = imagen;
+            if (peso) peso.textContent = imagen.indexOf('data:') === 0 ? 'Comprimida: ' + pesoLegible(pesoDeTexto(imagen)) : '';
             if (wrap) wrap.classList.remove('seccion-oculta-staff');
         };
 
@@ -1596,9 +1625,9 @@ document.addEventListener('liga:datos-listos', () => {
                     document.getElementById('jugador-dorsal').value = j.dorsal ?? '';
                     document.getElementById('jugador-instagram').value = j.instagram || '';
                     if (document.getElementById('jugador-foto')) {
-                        // Una foto subida se guarda como dataURL: no tiene sentido volcarla en el
-                        // campo de texto, va directo a la vista previa.
-                        const esSubida = (j.foto || '').indexOf('data:') === 0;
+                        // Una foto subida (URL de Cloudinary, o dataURL de antes del cambio) va a la
+                        // vista previa, no al campo de texto.
+                        const esSubida = /^(data:|https:\/\/res\.cloudinary\.com\/)/.test(j.foto || '');
                         document.getElementById('jugador-foto').value = esSubida ? '' : (j.foto || '');
                         if (esSubida) fotoJugadorSubida.mostrar(j.foto);
                         else fotoJugadorSubida.limpiar();
@@ -1658,8 +1687,13 @@ document.addEventListener('liga:datos-listos', () => {
     }
 
     if (formJugador) {
-        formJugador.addEventListener('submit', (e) => {
+        formJugador.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            // Antes de leer los planteles: si no, un guardado durante la subida quedaría sobre una copia vieja.
+            const foto = await subirImagen(fotoJugadorSubida.imagen || (document.getElementById('jugador-foto') ? document.getElementById('jugador-foto').value.trim() : ''), btnSubmitJugador);
+            if (foto === null) return;
+            if (fotoJugadorSubida.imagen) fotoJugadorSubida.imagen = foto;
 
             recargarPools();
             const ciclo = plantelCiclo.value;
@@ -1695,7 +1729,7 @@ document.addEventListener('liga:datos-listos', () => {
                 dni: document.getElementById('jugador-dni').value.trim(),
                 dorsal: dorsalNum,
                 instagram: document.getElementById('jugador-instagram').value.trim(),
-                foto: fotoJugadorSubida.dataURL || (document.getElementById('jugador-foto') ? document.getElementById('jugador-foto').value.trim() : ''),
+                foto: foto,
                 fichaMedica: document.getElementById('jugador-ficha-medica') ? document.getElementById('jugador-ficha-medica').value : 'no',
                 nacimiento: document.getElementById('jugador-nacimiento') ? document.getElementById('jugador-nacimiento').value : '',
                 celular: document.getElementById('jugador-celular') ? document.getElementById('jugador-celular').value.trim() : '',
@@ -2025,14 +2059,16 @@ document.addEventListener('liga:datos-listos', () => {
     }
 
     if (formNoticia) {
-        formNoticia.addEventListener('submit', (e) => {
+        formNoticia.addEventListener('submit', async (e) => {
             e.preventDefault();
             // La foto puede venir de una ruta escrita a mano o de un archivo subido (ya comprimido).
-            const fotoNoticia = fotoNoticiaSubida.dataURL || document.getElementById('noticia-foto').value.trim();
-            if (!fotoNoticia) {
+            const fotoElegida = fotoNoticiaSubida.imagen || document.getElementById('noticia-foto').value.trim();
+            if (!fotoElegida) {
                 alert('Falta la foto de la noticia: pegá una ruta/URL o subí un archivo.');
                 return;
             }
+            const fotoNoticia = await subirImagen(fotoElegida, formNoticia.querySelector('button[type="submit"]'));
+            if (fotoNoticia === null) return;
 
             const nuevaNoticia = {
                 id: Date.now(),
@@ -2092,13 +2128,15 @@ document.addEventListener('liga:datos-listos', () => {
     }
 
     if (formFotos) {
-        formFotos.addEventListener('submit', (e) => {
+        formFotos.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const portada = portadaAlbumSubida.dataURL || document.getElementById('foto-album-portada').value.trim();
-            if (!portada) {
+            const portadaElegida = portadaAlbumSubida.imagen || document.getElementById('foto-album-portada').value.trim();
+            if (!portadaElegida) {
                 alert('Falta la foto de portada: pegá una ruta/URL o subí un archivo.');
                 return;
             }
+            const portada = await subirImagen(portadaElegida, formFotos.querySelector('button[type="submit"]'));
+            if (portada === null) return;
 
             const nuevoAlbum = {
                 id: Date.now(),
@@ -2265,7 +2303,7 @@ document.addEventListener('liga:datos-listos', () => {
     }
 
     if (formSponsor) {
-        formSponsor.addEventListener('submit', (e) => {
+        formSponsor.addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const datosSponsor = {
@@ -2279,14 +2317,17 @@ document.addEventListener('liga:datos-listos', () => {
                 link: document.getElementById('sponsor-link').value.trim(),
                 ubicacion: document.getElementById('sponsor-ubicacion').value.trim()
             };
+            const idEdicion = idSponsorEnEdicion;
+            const logoSubido = await subirImagen(logoSponsorBase64Temp, btnSubmitSponsor);
+            if (logoSponsorBase64Temp && logoSubido === null) return;
 
-            if (idSponsorEnEdicion !== null) {
-                const existente = listaSponsors.find(s => s.id === idSponsorEnEdicion);
-                datosSponsor.logo = logoSponsorBase64Temp || (existente ? existente.logo : '');
-                listaSponsors = listaSponsors.map(s => s.id === idSponsorEnEdicion ? { ...s, ...datosSponsor } : s);
+            if (idEdicion !== null) {
+                const existente = listaSponsors.find(s => s.id === idEdicion);
+                datosSponsor.logo = logoSubido || (existente ? existente.logo : '');
+                listaSponsors = listaSponsors.map(s => s.id === idEdicion ? { ...s, ...datosSponsor } : s);
                 alert(`¡Sponsor "${datosSponsor.nombre}" actualizado!`);
             } else {
-                datosSponsor.logo = logoSponsorBase64Temp || 'Recursos/logo pelota fut.svg';
+                datosSponsor.logo = logoSubido || 'Recursos/logo pelota fut.svg';
                 const maxOrden = listaSponsors.reduce((max, s) => Math.max(max, s.orden || 0), -1);
                 listaSponsors.push({ id: Date.now(), orden: maxOrden + 1, ...datosSponsor });
                 alert(`¡Sponsor "${datosSponsor.nombre}" agregado!`);

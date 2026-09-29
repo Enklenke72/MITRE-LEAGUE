@@ -22,6 +22,11 @@ const golesDe = (nombreEquipo, dni) => (LS('liga_partidos') || []).filter(p => p
     total + [['local', 'goleadoresLocal'], ['visitante', 'goleadoresVisitante']].reduce((suma, [lado, campo]) =>
         suma + (p[lado] === nombreEquipo ? (p[campo] || []).filter(g => g.id === dni).reduce((s, g) => s + g.cantidad, 0) : 0), 0), 0);
 const ultimaAlerta = () => alertas[alertas.length - 1] || '';
+// Desde el 29/09/2026 las fotos se suben a Cloudinary: en la copia de prueba JAVASCRIPT/cloudinary-config.js se reemplaza
+// por cloudinary-falso.js, que anota cada subida en localStorage 'fakecloudinary' (ver ese archivo para correr Edge).
+const subidaDe = url => JSON.parse(localStorage.getItem('fakecloudinary') || '[]').find(s => s.url === url);
+const cantidadSubidas = () => JSON.parse(localStorage.getItem('fakecloudinary') || '[]').length;
+const esUrlNube = v => /^https:\/\/res\.cloudinary\.com\/nube-de-prueba\//.test(String(v || ''));
 
 // Borrar la base con un panel abierto es un cambio externo real (como borrar desde la consola) y le muestra el aviso:
 // se descarga la página antes de vaciar el Firestore simulado.
@@ -72,6 +77,7 @@ async function enviar(formId) {
         out('  (form ' + formId + ' inválido para el navegador: ' + inval.join(',') + ')');
     }
     f.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    for (let i = 0; i < 400 && [...f.querySelectorAll('button')].some(b => b.textContent === 'Subiendo foto...'); i++) await esperar(10);
     await esperar(2);
 }
 async function tab(target) { const b = D().querySelector(`.staff-tab-btn[data-target="${target}"]`); if (b) b.click(); await esperar(2); }
@@ -1056,11 +1062,12 @@ async function sponsors() {
     const a = porNombre('Kiosco El Gol'), b = porNombre('Panadería La Mitre'), c = porNombre('Radio Local FM');
     check(a && a.ubicacion === 'https://maps.google.com/?q=kiosco+el+gol' && b.ubicacion === 'Av. Mitre 1234, Berazategui' && !c.ubicacion, 'Ubicación guardada: link, texto y vacía', { a: a && a.ubicacion, b: b && b.ubicacion, c: c && c.ubicacion });
     check(a && a.categoria === 'Sponsor Oficial' && a.colorFondo === '#112233' && a.instagram === 'kioscoelgol' && a.telefono === '221 555-0001' && a.link === 'https://kioscoelgol.com' && a.beneficio.indexOf('10%') >= 0, 'Sponsor completo: categoría, color, Instagram (sin @), teléfono, link y beneficio', a);
-    const pesoGuardado = a ? Math.round(String(a.logo).length * 0.75) : 0;
-    const medidas = a ? await medirImagen(a.logo) : { ancho: -1, alto: -1 };
-    check(a && String(a.logo).indexOf('data:image/jpeg') === 0 && pesoGuardado < pesoLogoOriginal / 4 && pesoGuardado < 300 * 1024,
-        'Logo grande subido se guarda comprimido (JPEG, mucho más liviano que el original)',
-        { originalKB: Math.round(pesoLogoOriginal / 1024), guardadoKB: Math.round(pesoGuardado / 1024), formato: String(a.logo).slice(0, 15) });
+    const subLogo = a && subidaDe(a.logo);
+    const medidas = subLogo ? await medirImagen(subLogo.dataURL) : { ancho: -1, alto: -1 };
+    check(a && esUrlNube(a.logo) && !!subLogo && subLogo.preset === 'preset-de-prueba', 'El logo va a Cloudinary (con el preset configurado) y el sponsor guarda solo la URL', a && String(a.logo).slice(0, 70));
+    check(subLogo && subLogo.formato === 'image/jpeg' && subLogo.bytes < pesoLogoOriginal / 4 && subLogo.bytes < 300 * 1024,
+        'Logo grande: se sube comprimido (JPEG, mucho más liviano que el original)',
+        { originalKB: Math.round(pesoLogoOriginal / 1024), subidoKB: subLogo && Math.round(subLogo.bytes / 1024), formato: subLogo && subLogo.formato });
     check(medidas.ancho <= 500 && medidas.alto <= 500 && medidas.ancho > 0 && medidas.alto > 0,
         'El logo se redimensiona a 500 px de lado máximo y sigue siendo una imagen válida', medidas);
     check(b && b.logo === 'Recursos/logo pelota fut.svg', 'Sponsor sin logo usa el logo por defecto', b && b.logo);
@@ -1072,7 +1079,7 @@ async function sponsors() {
     setv('sponsor-ubicacion', 'https://maps.google.com/?q=kiosco+nuevo', false);
     await enviar('form-sponsor-admin');
     const a2 = (LS('liga_sponsors') || []).find(s => s.id === a.id);
-    check(a2 && a2.descripcion.indexOf('hielo') >= 0 && /kiosco\+nuevo$/.test(a2.ubicacion) && String(a2.logo).indexOf('data:image/') === 0 && a2.orden === 0 && (LS('liga_sponsors') || []).length === 3, 'Editar guarda los cambios, conserva el logo y el orden, y no duplica', a2 && { desc: a2.descripcion, ubi: a2.ubicacion, orden: a2.orden });
+    check(a2 && a2.descripcion.indexOf('hielo') >= 0 && /kiosco\+nuevo$/.test(a2.ubicacion) && a2.logo === a.logo && a2.orden === 0 && (LS('liga_sponsors') || []).length === 3, 'Editar guarda los cambios, conserva el logo y el orden, y no duplica', a2 && { desc: a2.descripcion, ubi: a2.ubicacion, orden: a2.orden });
 
     D().querySelector('.btn-sponsor-bajar[data-id="' + a.id + '"]').click();
     await esperar(2);
@@ -1097,8 +1104,7 @@ async function sponsors() {
     check(JSON.stringify(contactos(tB)) === JSON.stringify(['221 555-0002']), 'Sin Instagram se muestra el teléfono', contactos(tB));
     check(tA.getAttribute('style').indexOf('112233') >= 0 && !!tA.querySelector('.sponsor-badge') && tA.querySelector('.sponsor-badge').textContent === 'Sponsor Oficial', 'Color de fondo y categoría en la tarjeta pública', tA.getAttribute('style'));
     const logoPub = tA.querySelector('.sponsor-logo');
-    const medidasPub = await medirImagen(logoPub.src);
-    check(String(logoPub.src).indexOf('data:image/jpeg') === 0 && medidasPub.ancho > 0, 'El logo comprimido se ve bien en la tarjeta del carrusel', medidasPub);
+    check(logoPub && logoPub.getAttribute('src') === a.logo, 'La tarjeta del carrusel muestra el logo desde Cloudinary', logoPub && logoPub.getAttribute('src'));
     const ben = tA.querySelector('.beneficio-secreto');
     check(ben && ben.textContent.indexOf('10%') >= 0 && ben.querySelector('a') && ben.querySelector('a').getAttribute('href') === 'https://kioscoelgol.com', 'Beneficio y "Más información" con el link del sponsor', ben && ben.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
 
@@ -1143,6 +1149,35 @@ function subirImagen(input, ancho, alto, espera) {
 }
 let pesoUltimaImagen = 0;
 
+async function fotoJugador() {
+    out('\n=== FOTO DE JUGADOR: se sube a Cloudinary y se conserva al editar ===');
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    el('btn-sub-plantel-jugadores').click();
+    setv('plantel-ciclo', 'superior'); setv('plantel-equipo-select', '4to 1ra');
+    const j = jug('4to 1ra', 9);
+    const fichaDe = () => (LS('liga_cicloSuperior') || []).find(e => e.nombre === '4to 1ra').jugadores.find(x => x.dni === j.dni);
+    D().querySelector(`.btn-editar-jugador[data-dni="${j.dni}"]`).click();
+    await subirImagen(el('jugador-foto-file'), 900, 1200);
+    await esperarPreview('jugador-foto-preview');
+    await enviar('form-jugador');
+    const f1 = fichaDe();
+    const sub = f1 && subidaDe(f1.foto);
+    const medidas = sub ? await medirImagen(sub.dataURL) : { ancho: -1, alto: -1 };
+    check(f1 && esUrlNube(f1.foto) && sub && sub.formato === 'image/jpeg' && Math.max(medidas.ancho, medidas.alto) === 250, 'Foto de jugador: se sube a Cloudinary achicada a 250 px y la ficha guarda la URL', { foto: f1 && String(f1.foto).slice(0, 70), medidas });
+    const subidasAntes = cantidadSubidas();
+    D().querySelector(`.btn-editar-jugador[data-dni="${j.dni}"]`).click();
+    check(el('jugador-foto').value === '' && el('jugador-foto-preview').getAttribute('src') === (f1 && f1.foto), 'Al editar, la foto ya subida aparece en la vista previa y no en el campo de texto', { campo: el('jugador-foto').value, preview: el('jugador-foto-preview').getAttribute('src') });
+    setv('jugador-instagram', 'foto_nueva_ig', false);
+    await enviar('form-jugador');
+    const f2 = fichaDe();
+    check(f2 && f1 && f2.foto === f1.foto && f2.instagram === 'foto_nueva_ig' && cantidadSubidas() === subidasAntes, 'Guardar la ficha otra vez conserva la foto sin volver a subirla', { mismaFoto: !!(f2 && f1 && f2.foto === f1.foto), subidasNuevas: cantidadSubidas() - subidasAntes });
+    await cargar('index.html');
+    const publico = ((LS('liga_cicloSuperior') || []).find(e => e.nombre === '4to 1ra') || { jugadores: [] }).jugadores.find(x => x.nombre === j.nombre);
+    check(publico && f1 && publico.foto === f1.foto, 'La web pública recibe la URL de la foto del jugador', publico && String(publico.foto).slice(0, 70));
+    check(!/data:image/.test(localStorage.getItem('fakefs') || ''), 'Ninguna imagen quedó guardada dentro de Firestore: solo URLs');
+}
+
 async function prensa() {
     out('\n=== PRENSA: noticias con foto, álbumes y galería ===');
     await cargar('admin.html');
@@ -1159,6 +1194,15 @@ async function prensa() {
     await subirImagen(el('noticia-foto-file'), 1800, 1200);
     await esperarPreview('noticia-foto-preview');
     const pesoOriginalNoticia = pesoUltimaImagen;
+    const botonNoticia = el('form-noticia-admin').querySelector('button[type="submit"]');
+    localStorage.setItem('fake_cloudinary_falla', 'red');
+    await enviar('form-noticia-admin');
+    check(/No se pudo subir la foto: no hay conexión/.test(ultimaAlerta()) && (LS('liga_noticias') || []).length === 0 && !botonNoticia.disabled && /PUBLICAR NOTICIA/.test(botonNoticia.textContent),
+        'Sin conexión con Cloudinary: avisa, no guarda la noticia y el botón vuelve a quedar habilitado', { alerta: ultimaAlerta(), boton: botonNoticia.textContent });
+    localStorage.setItem('fake_cloudinary_falla', 'rechazo');
+    await enviar('form-noticia-admin');
+    check(/Upload preset not found/.test(ultimaAlerta()) && (LS('liga_noticias') || []).length === 0, 'Si Cloudinary rechaza la subida (por ejemplo, preset mal escrito) muestra su mensaje y no guarda', ultimaAlerta());
+    localStorage.removeItem('fake_cloudinary_falla');
     await enviar('form-noticia-admin');
     // Noticia 2: foto por ruta de texto
     setv('noticia-titulo', 'GOLEADA EN EL GRUPO B', false);
@@ -1168,8 +1212,9 @@ async function prensa() {
     const noticias = LS('liga_noticias') || [];
     check(noticias.length === 2, 'Se guardaron las 2 noticias', noticias.map(n => n.titulo));
     const n1 = noticias[0] || {}, n2 = noticias[1] || {};
-    const pesoN1 = Math.round(String(n1.foto || '').length * 0.75);
-    check(String(n1.foto).indexOf('data:image/jpeg') === 0 && pesoN1 < pesoOriginalNoticia / 3, 'La foto subida se guarda comprimida (JPEG)', { originalKB: Math.round(pesoOriginalNoticia / 1024), guardadaKB: Math.round(pesoN1 / 1024) });
+    const subN1 = subidaDe(n1.foto);
+    check(esUrlNube(n1.foto) && subN1 && subN1.formato === 'image/jpeg' && subN1.bytes < pesoOriginalNoticia / 3, 'Reintentar después de la falla funciona: la foto va comprimida (JPEG) a Cloudinary y la noticia guarda solo la URL',
+        { originalKB: Math.round(pesoOriginalNoticia / 1024), subidaKB: subN1 && Math.round(subN1.bytes / 1024), foto: String(n1.foto).slice(0, 70) });
     check(n2 && n2.foto === 'Recursos/Fotos/DSC05325.JPG' && n1.linkUrl === 'https://instagram.com/mitreleague' && n1.linkTexto === 'VER FOTOS', 'Noticia por ruta de texto y link guardados', { foto: n2.foto, link: n1.linkUrl, texto: n1.linkTexto });
     check(D().getElementById('lista-noticias-admin').querySelectorAll('button').length >= 2, 'El panel lista las noticias con su botón');
 
@@ -1186,8 +1231,8 @@ async function prensa() {
     await enviar('form-fotos-admin');
     const albumes = LS('liga_fotos_albumes') || [];
     check(albumes.length === 2, 'Se guardaron los 2 álbumes', albumes.map(a => a.titulo));
-    const pesoAlb = albumes[0] ? Math.round(String(albumes[0].portada).length * 0.75) : 0;
-    check(albumes[0] && String(albumes[0].portada).indexOf('data:image/jpeg') === 0 && pesoAlb < pesoOriginalAlbum / 3, 'La portada subida se guarda comprimida', { originalKB: Math.round(pesoOriginalAlbum / 1024), guardadaKB: Math.round(pesoAlb / 1024) });
+    const subAlb = albumes[0] && subidaDe(albumes[0].portada);
+    check(albumes[0] && esUrlNube(albumes[0].portada) && subAlb && subAlb.bytes < pesoOriginalAlbum / 3, 'La portada subida va comprimida a Cloudinary y el álbum guarda la URL', { originalKB: Math.round(pesoOriginalAlbum / 1024), subidaKB: subAlb && Math.round(subAlb.bytes / 1024) });
     check(albumes[1] && albumes[1].portada === 'Recursos/Fotos/DSC05325.JPG', 'Álbum con portada por ruta de texto', albumes[1] && albumes[1].portada);
     setv('foto-album-titulo', 'Sin portada', false);
     await enviar('form-fotos-admin');
@@ -1201,7 +1246,7 @@ async function prensa() {
     const titulosHero = tarjetasHero.map(t => t.querySelector('h2').textContent.trim());
     check(titulosHero.includes('ARRANCÓ EL CLAUSURA') && titulosHero.includes('GOLEADA EN EL GRUPO B'), 'Hero muestra las noticias cargadas', titulosHero);
     const fondo = tarjetasHero[0].querySelector('.hero-card-bg').getAttribute('style');
-    check(/data:image\/jpeg/.test(fondo), 'La foto subida se ve como fondo de la tarjeta del hero');
+    check(/res\.cloudinary\.com\/nube-de-prueba/.test(fondo), 'La foto subida (URL de Cloudinary) es el fondo de la tarjeta del hero', fondo.slice(0, 160));
     const btnNext = D().getElementById('next-hero');
     check(btnNext && !btnNext.hidden, 'Con 2 noticias, las flechas del hero quedan visibles');
     btnNext.click();
@@ -1226,7 +1271,7 @@ async function prensa() {
     check(tarjetasFoto.length === 2, 'Galería pública muestra los 2 álbumes', tarjetasFoto.length);
     const titulosAlb = tarjetasFoto.map(t => t.querySelector('h4').textContent.trim());
     const portadas = tarjetasFoto.map(t => t.querySelector('.foto-bg').getAttribute('style'));
-    check(titulosAlb.includes('Fecha 1 — Cancha 1') && portadas.some(x => /data:image\/jpeg/.test(x)) && portadas.some(x => /DSC05325/.test(x)), 'Los álbumes muestran su portada (subida y por ruta)', titulosAlb);
+    check(titulosAlb.includes('Fecha 1 — Cancha 1') && portadas.some(x => /res\.cloudinary\.com\/nube-de-prueba/.test(x)) && portadas.some(x => /DSC05325/.test(x)), 'Los álbumes muestran su portada (subida y por ruta)', titulosAlb);
     check(tarjetasFoto.every(t => /drive\.google\.com/.test(t.getAttribute('href'))), 'Cada álbum enlaza a su link', tarjetasFoto.map(t => t.getAttribute('href')));
 }
 
@@ -1633,6 +1678,7 @@ async function bordes() {
         await publica();
         await sponsors();
         await prensa();
+        await fotoJugador();
         await finanzas();
         await campanita();
         await responsive780();
