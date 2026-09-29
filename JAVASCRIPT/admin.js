@@ -359,6 +359,104 @@ document.addEventListener('liga:datos-listos', () => {
         });
     }
 
+    // Cantidad de fechas de fase de grupos por ciclo (liga_fechas_grupos): cada torneo tiene otra cantidad
+    // de equipos, así que no hay un número fijo. 7 si nunca se configuró.
+    const FECHAS_GRUPOS_DEFECTO = 7;
+    const FECHAS_PLAYOFF = [[108, '8vos de Final'], [104, 'Cuartos de Final'], [102, 'Semifinal'], [100, 'Gran Final']];
+    const inputFechasGruposSup = document.getElementById('fechas-grupos-superior');
+    const inputFechasGruposBas = document.getElementById('fechas-grupos-basico');
+    const btnGuardarFechasGrupos = document.getElementById('btn-guardar-fechas-grupos');
+
+    function fechasGruposValida(n) {
+        return Number.isInteger(n) && n >= 1 && n <= 30;
+    }
+
+    function obtenerFechasGrupos() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_fechas_grupos')); } catch (e) { guardado = null; }
+        const leer = ciclo => {
+            const n = Number(guardado && guardado[ciclo]);
+            return fechasGruposValida(n) ? n : FECHAS_GRUPOS_DEFECTO;
+        };
+        return { superior: leer('superior'), basico: leer('basico') };
+    }
+
+    // Fechas de fase de grupos que ya tienen partidos (de un ciclo, o de los dos con null).
+    function fechasGruposConPartidos(ciclo) {
+        return [...new Set(partidos
+            .filter(p => p && Number(p.fecha) < 100 && (ciclo === null || (p.ciclo || 'superior') === ciclo))
+            .map(p => Number(p.fecha)))];
+    }
+
+    // 1..n más las fechas que ya tienen partidos aunque queden fuera de rango (para poder editarlos).
+    function listaFechasGrupos(n, extras) {
+        const fechas = new Set(extras.filter(f => Number.isFinite(f) && f >= 1));
+        for (let f = 1; f <= n; f++) fechas.add(f);
+        return [...fechas].sort((a, b) => a - b);
+    }
+
+    // Opciones de "Fecha / Fase" según el ciclo elegido. valorDeseado (al editar un partido) siempre queda disponible.
+    function armarOpcionesFechaPartido(valorDeseado) {
+        if (!inputFechaPartido) return;
+        const ciclo = cicloSelect ? cicloSelect.value : 'superior';
+        const valor = String(valorDeseado !== undefined ? valorDeseado : (inputFechaPartido.value || '1'));
+        const extras = fechasGruposConPartidos(ciclo);
+        if (valorDeseado !== undefined && Number(valorDeseado) < 100) extras.push(Number(valorDeseado));
+        const grupos = listaFechasGrupos(obtenerFechasGrupos()[ciclo] || FECHAS_GRUPOS_DEFECTO, extras);
+        inputFechaPartido.innerHTML = grupos.map(f => `<option value="${f}">Fecha ${f}</option>`).join('')
+            + FECHAS_PLAYOFF.map(([f, texto]) => `<option value="${f}">${texto}</option>`).join('');
+        if ([...inputFechaPartido.options].some(o => o.value === valor)) {
+            inputFechaPartido.value = valor;
+        } else {
+            // La fecha elegida no existe en este ciclo (tiene menos fechas): la más cercana por debajo.
+            inputFechaPartido.value = String(grupos.filter(f => f < Number(valor)).pop() || grupos[0]);
+        }
+    }
+
+    // Un egreso no es de un ciclo: se ofrecen las fechas del ciclo que tiene más, más los playoffs.
+    function armarOpcionesFechaEgreso() {
+        const select = document.getElementById('egreso-fecha');
+        if (!select) return;
+        const valor = select.value;
+        const config = obtenerFechasGrupos();
+        const grupos = listaFechasGrupos(Math.max(config.superior, config.basico), fechasGruposConPartidos(null));
+        select.innerHTML = '<option value="">General del torneo (ej. premios)</option>'
+            + [...grupos, ...FECHAS_PLAYOFF.map(([f]) => f)].map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
+        select.value = [...select.options].some(o => o.value === valor) ? valor : '';
+    }
+
+    function mostrarFechasGrupos() {
+        const config = obtenerFechasGrupos();
+        if (inputFechasGruposSup) inputFechasGruposSup.value = config.superior;
+        if (inputFechasGruposBas) inputFechasGruposBas.value = config.basico;
+    }
+
+    if (btnGuardarFechasGrupos) {
+        btnGuardarFechasGrupos.addEventListener('click', () => {
+            const nuevo = {
+                superior: Number(inputFechasGruposSup ? inputFechasGruposSup.value : FECHAS_GRUPOS_DEFECTO),
+                basico: Number(inputFechasGruposBas ? inputFechasGruposBas.value : FECHAS_GRUPOS_DEFECTO)
+            };
+            if (!fechasGruposValida(nuevo.superior) || !fechasGruposValida(nuevo.basico)) {
+                alert('La cantidad de fechas de fase de grupos tiene que ser un número entero entre 1 y 30 en cada ciclo.');
+                return;
+            }
+            almacen.setItem('liga_fechas_grupos', JSON.stringify(nuevo));
+            armarOpcionesFechaPartido();
+            armarOpcionesFechaEgreso();
+
+            const fueraDeRango = [['superior', 'Superior'], ['basico', 'Básico']].map(([ciclo, nombre]) => {
+                const fuera = fechasGruposConPartidos(ciclo).filter(f => f > nuevo[ciclo]).sort((a, b) => a - b);
+                if (fuera.length === 0) return '';
+                return `• Ciclo ${nombre}: ya hay partidos en ${fuera.length === 1 ? 'la Fecha' : 'las Fechas'} ${fuera.join(', ')}, más allá de las ${nuevo[ciclo]} que guardaste.`;
+            }).filter(Boolean);
+            alert(`Fechas de fase de grupos guardadas: Superior ${nuevo.superior}, Básico ${nuevo.basico}.`
+                + (fueraDeRango.length > 0
+                    ? '\n\nOjo:\n' + fueraDeRango.join('\n') + '\nNo se borró nada: esas fechas siguen apareciendo en Carga de Partidos para poder editar o borrar esos partidos.'
+                    : ''));
+        });
+    }
+
     // Filtrar Equipos según Grupo en Fase Regular
     function filtrarEquiposPorGrupo() {
         recargarPools();
@@ -457,6 +555,7 @@ document.addEventListener('liga:datos-listos', () => {
     // Detección de Modo Regular vs Modo Playoffs en el Formulario
     function actualizarOpcionesGrupo() {
         if (!cicloSelect) return;
+        armarOpcionesFechaPartido();
         const ciclo = cicloSelect.value;
         const fechaVal = parseInt(inputFechaPartido ? inputFechaPartido.value : 1);
         const esFasePlayoff = fechaVal >= 100;
@@ -580,12 +679,25 @@ document.addEventListener('liga:datos-listos', () => {
         document.querySelectorAll('.btn-borrar-partido').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
+                const partidoBorrado = partidos.find(p => p.id === idBorrar);
+                const planTeso = partidoBorrado ? planTesoreriaPartido(partidoBorrado, null) : null;
+                if (planTeso && planTeso.bloqueos.length > 0) {
+                    alert(textoBloqueoTesoreria(planTeso, 'No se puede eliminar este partido: tiene plata cargada en Aranceles por Partido.'));
+                    return;
+                }
+                // También se van las entradas vacías que dejó este partido en claves viejas (sin plata no hay nada que rastrear).
+                if (planTeso) Object.keys(tesoreriaPartidos).forEach(clave => {
+                    if (clave.split('_')[1] === String(idBorrar) && montoTeso(tesoreriaPartidos[clave]) === 0 && !planTeso.descartes.includes(clave)) planTeso.descartes.push(clave);
+                });
                 partidos = partidos.filter(p => p.id !== idBorrar);
                 almacen.setItem('liga_partidos', JSON.stringify(partidos));
+                if (planTeso) aplicarPlanTesoreria(planTeso);
                 if (idPartidoEnEdicion === idBorrar) cancelarEdicionPartido();
                 sincronizarAusencias();
                 actualizarListaAdmin();
                 actualizarSelectFechasCronograma();
+                armarOpcionesFechaPartido();
+                armarOpcionesFechaEgreso();
                 if (typeof actualizarFiltroFechasTesoreria === 'function') actualizarFiltroFechasTesoreria();
             });
         });
@@ -596,8 +708,8 @@ document.addEventListener('liga:datos-listos', () => {
                 const p = partidos.find(part => part.id === idEditar);
                 if (p) {
                     idPartidoEnEdicion = p.id;
-                    if (inputFechaPartido) inputFechaPartido.value = p.fecha;
                     if (cicloSelect) cicloSelect.value = p.ciclo;
+                    armarOpcionesFechaPartido(p.fecha);
                     actualizarOpcionesGrupo();
 
                     if (p.fecha < 100 && grupoSelect) {
@@ -816,6 +928,17 @@ document.addEventListener('liga:datos-listos', () => {
                 }));
             }
 
+            // Antes de guardar nada (procesarDorsales ya anota avisos): un equipo con plata cargada no puede salir del partido.
+            const partidoEditado = idPartidoEnEdicion !== null ? partidos.find(p => p.id === idPartidoEnEdicion) : null;
+            const planTeso = partidoEditado ? planTesoreriaPartido(partidoEditado, {
+                ...partidoEditado, fecha: fechaVal, ciclo, local: localInput, visitante: visitanteInput,
+                localId: eqLocalObj ? eqLocalObj.id : null, visitanteId: eqVisitanteObj ? eqVisitanteObj.id : null
+            }) : null;
+            if (planTeso && planTeso.bloqueos.length > 0) {
+                alert(textoBloqueoTesoreria(planTeso, 'No se guardó el cambio: sacás del partido a un equipo que tiene plata cargada en Aranceles por Partido.'));
+                return;
+            }
+
             const arrayGolesLocal = esJugado ? procesarDorsales(dorsalesLocalTxt, eqLocalObj, eqVisitanteObj ? eqVisitanteObj.nombre : visitanteInput) : [];
             const arrayGolesVisita = esJugado ? procesarDorsales(dorsalesVisitaTxt, eqVisitanteObj, eqLocalObj ? eqLocalObj.nombre : localInput) : [];
 
@@ -868,6 +991,7 @@ document.addEventListener('liga:datos-listos', () => {
             }
 
             almacen.setItem('liga_partidos', JSON.stringify(partidos));
+            if (planTeso) aplicarPlanTesoreria(planTeso);
 
             if (datosPartido.esPlayoff && datosPartido.jugado) {
                 procesarAvancePlayoff(datosPartido);
@@ -877,6 +1001,7 @@ document.addEventListener('liga:datos-listos', () => {
             cancelarEdicionPartido();
             actualizarListaAdmin();
             actualizarSelectFechasCronograma();
+            armarOpcionesFechaEgreso();
             if (typeof actualizarFiltroFechasTesoreria === 'function') actualizarFiltroFechasTesoreria();
         });
     }
@@ -2348,6 +2473,8 @@ document.addEventListener('liga:datos-listos', () => {
     const btnSubTesoInscripciones = document.getElementById('btn-sub-teso-inscripciones');
     const btnSubTesoCaja = document.getElementById('btn-sub-teso-caja');
     const btnSubTesoCalculadora = document.getElementById('btn-sub-teso-calculadora');
+    const btnSubTesoRecaudacion = document.getElementById('btn-sub-teso-recaudacion');
+    const subVistaTesoRecaudacion = document.getElementById('sub-vista-teso-recaudacion');
     const subVistaTesoPartidos = document.getElementById('sub-vista-teso-partidos');
     const subVistaTesoInscripciones = document.getElementById('sub-vista-teso-inscripciones');
     const subVistaTesoCaja = document.getElementById('sub-vista-teso-caja');
@@ -2357,8 +2484,8 @@ document.addEventListener('liga:datos-listos', () => {
     const filtroInscripcionesCiclo = document.getElementById('filtro-inscripciones-ciclo');
 
     function ocultarTodasLasSubVistasTeso() {
-        [subVistaTesoPartidos, subVistaTesoInscripciones, subVistaTesoCaja, subVistaTesoCalculadora].forEach(v => { if (v) v.classList.add('seccion-oculta-staff'); });
-        [btnSubTesoPartidos, btnSubTesoInscripciones, btnSubTesoCaja, btnSubTesoCalculadora].forEach(b => { if (b) b.classList.remove('active'); });
+        [subVistaTesoPartidos, subVistaTesoInscripciones, subVistaTesoRecaudacion, subVistaTesoCaja, subVistaTesoCalculadora].forEach(v => { if (v) v.classList.add('seccion-oculta-staff'); });
+        [btnSubTesoPartidos, btnSubTesoInscripciones, btnSubTesoRecaudacion, btnSubTesoCaja, btnSubTesoCalculadora].forEach(b => { if (b) b.classList.remove('active'); });
     }
 
     if (btnSubTesoPartidos && btnSubTesoInscripciones) {
@@ -2374,6 +2501,15 @@ document.addEventListener('liga:datos-listos', () => {
             btnSubTesoInscripciones.classList.add('active');
             if (subVistaTesoInscripciones) subVistaTesoInscripciones.classList.remove('seccion-oculta-staff');
             renderizarTesoreriaInscripciones();
+        });
+    }
+
+    if (btnSubTesoRecaudacion) {
+        btnSubTesoRecaudacion.addEventListener('click', () => {
+            ocultarTodasLasSubVistasTeso();
+            btnSubTesoRecaudacion.classList.add('active');
+            if (subVistaTesoRecaudacion) subVistaTesoRecaudacion.classList.remove('seccion-oculta-staff');
+            renderizarRecaudacionPorFecha();
         });
     }
 
@@ -2454,25 +2590,77 @@ document.addEventListener('liga:datos-listos', () => {
 
     // Solo el resumen (total pagado + estado de deuda) de UNA tarjeta: cargar un monto no debe redibujar
     // la lista entera, o se pierde el foco y el scroll en el equipo que se estaba cargando (celular en cancha).
-    function htmlResumenInscripcion(totalExigido, pagoData) {
+    // Beneficio de inscripción de un equipo (por ejemplo, los campeones): exento o % de descuento, con un motivo.
+    // Se guarda en su entrada de liga_tesoreria_inscripciones como beneficio: { tipo: 'exento' | 'descuento',
+    // porcentaje, motivo } (null = sin beneficio). Lo bonificado no es plata que entró: no suma a ninguna recaudación.
+    function porcentajeBeneficio(beneficio) {
+        if (!beneficio) return 0;
+        if (beneficio.tipo === 'exento') return 100;
+        if (beneficio.tipo === 'descuento') return Math.min(100, Math.max(0, Number(beneficio.porcentaje) || 0));
+        return 0;
+    }
+
+    function montosInscripcion(cantJugadores, valorIndividual, beneficio) {
+        const bruto = cantJugadores * valorIndividual;
+        const exigido = Math.round(bruto * (1 - porcentajeBeneficio(beneficio) / 100));
+        return { bruto, exigido, bonificado: bruto - exigido };
+    }
+
+    function valorInscripcionGuardado() {
+        return parseFloat(almacen.getItem('liga_valor_inscripcion')) || 3000;
+    }
+
+    // Cobrado: ef + tr de todas las entradas (igual que el Balance Central de Caja). Bonificado: solo informativo.
+    function totalesInscripciones() {
+        let cobrado = 0, bonificado = 0;
+        Object.values(tesoreriaInscripciones).forEach(p => { cobrado += (p.ef || 0) + (p.tr || 0); });
+        const valor = valorInscripcionGuardado();
+        [...(poolSuperior || []), ...(poolBasico || [])].forEach(eq => {
+            const pago = tesoreriaInscripciones[claveInscripcion(eq)];
+            bonificado += montosInscripcion(eq.jugadores ? eq.jugadores.length : 0, valor, pago && pago.beneficio).bonificado;
+        });
+        return { cobrado, bonificado };
+    }
+
+    function textoExigidoInscripcion(cantJugadores, montos) {
+        return `${cantJugadores} jug. — Exigido $${montos.exigido.toLocaleString()}` + (montos.bonificado > 0 ? ` (de $${montos.bruto.toLocaleString()})` : '');
+    }
+
+    function htmlEstadoBeneficio(beneficio) {
+        const pct = porcentajeBeneficio(beneficio);
+        if (!pct) return '<div class="teso-insc-benef-estado"></div>';
+        const titulo = beneficio.tipo === 'exento' ? 'EXENTO' : `${pct}% DE DESCUENTO`;
+        return `<div class="teso-insc-benef-estado"><span class="teso-chip teso-chip-dorado">${titulo}${beneficio.motivo ? ' · ' + attrSeguro(beneficio.motivo) : ''}</span></div>`;
+    }
+
+    // Solo el resumen (total pagado + estado de deuda) de UNA tarjeta: cargar un monto no debe redibujar
+    // la lista entera, o se pierde el foco y el scroll en el equipo que se estaba cargando (celular en cancha).
+    function htmlResumenInscripcion(montos, pagoData) {
         const pagado = (pagoData.ef || 0) + (pagoData.tr || 0);
-        const deuda = totalExigido - pagado;
-        const alDia = deuda <= 0;
+        const diferencia = montos.exigido - pagado;
+        let chip = '<span class="teso-chip teso-chip-verde">AL DÍA</span>';
+        if (diferencia > 0) chip = `<span class="teso-chip teso-chip-rojo">Falta $${diferencia.toLocaleString()}</span>`;
+        // Pagó de más (por ejemplo, se lo pasó a exento después de que pagó): no es una deuda negativa.
+        else if (diferencia < 0) chip = `<span class="teso-chip teso-chip-verde">A favor $${(-diferencia).toLocaleString()}</span>`;
         return `
             <div class="teso-insc-resumen">
-                <span class="teso-insc-total">Total pagado: $${pagado.toLocaleString()}</span>
-                <span class="teso-chip ${alDia ? 'teso-chip-verde' : 'teso-chip-rojo'}">${alDia ? 'AL DÍA' : `Falta $${deuda.toLocaleString()}`}</span>
+                <span class="teso-insc-total">Total pagado: $${pagado.toLocaleString()}${montos.bonificado > 0 ? `<span class="teso-insc-bonif">Bonificado: $${montos.bonificado.toLocaleString()} (no suma a la caja)</span>` : ''}</span>
+                ${chip}
             </div>
         `;
     }
 
-    function htmlCardInscripcion(idEq, nombreEq, cantJugadores, totalExigido, pagoData) {
+    function htmlCardInscripcion(idEq, nombreEq, cantJugadores, valorIndividual, pagoData) {
+        const beneficio = pagoData.beneficio || null;
+        const tipo = beneficio ? beneficio.tipo : '';
+        const montos = montosInscripcion(cantJugadores, valorIndividual, beneficio);
         return `
-            <div class="teso-team-box teso-insc-card" data-eq="${attrSeguro(idEq)}" data-nombre="${attrSeguro(nombreEq)}" data-exigido="${totalExigido}">
+            <div class="teso-team-box teso-insc-card" data-eq="${attrSeguro(idEq)}" data-nombre="${attrSeguro(nombreEq)}" data-cant="${cantJugadores}" data-valor="${valorIndividual}" data-exigido="${montos.exigido}">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
                     <span class="teso-team-name">${attrSeguro(nombreEq)}</span>
-                    <span style="font-family:'Oswald',sans-serif; font-size:11px; color:#869bd8;">${cantJugadores} jug. — Exigido $${totalExigido.toLocaleString()}</span>
+                    <span class="teso-insc-exigido" style="font-family:'Oswald',sans-serif; font-size:11px; color:#869bd8;">${textoExigidoInscripcion(cantJugadores, montos)}</span>
                 </div>
+                ${htmlEstadoBeneficio(beneficio)}
                 <div class="teso-inputs-row">
                     <label>Pago Efectivo ($):</label>
                     <input type="number" class="input-monto-teso in-insc-ef" data-eq="${attrSeguro(idEq)}" value="${pagoData.ef || 0}">
@@ -2481,19 +2669,71 @@ document.addEventListener('liga:datos-listos', () => {
                     <label>Pago Transf. ($):</label>
                     <input type="number" class="input-monto-teso in-insc-tr" data-eq="${attrSeguro(idEq)}" value="${pagoData.tr || 0}">
                 </div>
-                ${htmlResumenInscripcion(totalExigido, pagoData)}
+                ${htmlResumenInscripcion(montos, pagoData)}
+                <details class="teso-insc-benef">
+                    <summary>Beneficio (exento o descuento)</summary>
+                    <div class="teso-inputs-row">
+                        <label>Tipo:</label>
+                        <select class="select-asist-teso in-insc-benef-tipo">
+                            <option value=""${tipo === '' ? ' selected' : ''}>Sin beneficio</option>
+                            <option value="exento"${tipo === 'exento' ? ' selected' : ''}>Exento (no paga)</option>
+                            <option value="descuento"${tipo === 'descuento' ? ' selected' : ''}>Descuento (%)</option>
+                        </select>
+                    </div>
+                    <div class="teso-inputs-row teso-insc-fila-pct"${tipo === 'descuento' ? '' : ' hidden'}>
+                        <label>Descuento (%):</label>
+                        <input type="number" min="1" max="100" class="input-monto-teso in-insc-benef-pct" value="${tipo === 'descuento' ? porcentajeBeneficio(beneficio) : ''}">
+                    </div>
+                    <div class="teso-insc-fila-motivo"${tipo ? '' : ' hidden'}>
+                        <label>Motivo:</label>
+                        <input type="text" maxlength="60" class="input-monto-teso in-insc-benef-motivo" placeholder="Ej: Campeones 2025" value="${attrSeguro((beneficio && beneficio.motivo) || '')}">
+                    </div>
+                </details>
             </div>
         `;
     }
 
-    // Reemplaza solo el bloque de resumen de esa tarjeta (no la tarjeta entera, para no tocar los inputs).
+    // Actualiza lo que depende de los montos y del beneficio sin reemplazar la tarjeta (no toca los inputs).
     function actualizarCardInscripcion(card) {
         if (!card) return;
-        const totalExigido = parseFloat(card.dataset.exigido) || 0;
+        const beneficio = (tesoreriaInscripciones[card.dataset.eq] || {}).beneficio || null;
+        const cant = parseInt(card.dataset.cant) || 0;
+        const montos = montosInscripcion(cant, parseFloat(card.dataset.valor) || 0, beneficio);
+        card.dataset.exigido = montos.exigido;
+        card.querySelector('.teso-insc-exigido').textContent = textoExigidoInscripcion(cant, montos);
+        card.querySelector('.teso-insc-benef-estado').outerHTML = htmlEstadoBeneficio(beneficio);
         const ef = parseFloat(card.querySelector('.in-insc-ef').value) || 0;
         const tr = parseFloat(card.querySelector('.in-insc-tr').value) || 0;
         const resumenViejo = card.querySelector('.teso-insc-resumen');
-        if (resumenViejo) resumenViejo.outerHTML = htmlResumenInscripcion(totalExigido, { ef, tr });
+        if (resumenViejo) resumenViejo.outerHTML = htmlResumenInscripcion(montos, { ef, tr });
+    }
+
+    // Cambiar el beneficio no mueve plata: no registra nada en la Caja.
+    function guardarBeneficioInscripcion(card) {
+        const idEq = card.dataset.eq;
+        const tipo = card.querySelector('.in-insc-benef-tipo').value;
+        const inputPct = card.querySelector('.in-insc-benef-pct');
+        const inputMotivo = card.querySelector('.in-insc-benef-motivo');
+        let beneficio = null;
+        if (tipo === 'exento') {
+            beneficio = { tipo, porcentaje: 100, motivo: inputMotivo.value.trim() };
+        } else if (tipo === 'descuento') {
+            let pct = Math.round(parseFloat(inputPct.value));
+            if (!(pct >= 1)) pct = 50;
+            pct = Math.min(100, pct);
+            inputPct.value = pct;
+            beneficio = { tipo, porcentaje: pct, motivo: inputMotivo.value.trim() };
+        } else {
+            inputMotivo.value = '';
+        }
+        card.querySelector('.teso-insc-fila-pct').hidden = tipo !== 'descuento';
+        card.querySelector('.teso-insc-fila-motivo').hidden = !tipo;
+        if (!beneficio && !tesoreriaInscripciones[idEq]) return;
+        if (!tesoreriaInscripciones[idEq]) tesoreriaInscripciones[idEq] = { ef: 0, tr: 0 };
+        tesoreriaInscripciones[idEq].beneficio = beneficio;
+        almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+        actualizarCardInscripcion(card);
+        calcularBalanceGeneral();
     }
 
     function renderizarTesoreriaInscripciones() {
@@ -2523,10 +2763,13 @@ document.addEventListener('liga:datos-listos', () => {
 
         pool.forEach(eq => {
             const cantJugadores = eq.jugadores ? eq.jugadores.length : 0;
-            const totalExigido = cantJugadores * valorIndividual;
             const idEq = claveInscripcion(eq);
             const pagoData = tesoreriaInscripciones[idEq] || { ef: 0, tr: 0 };
-            contenedor.innerHTML += htmlCardInscripcion(idEq, eq.nombre.trim(), cantJugadores, totalExigido, pagoData);
+            contenedor.innerHTML += htmlCardInscripcion(idEq, eq.nombre.trim(), cantJugadores, valorIndividual, pagoData);
+        });
+
+        contenedor.querySelectorAll('.in-insc-benef-tipo, .in-insc-benef-pct, .in-insc-benef-motivo').forEach(campo => {
+            campo.addEventListener('change', (e) => guardarBeneficioInscripcion(e.target.closest('.teso-insc-card')));
         });
 
         document.querySelectorAll('.in-insc-ef').forEach(inpt => {
@@ -2644,6 +2887,66 @@ document.addEventListener('liga:datos-listos', () => {
         if (inscripciones) almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
     }
     migrarClavesTesoreria();
+
+    const montoTeso = d => ((d && d.ef) || 0) + ((d && d.tr) || 0);
+
+    // Qué pasa con la Tesorería de un partido que se edita o se borra (nuevo = null): nunca puede quedar plata sin
+    // rastro. Cada equipo que sigue en el partido se lleva su entrada (pagos, arancel, asistencia, sanción descartada)
+    // a la clave nueva; se lo busca por equipo y no por lado, así también sirve invertir local y visitante. Un equipo
+    // que deja el partido con plata cargada bloquea el cambio; sin plata, su entrada se descarta.
+    function planTesoreriaPartido(previo, nuevo) {
+        const plan = { mudanzas: [], descartes: [], bloqueos: [] };
+        ['local', 'visita'].forEach(lado => {
+            const vieja = claveTesoreria(previo, lado);
+            const datos = tesoreriaPartidos[vieja];
+            if (!datos) return;
+            const equipo = equipoTeso(previo, lado);
+            const ladoNuevo = nuevo ? ['local', 'visita'].find(l => equipoTeso(nuevo, l) === equipo) : null;
+            if (ladoNuevo) {
+                const clave = claveTesoreria(nuevo, ladoNuevo);
+                if (clave !== vieja) plan.mudanzas.push({ vieja, nueva: clave, fecha: nuevo.fecha });
+            } else if (montoTeso(datos) > 0) {
+                plan.bloqueos.push(`${lado === 'local' ? previo.local : previo.visitante}: $${montoTeso(datos).toLocaleString()} (${nombreFaseTeso(previo.fecha)})`);
+            } else {
+                plan.descartes.push(vieja);
+            }
+        });
+        return plan;
+    }
+
+    function aplicarPlanTesoreria(plan) {
+        if (plan.mudanzas.length === 0 && plan.descartes.length === 0) return;
+        const entradas = plan.mudanzas.map(m => tesoreriaPartidos[m.vieja]);
+        plan.mudanzas.forEach(m => delete tesoreriaPartidos[m.vieja]);
+        plan.descartes.forEach(clave => delete tesoreriaPartidos[clave]);
+        plan.mudanzas.forEach((m, i) => {
+            const previa = tesoreriaPartidos[m.nueva];
+            // Un pago suelto de antes en la clave nueva es del mismo equipo en este mismo partido: se suma, es su plata.
+            tesoreriaPartidos[m.nueva] = previa
+                ? { ...entradas[i], ef: (previa.ef || 0) + (entradas[i].ef || 0), tr: (previa.tr || 0) + (entradas[i].tr || 0) }
+                : entradas[i];
+        });
+        let cambioSanciones = false;
+        listaSanciones.forEach(s => {
+            const m = plan.mudanzas.find(x => x.vieja === s.claveTeso);
+            if (!m) return;
+            s.claveTeso = m.nueva;
+            if (s.origenAuto) {
+                s.id = idSancionAutomatica(m.nueva);
+                s.acta = m.fecha;
+                s.fecha = m.fecha;
+            }
+            cambioSanciones = true;
+        });
+        guardarTesoreriaPartidos();
+        if (cambioSanciones) almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+    }
+
+    function textoBloqueoTesoreria(plan, motivo) {
+        return motivo + '\n\n'
+            + plan.bloqueos.map(b => '• ' + b).join('\n')
+            + '\n\nPrimero poné esos pagos en $0 en Tesorería > Aranceles por Partido (así queda registrada la devolución en la Caja) y después volvé a intentarlo.';
+    }
 
     function fechaHoyTexto() {
         const d = new Date();
@@ -2846,6 +3149,10 @@ document.addEventListener('liga:datos-listos', () => {
                     existente.puntosRestados = 0;
                     existente.levantada = true;
                     existente.fechaLevantada = fechaHoyTexto();
+                    cambioSanciones = true;
+                } else if (existente && existente.motivo !== s.motivo) {
+                    // Ya levantada, pero el partido cambió de fecha o de rival: se actualiza el texto.
+                    existente.motivo = s.motivo;
                     cambioSanciones = true;
                 }
             });
@@ -3515,7 +3822,15 @@ document.addEventListener('liga:datos-listos', () => {
         filtroTesoreriaCancha.value = canchas.includes(valorActual) ? valorActual : 'todas';
     }
 
-    // Egresos
+    // Egresos. Cada uno puede ser de una fecha del torneo (mismo número que los partidos: '1', '2'… y
+    // '108'/'104'/'102'/'100' en playoffs) o general del torneo (fecha vacía o ausente, por ejemplo premios).
+    const selectEgresoFecha = document.getElementById('egreso-fecha');
+    armarOpcionesFechaEgreso();
+
+    function textoFechaEgreso(eg) {
+        return eg.fecha ? nombreFaseTeso(eg.fecha) : 'GENERAL DEL TORNEO';
+    }
+
     const formEgreso = document.getElementById('form-egreso');
     if (formEgreso) {
         formEgreso.addEventListener('submit', (e) => {
@@ -3525,7 +3840,8 @@ document.addEventListener('liga:datos-listos', () => {
                 concepto: document.getElementById('egreso-concepto').value,
                 detalle: document.getElementById('egreso-detalle').value.trim(),
                 monto: parseFloat(document.getElementById('egreso-monto').value) || 0,
-                medio: document.getElementById('egreso-medio').value
+                medio: document.getElementById('egreso-medio').value,
+                fecha: selectEgresoFecha ? selectEgresoFecha.value : ''
             };
             listaEgresos.push(nuevoEgreso);
             almacen.setItem('liga_egresos', JSON.stringify(listaEgresos));
@@ -3551,7 +3867,7 @@ document.addEventListener('liga:datos-listos', () => {
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(244,63,94,0.05); padding:8px 12px; margin-bottom:6px; border-radius:3px; border-left: 4px solid #f43f5e;">
                     <div style="text-align:left;">
                         <span style="font-size:11px; color:white; font-weight:bold;">${eg.detalle} (${eg.concepto.toUpperCase()})</span>
-                        <span style="font-size:9px; color:#fca5a5; display:block;">Medio: ${eg.medio.toUpperCase()}</span>
+                        <span style="font-size:9px; color:#fca5a5; display:block;">Medio: ${eg.medio.toUpperCase()} · ${textoFechaEgreso(eg)}</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <span style="font-size:13px; color:#f43f5e; font-weight:bold;">-$${eg.monto.toLocaleString()}</span>
@@ -3605,6 +3921,101 @@ document.addEventListener('liga:datos-listos', () => {
         if (document.getElementById('txt-total-partidos')) document.getElementById('txt-total-partidos').textContent = `$${totalPartidos.toLocaleString()}`;
         if (document.getElementById('txt-total-egresos')) document.getElementById('txt-total-egresos').textContent = `-$${egresosTotal.toLocaleString()}`;
         if (document.getElementById('txt-saldo-neto')) document.getElementById('txt-saldo-neto').textContent = `$${neto.toLocaleString()}`;
+        const txtBonificado = document.getElementById('txt-bonificado-inscripciones');
+        if (txtBonificado) {
+            const { bonificado } = totalesInscripciones();
+            txtBonificado.textContent = bonificado > 0 ? `Bonificado: $${bonificado.toLocaleString()} (no suma)` : '';
+        }
+        renderizarRecaudacionPorFecha();
+    }
+
+    // RECAUDACIÓN POR FECHA (EXCLUSIVO COORDINADOR): aranceles cobrados y egresos de cada fecha del torneo.
+    // Las inscripciones y los egresos generales no son de una fecha: van solo en el total, que tiene que
+    // coincidir con el "Saldo Caja Neto" del Balance Central de Caja.
+    function renderizarRecaudacionPorFecha() {
+        const contenedor = document.getElementById('contenedor-recaudacion-fecha');
+        if (!contenedor) return;
+
+        const porFecha = {};
+        const filaDe = f => porFecha[f] || (porFecha[f] = { partidos: 0, aranceles: 0, egresos: 0 });
+        const clavesContadas = new Set();
+        partidos.forEach(p => {
+            if (!p || !p.local || !p.visitante) return;
+            const fila = filaDe(String(p.fecha));
+            fila.partidos++;
+            ['local', 'visita'].forEach(lado => {
+                const clave = claveTesoreria(p, lado);
+                if (clavesContadas.has(clave)) return;
+                clavesContadas.add(clave);
+                const d = tesoreriaPartidos[clave] || {};
+                fila.aranceles += (d.ef || 0) + (d.tr || 0);
+            });
+        });
+
+        // Pagos cargados en un partido que después se borró (o se le cambió la fecha o un equipo) antes del
+        // 29/09/2026, cuando eso todavía se permitía: el Balance los sigue sumando, así que se listan aparte
+        // para que el total cierre igual y se puedan rastrear.
+        let sinPartido = 0;
+        const sueltos = [];
+        Object.keys(tesoreriaPartidos).forEach(clave => {
+            if (clavesContadas.has(clave)) return;
+            const monto = montoTeso(tesoreriaPartidos[clave]);
+            if (!monto) return;
+            sinPartido += monto;
+            const partes = clave.match(/^F([^_]*)_[^_]*_(?:local|visita)_(.*)$/);
+            const idEquipo = partes && /^eq/.test(partes[2]) ? partes[2].slice(2) : null;
+            const equipo = idEquipo !== null ? [...(poolSuperior || []), ...(poolBasico || [])].find(e => String(e.id) === idEquipo) : null;
+            sueltos.push({ equipo: equipo ? equipo.nombre : clave, fecha: partes ? nombreFaseTeso(partes[1]) : '', monto });
+        });
+
+        let egresosGenerales = 0;
+        listaEgresos.forEach(eg => {
+            if (eg.fecha) filaDe(String(eg.fecha)).egresos += (eg.monto || 0);
+            else egresosGenerales += (eg.monto || 0);
+        });
+
+        const fechas = Object.keys(porFecha).sort((a, b) => ordenCronologicoFecha(a) - ordenCronologicoFecha(b));
+        const dinero = n => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString()}`;
+        const filaMonto = (etiqueta, monto, clase) => `
+            <div class="teso-recaud-fila"><span>${etiqueta}</span><strong class="${clase}">${dinero(monto)}</strong></div>`;
+
+        const tarjetas = fechas.map(f => {
+            const r = porFecha[f];
+            const neto = r.aranceles - r.egresos;
+            return `
+                <div class="teso-team-box teso-recaud-card" data-fecha="${attrSeguro(f)}">
+                    <div class="teso-recaud-titulo">
+                        <span class="teso-team-name">${nombreFaseTeso(f)}</span>
+                        <span class="teso-nota">${r.partidos} partido${r.partidos === 1 ? '' : 's'}</span>
+                    </div>
+                    ${filaMonto('Aranceles cobrados', r.aranceles, 'teso-recaud-ingreso')}
+                    ${filaMonto('Egresos de la fecha', -r.egresos, 'teso-recaud-egreso')}
+                    <div class="teso-recaud-fila teso-recaud-neto"><span>Neto de la fecha</span><strong class="${neto < 0 ? 'teso-recaud-egreso' : ''}">${dinero(neto)}</strong></div>
+                </div>
+            `;
+        }).join('');
+
+        const arancelesTotal = fechas.reduce((acc, f) => acc + porFecha[f].aranceles, 0) + sinPartido;
+        const egresosPorFecha = fechas.reduce((acc, f) => acc + porFecha[f].egresos, 0);
+        const { cobrado: inscripciones, bonificado } = totalesInscripciones();
+        const netoTotal = arancelesTotal + inscripciones - egresosPorFecha - egresosGenerales;
+
+        contenedor.innerHTML = `
+            ${tarjetas ? `<div class="teso-recaud-grid">${tarjetas}</div>` : '<p class="teso-nota" style="text-align:center; padding:15px;">Todavía no hay partidos ni egresos con fecha.</p>'}
+            <div class="teso-team-box teso-recaud-total">
+                <span class="teso-recaud-total-titulo">Total del torneo</span>
+                ${filaMonto('Aranceles de todas las fechas', arancelesTotal, 'teso-recaud-ingreso')}
+                ${sinPartido ? `<div class="teso-recaud-sueltos">
+                    <p class="teso-nota">Incluye ${dinero(sinPartido)} cargados en partidos que ya no existen (se borraron o se les cambió la fecha o un equipo antes de que el panel lo impidiera). Detalle para rastrearlos:</p>
+                    ${sueltos.map(s => `<div class="teso-recaud-fila teso-recaud-suelto"><span>${attrSeguro(s.equipo)}${s.fecha ? ' · ' + attrSeguro(s.fecha) : ''}</span><strong>${dinero(s.monto)}</strong></div>`).join('')}
+                </div>` : ''}
+                ${filaMonto('Inscripciones cobradas', inscripciones, 'teso-recaud-ingreso')}
+                ${filaMonto('Egresos por fecha', -egresosPorFecha, 'teso-recaud-egreso')}
+                ${filaMonto('Egresos generales del torneo', -egresosGenerales, 'teso-recaud-egreso')}
+                <div class="teso-recaud-fila teso-recaud-neto"><span>Neto total</span><strong id="txt-recaud-neto-total" class="${netoTotal < 0 ? 'teso-recaud-egreso' : ''}">${dinero(netoTotal)}</strong></div>
+                ${bonificado > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en inscripciones (informativo, no suma)</span><span>${dinero(bonificado)}</span></div>` : ''}
+            </div>
+        `;
     }
 
     // ============================================================
@@ -3902,6 +4313,7 @@ document.addEventListener('liga:datos-listos', () => {
     // ============================================================
     // 9. INICIALIZACIÓN GENERAL AL CARGAR ADMIN.HTML
     // ============================================================
+    mostrarFechasGrupos();
     actualizarOpcionesGrupo();
     actualizarListaAdmin();
     actualizarSelectFechasCronograma();
@@ -4017,12 +4429,12 @@ document.addEventListener('liga:datos-listos', () => {
         // Equipos con inscripción pendiente (solo cantidad — el detalle en $ vive en Tesorería, exclusivo Admin)
         const contPagos = document.getElementById('resumen-pagos-pendientes');
         if (contPagos) {
-            const valorIndividual = parseFloat(almacen.getItem('liga_valor_inscripcion')) || 3000;
+            const valorIndividual = valorInscripcionGuardado();
             const equiposTotal = [...(poolSuperior || []), ...(poolBasico || [])];
             const pendientesPago = equiposTotal.filter(eq => {
                 const cant = eq.jugadores ? eq.jugadores.length : 0;
-                const exigido = cant * valorIndividual;
                 const pago = tesoreriaInscripciones[claveInscripcion(eq)] || { ef: 0, tr: 0 };
+                const exigido = montosInscripcion(cant, valorIndividual, pago.beneficio).exigido;
                 const pagado = (pago.ef || 0) + (pago.tr || 0);
                 return exigido > 0 && pagado < exigido;
             });

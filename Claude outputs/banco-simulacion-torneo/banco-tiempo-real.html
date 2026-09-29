@@ -46,6 +46,9 @@ const guardar = (nombre, clave, valor) => W(nombre).almacen.setItem(clave, JSON.
 const leer = (nombre, clave) => JSON.parse(W(nombre).almacen.getItem(clave));
 const fakefs = () => JSON.parse(localStorage.getItem('fakefs') || '{}');
 const banner = nombre => !D(nombre).getElementById('aviso-cambios-ajenos').hidden;
+const publicaciones = () => JSON.parse(localStorage.getItem('fake_publicaciones_resumen') || '{}');
+// La web pública lee el resumen que publica el panel como mucho cada 10 s (ESPERA_RESUMEN_MS).
+const ESPERA_RESUMEN = 11000;
 const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', foto: '', goles: 0, amarillas: 0, rojas: 0, fichaMedica: 'si', celular: '1122334455' });
 
 (async () => {
@@ -61,8 +64,18 @@ const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', 
     guardar('admin1', 'liga_partidos', [{ id: 100, fecha: 1, dia: '', horario: '10:00', cancha: 'Cancha 1', local: 'Rojo FC', visitante: 'Azul FC', localId: 1, visitanteId: 2, golesLocal: null, golesVisitante: null, ciclo: 'superior', grupo: 'A', jugado: false, asistentesLocal: [], asistentesVisitante: [] }]);
     await esperar(300);
 
+    out('\n=== Resumen para la web pública ===');
+    await cargar('publico', 'index.html');
+    const lecturasSinResumen = W('publico').__lecturasIniciales;
+    check(!fakefs().resumen && /VS/.test(D('publico').getElementById('contenedor-partidos-fecha').textContent) && lecturasSinResumen > 4,
+        'Sin resumen publicado todavía, la web lee las colecciones una por una y se ve igual', { lecturas: lecturasSinResumen });
+    await esperar(ESPERA_RESUMEN);
+    const secciones = Object.keys(fakefs().resumen || {}).sort();
+    check(JSON.stringify(secciones) === '["equipos","general","partidos","tribunal"]', 'A los 10 s el panel publicó las 4 secciones del resumen', secciones);
+    check(!JSON.stringify(fakefs().resumen || {}).includes('40111222') && !JSON.stringify(fakefs().resumen || {}).includes('1122334455'), 'El resumen no tiene DNIs ni datos privados (celular)');
     await cargar('publico', 'index.html');
     await cargar('admin2', 'admin.html');
+    check(W('publico').__lecturasIniciales === 4, 'Con el resumen, abrir la web lee 4 documentos', { antes: lecturasSinResumen, ahora: W('publico').__lecturasIniciales });
     check(/VS/.test(D('publico').getElementById('contenedor-partidos-fecha').textContent), 'Web pública: el partido aparece pendiente (VS)');
     check(!banner('admin1') && !banner('admin2'), 'Al abrir, ningún panel muestra el aviso de cambios');
 
@@ -81,7 +94,7 @@ const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', 
     const ps = leer('admin1', 'liga_partidos');
     Object.assign(ps[0], { jugado: true, golesLocal: 3, golesVisitante: 1 });
     guardar('admin1', 'liga_partidos', ps);
-    await esperar(1000);
+    await esperar(ESPERA_RESUMEN);
 
     const dp = D('publico');
     check(/3 - 1/.test(dp.querySelector('.resultados-lista').textContent), 'Web pública, sin recargar: "Últimos partidos" muestra 3 - 1', dp.querySelector('.resultados-lista').textContent.replace(/\s+/g, ' ').trim().slice(0, 80));
@@ -100,8 +113,10 @@ const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', 
     guardar('admin1', 'liga_partidos', ps1);
     const ps2 = leer('admin2', 'liga_partidos'); ps2[0].asistentesLocal = ['40333444'];
     check(ps2[0].jugado === false, 'El panel 2 sigue con la versión vieja del partido (sin resultado)');
+    const pubAntes = publicaciones().partidos || 0;
     guardar('admin2', 'liga_partidos', ps2);
-    await esperar(1000);
+    await esperar(ESPERA_RESUMEN);
+    check((publicaciones().partidos || 0) - pubAntes <= 2, 'Varios tildados seguidos no reescriben el resumen en cada clic (una publicación por panel)', { publicaciones: (publicaciones().partidos || 0) - pubAntes });
     const doc = fakefs().partidos['100'];
     check(doc.jugado === true && doc.golesLocal === 3 && doc.golesVisitante === 1, 'El guardado del panel desactualizado NO borró el resultado', { jugado: doc.jugado, gl: doc.golesLocal, gv: doc.golesVisitante });
     check(doc.asistentesLocal.length === 2 && doc.asistentesLocal.every(x => /^j/.test(x)), 'Quedaron los dos tildados (uno de cada panel), guardados con código y no con DNI', doc.asistentesLocal);
@@ -113,11 +128,31 @@ const jugador = (nombre, dni, dorsal) => ({ nombre, dni, dorsal, instagram: '', 
     dp.getElementById('btn-toggle-tribunal').click();
     guardar('admin1', 'liga_notificaciones', [{ id: 555, titulo: 'Aviso en vivo', texto: 'Se atrasa la fecha 20 minutos.', tipo: 'normal', timestamp: Date.now(), leida: false }]);
     guardar('admin1', 'liga_sanciones', [{ id: 777, acta: 1, ciclo: 'superior', equipo: 'Azul FC', equipoId: 2, jugador: 'Carla Tres (#7)', jugadorId: '40555666', tipo: 'Sanción Disciplinaria', puntosRestados: 1, motivo: 'Roja directa' }]);
-    await esperar(1000);
+    await esperar(ESPERA_RESUMEN);
     check(/Aviso en vivo/.test(dp.getElementById('contenedor-lista-notificaciones').textContent) && dp.getElementById('badge-notificacion').classList.contains('activo'), 'La campanita muestra el aviso nuevo y prende el puntito, sin recargar');
     check(/Acta N° 1/.test(dp.getElementById('selector-fechas-tribunal').textContent) && /Carla Tres/.test(dp.getElementById('contenido-acta-detalle').textContent), 'El Tribunal abierto muestra la sanción nueva, sin recargar');
     const sancPublica = leer('publico', 'liga_sanciones')[0];
     check(/^j/.test(sancPublica.jugadorId) && !JSON.stringify(leer('publico', 'liga_cicloSuperior')).includes('40111222'), 'La web pública nunca recibe DNIs (ni en sanciones ni en planteles)', sancPublica.jugadorId);
+
+    out('\n=== Cerrar el panel enseguida después de guardar ===');
+    guardar('admin1', 'liga_notificaciones', [{ id: 556, titulo: 'Cierre rápido', texto: 'Guardado y cerrado al toque.', tipo: 'normal', timestamp: Date.now(), leida: false }]);
+    await esperar(200);
+    await new Promise(res => { marcos.admin1.onload = res; marcos.admin1.src = 'about:blank'; });
+    await esperar(500);
+    const generalAlSalir = JSON.parse(((fakefs().resumen || {}).general || {}).datos || '{}');
+    check(!!(generalAlSalir.notificaciones || {})['556'], 'Si el panel se cierra antes de los 10 s, publica el resumen al salir');
+    await cargar('publico', 'index.html');
+    check(/Cierre rápido/.test(D('publico').getElementById('contenedor-lista-notificaciones').textContent), 'La web lo muestra al entrar');
+
+    out('\n=== Resumen viejo: lo corrige el próximo panel que se abre ===');
+    const fs0 = fakefs();
+    const general = JSON.parse(fs0.resumen.general.datos);
+    delete general.notificaciones['556'];
+    fs0.resumen.general.datos = JSON.stringify(general);
+    localStorage.setItem('fakefs', JSON.stringify(fs0));
+    await cargar('admin1', 'admin.html');
+    await esperar(ESPERA_RESUMEN);
+    check(!!JSON.parse(fakefs().resumen.general.datos).notificaciones['556'], 'Al abrir el panel, un resumen que no coincide con los datos se vuelve a publicar');
 
     out('\n=== Actualizar el panel 2 ===');
     await cargar('admin2', 'admin.html');

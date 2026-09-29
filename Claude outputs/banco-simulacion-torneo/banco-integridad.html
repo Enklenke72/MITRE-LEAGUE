@@ -98,7 +98,7 @@ async function abrirTeso(nombre, fecha) {
     check(/^j/.test(fakefs().partidos['100'].goleadoresLocal[0].id), 'En Firestore el goleador va con código, no con DNI', fakefs().partidos['100'].goleadoresLocal[0].id);
     check(leer('admin1', 'liga_partidos').find(p => p.id === 100).goleadoresLocal[0].id === '40111222', 'El panel lo vuelve a ver con el DNI real');
     guardar('admin1', 'liga_partidos', leer('admin1', 'liga_partidos').filter(p => p.id !== 101));
-    await esperar(1000);
+    await esperar(11000); // la web pública lee el resumen, que el panel publica cada 10 s
     check(JSON.stringify(goleadores()) === JSON.stringify(['Ana Uno:2', 'Carla Tres:1']), 'Al borrar un partido, sus goles desaparecen de la tabla (antes el contador los dejaba)', goleadores());
 
     out('\n=== Renombrar un equipo no le borra los pagos ===');

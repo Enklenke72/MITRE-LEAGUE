@@ -676,8 +676,9 @@ async function tesoreriaChecks() {
     await cargar('admin.html');
     const soloAdmin = [...D().querySelectorAll('.solo-admin')];
     check(soloAdmin.length > 0 && soloAdmin.every(x => getComputedStyle(x).display === 'none'), 'Rol Staff oculta todos los .solo-admin', soloAdmin.length);
-    check(LS('liga_egresos') === null && LS('liga_caja_movimientos') === null && LS('liga_tesoreria_partidos_v2') !== null && LS('liga_cicloSuperior')[0].jugadores[0].dni && /^\d/.test(String(LS('liga_cicloSuperior')[0].jugadores[0].dni)),
-        'Rol Staff: carga tesorería y DNIs reales, pero no egresos ni Caja por Fecha', { egresos: LS('liga_egresos'), caja: LS('liga_caja_movimientos'), dni: LS('liga_cicloSuperior')[0].jugadores[0].dni });
+    // Desde el 29/09/2026 las inscripciones y su valor por jugador son solo del Coordinador.
+    check(LS('liga_egresos') === null && LS('liga_caja_movimientos') === null && LS('liga_tesoreria_inscripciones') === null && LS('liga_valor_inscripcion') === null && LS('liga_tesoreria_partidos_v2') !== null && LS('liga_cicloSuperior')[0].jugadores[0].dni && /^\d/.test(String(LS('liga_cicloSuperior')[0].jugadores[0].dni)),
+        'Rol Staff: carga los pagos por partido y DNIs reales, pero no egresos, Caja por Fecha ni inscripciones', { egresos: LS('liga_egresos'), caja: LS('liga_caja_movimientos'), insc: LS('liga_tesoreria_inscripciones'), valorInsc: LS('liga_valor_inscripcion'), dni: LS('liga_cicloSuperior')[0].jugadores[0].dni });
     localStorage.removeItem('fake_rol');
     await cargar('admin.html');
     await tab('sec-tesoreria');
@@ -1178,6 +1179,18 @@ async function fotoJugador() {
     check(!/data:image/.test(localStorage.getItem('fakefs') || ''), 'Ninguna imagen quedó guardada dentro de Firestore: solo URLs');
 }
 
+async function resumenPublico() {
+    out('\n=== RESUMEN PARA LA WEB PÚBLICA (torneo completo cargado) ===');
+    await cargar('admin.html');
+    await esperar(11000);
+    await cargar('index.html');
+    const fsd = JSON.parse(localStorage.getItem('fakefs') || '{}');
+    const documentos = ['equipos', 'partidos', 'sanciones', 'noticias', 'albumes', 'sponsors', 'notificaciones', 'crucesPlayoffs', 'config'].reduce((t, c) => t + Object.keys(fsd[c] || {}).length, 0);
+    check(W().__lecturasIniciales === 4, 'Abrir la web lee 4 documentos en vez de uno por cada partido, equipo, sanción, etc.', { lecturas: W().__lecturasIniciales, documentosPublicos: documentos });
+    const pesos = Object.fromEntries(Object.entries(fsd.resumen || {}).map(([k, v]) => [k, v.datos ? Math.round(v.datos.length / 1024) + ' KB' : 'demasiado grande']));
+    check(Object.keys(pesos).length === 4 && Object.values(fsd.resumen).every(v => v.datos), 'Las 4 secciones del resumen están publicadas y ninguna pasa el tope', pesos);
+}
+
 async function prensa() {
     out('\n=== PRENSA: noticias con foto, álbumes y galería ===');
     await cargar('admin.html');
@@ -1665,6 +1678,459 @@ async function bordes() {
     if (sv) { await cargar('index.html'); D().querySelector('.tabs-sup .tab-btn[data-grupo-val="C"]').click(); const t = [...D().querySelectorAll('.tbody-sup tr')].map(tr => tr.querySelector('.td-team-name').textContent + ' ' + tr.querySelector('.td-pts-total').textContent); out('  info: tabla Grupo C con esa sanción: ' + t.join(' | ')); }
 }
 
+// ---------------- Beneficios de inscripción, egresos por fecha y Recaudación por Fecha (29/09/2026) ----------------
+async function beneficiosYRecaudacion() {
+    out('\n=== TESORERÍA: beneficios de inscripción, egresos por fecha, Recaudación por Fecha y rol Staff ===');
+    const num = t => Number(String(t).replace(/[^0-9-]/g, ''));
+    // Monto que sigue a una etiqueta en un texto ("Falta $12.000" → 12000). Sin signo.
+    const montoTras = (txt, etiqueta) => { const m = String(txt).replace(/\s+/g, ' ').match(new RegExp(etiqueta + '\\s*-?\\$([\\d.,]+)')); return m ? num(m[1]) : null; };
+    const cambiar = async (campo, v) => { campo.value = v; campo.dispatchEvent(new Event('change', { bubbles: true })); await esperar(2); };
+    const insc = () => LS('liga_tesoreria_inscripciones') || {};
+    const movs = () => LS('liga_caja_movimientos') || [];
+    const ord = f => { const n = Number(f); return n >= 100 ? 1000 + (200 - n) : n; };
+    const abrirInscripciones = async () => {
+        await tab('sec-tesoreria');
+        el('btn-sub-teso-inscripciones').click();
+        setv('filtro-inscripciones-ciclo', 'superior');
+        await esperar(2);
+    };
+    const cards = () => [...D().querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')];
+    const card = n => cards().find(c => c.dataset.nombre === n);
+
+    await cargar('admin.html');
+    await abrirInscripciones();
+    const valor = Number(el('monto-inscripcion-individual').value) || 3000;
+    const [nomA, nomB, nomC] = cards().filter(c => Number(c.dataset.cant) > 0 && c.dataset.nombre !== '4to 1ra').map(c => c.dataset.nombre);
+    const brutoA = Number(card(nomA).dataset.cant) * valor, brutoB = Number(card(nomB).dataset.cant) * valor;
+    const totalInsc = () => num(el('txt-total-inscripciones').textContent);
+
+    // 1) Exento después de haber pagado: no queda deuda negativa sino "A favor", y lo bonificado no suma
+    await cambiar(card(nomA).querySelector('.in-insc-ef'), String(brutoA));
+    const cA = card(nomA);
+    const claveA = cA.dataset.eq;
+    const inscAntes = totalInsc(), movsAntes = movs().length;
+    await cambiar(cA.querySelector('.in-insc-benef-tipo'), 'exento');
+    await cambiar(cA.querySelector('.in-insc-benef-motivo'), 'Campeones 2025');
+    const entradaA = insc()[claveA] || {};
+    check(entradaA.beneficio && entradaA.beneficio.tipo === 'exento' && entradaA.beneficio.porcentaje === 100 && entradaA.beneficio.motivo === 'Campeones 2025' && entradaA.ef === brutoA && (entradaA.tr || 0) === 0,
+        'Beneficio exento: queda en la entrada del equipo (misma clave) sin tocar ef/tr', { clave: claveA, entrada: entradaA });
+    const textoA = cA.textContent.replace(/\s+/g, ' ');
+    check(card(nomA) === cA && cA.dataset.exigido === '0' && /EXENTO · Campeones 2025/.test(textoA) && montoTras(textoA, 'Bonificado:') === brutoA && montoTras(textoA, 'A favor') === brutoA && !/Falta/.test(textoA),
+        'Exento después de pagar: exigido $0, se ve el motivo, bonificado aparte y "A favor" (no deuda negativa)', textoA.slice(0, 260));
+    check(movs().length === movsAntes && totalInsc() === inscAntes, 'Cambiar un beneficio no es un movimiento de Caja ni cambia la recaudación', { movsAntes, movsDespues: movs().length, inscAntes, inscDespues: totalInsc() });
+
+    // 2) Descuento: exigido = bruto × (1 − %), el foco no se pierde al cargar el pago
+    const cB = card(nomB);
+    await cambiar(cB.querySelector('.in-insc-benef-tipo'), 'descuento');
+    check(cB.querySelector('.in-insc-benef-pct').value === '50' && !cB.querySelector('.teso-insc-fila-pct').hidden && Number(cB.dataset.exigido) === Math.round(brutoB * 0.5),
+        'Al elegir descuento arranca en 50% y el exigido se recalcula en la misma tarjeta', { pct: cB.querySelector('.in-insc-benef-pct').value, exigido: cB.dataset.exigido, bruto: brutoB });
+    await cambiar(cB.querySelector('.in-insc-benef-pct'), '40');
+    await cambiar(cB.querySelector('.in-insc-benef-motivo'), 'Subcampeones 2025');
+    const exigB = Math.round(brutoB * 0.6);
+    const textoB = cB.textContent.replace(/\s+/g, ' ');
+    check(Number(cB.dataset.exigido) === exigB && montoTras(textoB, 'Falta') === exigB && montoTras(textoB, 'Bonificado:') === brutoB - exigB && /40% DE DESCUENTO · Subcampeones 2025/.test(textoB) && insc()[cB.dataset.eq].beneficio.porcentaje === 40,
+        'Descuento del 40%: exigido = jugadores × valor × 0,6, bonificado aparte y motivo visible', { exigido: cB.dataset.exigido, esperado: exigB, texto: textoB.slice(0, 260) });
+    const inpB = cB.querySelector('.in-insc-tr');
+    inpB.focus();
+    const inscAntesB = totalInsc(), movsAntesB = movs().length;
+    await cambiar(inpB, String(exigB));
+    const ultMov = movs()[movs().length - 1] || {};
+    check(D().activeElement === inpB && inpB.isConnected && card(nomB) === cB, 'Con beneficio, cargar un monto no redibuja la lista: el foco sigue en el campo', { activo: D().activeElement && D().activeElement.className });
+    check(/AL DÍA/.test(cB.textContent) && totalInsc() === inscAntesB + exigB && movs().length === movsAntesB + 1 && ultMov.monto === exigB && ultMov.medio === 'Transferencia' && ultMov.concepto === 'Inscripción',
+        'Pago con descuento: AL DÍA, suma solo lo pagado y registra el movimiento en la Caja', { insc: totalInsc(), esperado: inscAntesB + exigB, ultMov });
+    const bonifEsperado = brutoA + (brutoB - exigB);
+    const cobradoInsc = Object.values(insc()).reduce((a, v) => a + (v.ef || 0) + (v.tr || 0), 0);
+    check(montoTras(el('txt-bonificado-inscripciones').textContent, 'Bonificado:') === bonifEsperado && totalInsc() === cobradoInsc,
+        'Balance Central: la recaudación de inscripciones es solo lo cobrado y lo bonificado se muestra aparte', { enPantalla: el('txt-bonificado-inscripciones').textContent, bonifEsperado, recaudacion: totalInsc(), cobradoInsc });
+
+    // 3) Volver a "Sin beneficio"
+    const cC = card(nomC);
+    await cambiar(cC.querySelector('.in-insc-benef-tipo'), 'exento');
+    await cambiar(cC.querySelector('.in-insc-benef-tipo'), '');
+    check((insc()[cC.dataset.eq] || {}).beneficio === null && Number(cC.dataset.exigido) === Number(cC.dataset.cant) * valor && cC.querySelector('.teso-insc-fila-motivo').hidden,
+        'Volver a "Sin beneficio" deja beneficio en null y el exigido completo', insc()[cC.dataset.eq]);
+
+    // 4) Persistencia: al volver a abrir el panel el beneficio sigue
+    await cargar('admin.html');
+    await abrirInscripciones();
+    const fsInsc = (JSON.parse(localStorage.getItem('fakefs') || '{}').tesoreriaInscripciones || {})[claveA];
+    check(card(nomA).dataset.exigido === '0' && card(nomA).querySelector('.in-insc-benef-tipo').value === 'exento' && /EXENTO · Campeones 2025/.test(card(nomA).textContent) && card(nomB).querySelector('.in-insc-benef-pct').value === '40'
+        && fsInsc && JSON.stringify(fsInsc).includes('Campeones 2025'),
+        'El beneficio queda guardado en Firestore y se ve igual al volver a abrir el panel', fsInsc);
+
+    // 5) Egresos con fecha
+    await tab('sec-tesoreria');
+    const opsEg = [...el('egreso-fecha').options].map(o => o.value);
+    const opsPart = [...el('partido-fecha').options].map(o => o.value);
+    const etiqueta108 = ([...el('egreso-fecha').options].find(o => o.value === '108') || {}).textContent;
+    check(opsEg[0] === '' && el('egreso-fecha').value === '' && JSON.stringify(opsEg.slice(1)) === JSON.stringify(opsPart) && etiqueta108 === '8VOS DE FINAL',
+        'Cargar Egreso: "General del torneo" por defecto y las mismas fechas que Carga de Partidos (playoffs con su nombre)', { opsEg, etiqueta108 });
+    const altaEgreso = async (concepto, detalle, monto, fecha) => {
+        setv('egreso-concepto', concepto, false); setv('egreso-detalle', detalle, false); setv('egreso-monto', String(monto), false); setv('egreso-medio', 'efectivo', false); setv('egreso-fecha', fecha, false);
+        await enviar('form-egreso');
+    };
+    await altaEgreso('canchas', 'Canchas Fecha 1', 30000, '1');
+    check(el('egreso-fecha').value === '', 'Después de cargar un egreso el selector vuelve a "General del torneo"', el('egreso-fecha').value);
+    await altaEgreso('arbitros', 'Terna 8vos', 12000, '108');
+    await altaEgreso('varios', 'Trofeos y medallas', 50000, '');
+    const eg = LS('liga_egresos') || [];
+    const egDe = d => eg.find(e => e.detalle === d) || {};
+    check(egDe('Canchas Fecha 1').fecha === '1' && egDe('Terna 8vos').fecha === '108' && !egDe('Trofeos y medallas').fecha,
+        'Cada egreso guarda su fecha ("1", "108") o vacía si es general', eg.map(e => e.detalle + ':' + JSON.stringify(e.fecha)));
+    const filaEgreso = d => [...D().querySelectorAll('#lista-egresos-admin .match-card')].find(x => x.textContent.includes(d));
+    check(/FECHA 1/.test(filaEgreso('Canchas Fecha 1').textContent) && /8VOS DE FINAL/.test(filaEgreso('Terna 8vos').textContent) && /GENERAL DEL TORNEO/.test(filaEgreso('Trofeos y medallas').textContent),
+        'La lista de egresos muestra a qué fecha corresponde cada uno', [...D().querySelectorAll('#lista-egresos-admin .match-card')].map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+
+    // 6) Recaudación por Fecha contra una cuenta hecha a mano
+    const recaudar = async () => { el('btn-sub-teso-recaudacion').click(); await esperar(2); };
+    const cuentaAMano = () => {
+        const partidos = LS('liga_partidos') || [], teso = LS('liga_tesoreria_partidos_v2') || {}, egresos = LS('liga_egresos') || [];
+        const porFecha = {};
+        const fila = f => porFecha[f] || (porFecha[f] = { aranceles: 0, egresos: 0 });
+        const contadas = new Set();
+        partidos.filter(p => p.local && p.visitante).forEach(p => {
+            fila(String(p.fecha));
+            Object.keys(teso).filter(k => k.startsWith(`F${p.fecha}_${p.id}_`)).forEach(k => { if (contadas.has(k)) return; contadas.add(k); fila(String(p.fecha)).aranceles += (teso[k].ef || 0) + (teso[k].tr || 0); });
+        });
+        egresos.filter(e => e.fecha).forEach(e => { fila(String(e.fecha)).egresos += e.monto; });
+        const totTeso = Object.values(teso).reduce((a, v) => a + (v.ef || 0) + (v.tr || 0), 0);
+        const totInsc = Object.values(LS('liga_tesoreria_inscripciones') || {}).reduce((a, v) => a + (v.ef || 0) + (v.tr || 0), 0);
+        const totEgresos = egresos.reduce((a, e) => a + e.monto, 0);
+        const generales = egresos.filter(e => !e.fecha).reduce((a, e) => a + e.monto, 0);
+        return { porFecha, totTeso, totInsc, totEgresos, generales, sinPartido: totTeso - Object.values(porFecha).reduce((a, r) => a + r.aranceles, 0), neto: totTeso + totInsc - totEgresos };
+    };
+    await recaudar();
+    const mano = cuentaAMano();
+    const tarjetasR = [...D().querySelectorAll('#contenedor-recaudacion-fecha .teso-recaud-card')];
+    const pantalla = Object.fromEntries(tarjetasR.map(t => [t.dataset.fecha, { aranceles: montoTras(t.textContent, 'Aranceles cobrados'), egresos: montoTras(t.textContent, 'Egresos de la fecha'), neto: montoTras(t.textContent, 'Neto de la fecha'), titulo: t.querySelector('.teso-team-name').textContent }]));
+    const ordenPantalla = tarjetasR.map(t => t.dataset.fecha);
+    const ordenEsperado = Object.keys(mano.porFecha).sort((a, b) => ord(a) - ord(b));
+    check(JSON.stringify(ordenPantalla) === JSON.stringify(ordenEsperado) && ordenPantalla.includes('108') && pantalla['108'].titulo === '8VOS DE FINAL',
+        'Recaudación por Fecha: una tarjeta por fecha con partidos o egresos, en orden cronológico y con el nombre de la ronda', ordenPantalla);
+    const netoNegativo = f => /Neto de la fecha\s*-\$/.test(tarjetasR.find(t => t.dataset.fecha === f).textContent);
+    check(ordenEsperado.every(f => pantalla[f] && pantalla[f].aranceles === mano.porFecha[f].aranceles && pantalla[f].egresos === mano.porFecha[f].egresos
+        && pantalla[f].neto === Math.abs(mano.porFecha[f].aranceles - mano.porFecha[f].egresos) && netoNegativo(f) === (mano.porFecha[f].aranceles < mano.porFecha[f].egresos)),
+        'Cada fecha muestra aranceles cobrados, egresos de la fecha y neto como la cuenta a mano', { pantalla, mano: mano.porFecha });
+    const cajaTotal = () => D().querySelector('#contenedor-recaudacion-fecha .teso-recaud-total').textContent;
+    const netoRecaud = () => num(el('txt-recaud-neto-total').textContent), netoBalance = () => num(el('txt-saldo-neto').textContent);
+    check(netoRecaud() === mano.neto && netoBalance() === mano.neto && mano.sinPartido === 0,
+        'Neto total de Recaudación por Fecha = Saldo Caja Neto del Balance = cuenta a mano', { netoRecaud: netoRecaud(), netoBalance: netoBalance(), aMano: mano.neto, aranceles: mano.totTeso, inscripciones: mano.totInsc, egresos: mano.totEgresos });
+    check(montoTras(cajaTotal(), 'Aranceles de todas las fechas') === mano.totTeso && montoTras(cajaTotal(), 'Inscripciones cobradas') === mano.totInsc && montoTras(cajaTotal(), 'Egresos generales del torneo') === mano.generales
+        && montoTras(cajaTotal(), 'Egresos por fecha') === mano.totEgresos - mano.generales && montoTras(cajaTotal(), 'Bonificado en inscripciones \\(informativo, no suma\\)') === bonifEsperado,
+        'Total del torneo: aranceles + inscripciones − egresos por fecha − generales, y el bonificado aparte (no suma)', cajaTotal().replace(/\s+/g, ' ').trim());
+
+    // 7) Un partido con pagos no se puede borrar (29/09/2026: antes se borraba y la plata quedaba suelta).
+    //    Con el pago en $0 sí se borra, sin dejar entradas de Tesorería.
+    await tab('sec-jornada');
+    await crearPartido(7, 'superior', 'C', '4to 3ra', '5to 1ra', 1);
+    const pBorrar = P(7, '4to 3ra', '5to 1ra');
+    await abrirTeso(7);
+    await pagar(pBorrar.id, 'local', 'in-p-ef', 7000);
+    const borrarPartido = async () => {
+        await tab('sec-jornada');
+        setv('filtro-fecha-cronograma-admin', '7');
+        const btnBorrar = D().querySelector(`.btn-borrar-partido[data-id="${pBorrar.id}"]`);
+        if (btnBorrar) { respuestaConfirm = true; btnBorrar.click(); await esperar(3); }
+    };
+    await borrarPartido();
+    await tab('sec-tesoreria');
+    await recaudar();
+    const mano2 = cuentaAMano();
+    check(!!P(7, '4to 3ra', '5to 1ra') && /No se puede eliminar este partido/.test(ultimaAlerta()) && /4to 3ra: \$7[.,]000 \(FECHA 7\)/.test(ultimaAlerta()) && mano2.sinPartido === 0
+        && netoRecaud() === netoBalance() && netoRecaud() === mano2.neto,
+        'Borrar un partido con pagos se bloquea con un aviso (equipo, monto y qué hacer); el neto total sigue igual al Balance', { alerta: ultimaAlerta(), sinPartido: mano2.sinPartido, netoRecaud: netoRecaud(), netoBalance: netoBalance(), aMano: mano2.neto });
+    await abrirTeso(7);
+    await pagar(pBorrar.id, 'local', 'in-p-ef', 0);
+    await borrarPartido();
+    await tab('sec-tesoreria');
+    await recaudar();
+    const mano3 = cuentaAMano();
+    const restos = Object.keys(LS('liga_tesoreria_partidos_v2') || {}).filter(k => k.split('_')[1] === String(pBorrar.id));
+    check(!P(7, '4to 3ra', '5to 1ra') && restos.length === 0 && mano3.sinPartido === 0 && netoRecaud() === netoBalance() && netoRecaud() === mano3.neto,
+        'Con el pago puesto en $0 el partido se borra y no deja entradas de Tesorería; el neto sigue igual al Balance', { restos, netoRecaud: netoRecaud(), netoBalance: netoBalance(), aMano: mano3.neto });
+
+    // 8) A 390 px las tarjetas nuevas no desbordan
+    const anchoOriginal = marco.style.width;
+    marco.style.width = '390px';
+    await cargar('admin.html');
+    await abrirInscripciones();
+    cards().forEach(c => { c.querySelector('.teso-insc-benef').open = true; });
+    const desbordes = selector => {
+        const w = D().documentElement.clientWidth;
+        return [...D().querySelectorAll(selector + ' *')].filter(e => getComputedStyle(e).display !== 'none')
+            .map(e => ({ e, r: e.getBoundingClientRect() })).filter(x => x.r.width > 0 && x.r.right > w + 1)
+            .map(x => (x.e.id ? '#' + x.e.id : x.e.tagName + '.' + [...x.e.classList].join('.')) + ' right=' + Math.round(x.r.right)).slice(0, 6);
+    };
+    const dInsc = desbordes('#contenedor-tesoreria-inscripciones');
+    await recaudar();
+    const dRec = desbordes('#contenedor-recaudacion-fecha');
+    const dEg = desbordes('#form-egreso');
+    check(dInsc.length === 0 && dRec.length === 0 && dEg.length === 0, 'A 390 px no desbordan las tarjetas de Inscripciones (con beneficio abierto), la Recaudación por Fecha ni el formulario de egresos',
+        { ancho: D().documentElement.clientWidth, dInsc, dRec, dEg, scrollPagina: D().documentElement.scrollWidth });
+    marco.style.width = anchoOriginal;
+
+    // 9) Rol Staff: no ve nada de esto y puede cargar un pago de partido sin errores de guardado
+    localStorage.setItem('fake_rol', 'staff');
+    const inscFsAntes = JSON.stringify((JSON.parse(localStorage.getItem('fakefs') || '{}')).tesoreriaInscripciones || {});
+    const erroresAntes = salida.filter(s => /^JS ERROR/.test(s)).length;
+    const alertasAntes = alertas.length;
+    await cargar('admin.html');
+    await tab('sec-tesoreria');
+    const oculto = id => { const e = D().getElementById(id); return !!e && getComputedStyle(e).display === 'none'; };
+    check(['btn-sub-teso-inscripciones', 'sub-vista-teso-inscripciones', 'btn-sub-teso-recaudacion', 'sub-vista-teso-recaudacion'].every(oculto) && getComputedStyle(el('form-egreso').closest('section')).display === 'none'
+        && el('btn-sub-teso-partidos').classList.contains('active') && !oculto('sub-vista-teso-partidos'),
+        'Rol Staff: no ve Inscripciones, Recaudación por Fecha ni egresos; queda en Aranceles por Partido', ['btn-sub-teso-inscripciones', 'sub-vista-teso-inscripciones', 'btn-sub-teso-recaudacion', 'sub-vista-teso-recaudacion'].map(id => id + ':' + oculto(id)));
+    const pStaff = (LS('liga_partidos') || []).find(p => p.fecha === 1 && p.local && p.visitante);
+    await abrirTeso(1);
+    const inpStaff = cajaEquipo(pStaff.id, 'local').querySelector('.in-p-tr');
+    const trAntes = Number(inpStaff.value) || 0;
+    await pagar(pStaff.id, 'local', 'in-p-tr', trAntes + 1000);
+    el('btn-sub-teso-partidos').click();
+    await esperar(300);
+    await cargar('admin.html');
+    const claveStaff = Object.keys(LS('liga_tesoreria_partidos_v2') || {}).find(k => k.startsWith(`F1_${pStaff.id}_local_`));
+    const trGuardado = ((LS('liga_tesoreria_partidos_v2') || {})[claveStaff] || {}).tr || 0;
+    const alertasNuevas = alertas.slice(alertasAntes);
+    check(trGuardado === trAntes + 1000 && !alertasNuevas.some(a => /No se pudo guardar/.test(a)) && salida.filter(s => /^JS ERROR/.test(s)).length === erroresAntes
+        && JSON.stringify((JSON.parse(localStorage.getItem('fakefs') || '{}')).tesoreriaInscripciones || {}) === inscFsAntes,
+        'Rol Staff: carga un pago de partido y se guarda, sin carteles de error, sin errores de JS y sin tocar las inscripciones', { trAntes, trGuardado, alertasNuevas });
+    localStorage.removeItem('fake_rol');
+}
+
+// ---------------- Pagos que siguen al partido y fechas de grupos configurables (29/09/2026) ----------------
+async function partidosYFechas() {
+    out('\n=== PARTIDOS EDITADOS O BORRADOS: la plata de Tesorería nunca queda suelta ===');
+    const num = t => Number(String(t).replace(/[^0-9-]/g, ''));
+    const teso = () => LS('liga_tesoreria_partidos_v2') || {};
+    const fsTeso = () => Object.keys((JSON.parse(localStorage.getItem('fakefs') || '{}')).tesoreriaPartidos || {}).map(decodeURIComponent);
+    const fsSanciones = () => Object.values((JSON.parse(localStorage.getItem('fakefs') || '{}')).sanciones || {});
+    const clavesDe = pid => Object.keys(teso()).filter(k => k.split('_')[1] === String(pid)).sort();
+    const idEq = nombre => [...LS('liga_cicloSuperior'), ...LS('liga_cicloBasico')].find(e => e.nombre === nombre).id;
+    const autoDe = pid => (LS('liga_sanciones') || []).filter(s => s.origenAuto && String(s.claveTeso || '').split('_')[1] === String(pid));
+    const porId = id => (LS('liga_partidos') || []).find(p => p.id === id);
+    const netos = async () => {
+        await tab('sec-tesoreria');
+        el('btn-sub-teso-recaudacion').click(); await esperar(2);
+        const total = Object.values(teso()).reduce((a, v) => a + (v.ef || 0) + (v.tr || 0), 0);
+        return { recaud: num(el('txt-recaud-neto-total').textContent), balance: num(el('txt-saldo-neto').textContent), totalTeso: total };
+    };
+    const cierra = n => n.recaud === n.balance;
+    const editar = async (p, cambios) => {
+        await tab('sec-jornada');
+        setv('filtro-fecha-cronograma-admin', 'todas');
+        editarPartido(p);
+        if (cambios.fecha !== undefined) setv('partido-fecha', String(cambios.fecha));
+        setv('partido-local', cambios.local || p.local, false);
+        setv('partido-visitante', cambios.visitante || p.visitante, false);
+        if (cambios.horario) setv('partido-horario', cambios.horario, false);
+        await enviar('form-partido');
+        await esperar(200); // que las escrituras lleguen al Firestore simulado
+    };
+
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    const [A, B, C, E] = SUP.A; // 4to 1ra, 5to 2da, 6to 3ra, 7mo 1ra
+    await crearPartido(4, 'superior', 'A', A, B, 0);
+    await crearPartido(4, 'superior', 'A', C, E, 1);
+    await crearPartido(6, 'superior', 'A', A, C, 2);
+    const pM = P(4, A, B), pS = P(4, C, E), pD = P(6, A, C);
+    await abrirTeso(4);
+    await pagar(pM.id, 'local', 'in-p-ef', 10000);
+    await pagar(pM.id, 'visita', 'in-p-tr', 5000);
+    await tildar(pM.id, 'local', [jug(A, 5).dni]);
+    await asistencia(pS.id, 'local', 'presente');
+    await pagar(pS.id, 'local', 'in-p-ef', 30000);
+    await asistencia(pS.id, 'visita', 'sin_aviso');
+    const n0 = await netos();
+    check(clavesDe(pM.id).join() === [`F4_${pM.id}_local_eq${idEq(A)}`, `F4_${pM.id}_visita_eq${idEq(B)}`].sort().join() && autoDe(pS.id).length === 1 && porId(pS.id).resultadoAuto && cierra(n0),
+        'Preparación: pagos en un partido de la Fecha 4 y una ausencia con sanción automática y 3-0 en otro', { claves: clavesDe(pM.id), sanciones: autoDe(pS.id).length, n0 });
+
+    // 1) Cambiar el horario: las claves no cambian y nada se mueve
+    await editar(porId(pM.id), { horario: '18:00' });
+    check(porId(pM.id).horario === '18:00' && teso()[`F4_${pM.id}_local_eq${idEq(A)}`].ef === 10000 && teso()[`F4_${pM.id}_visita_eq${idEq(B)}`].tr === 5000,
+        'Cambiar el horario de un partido con pagos: se guarda y los pagos siguen en su lugar', clavesDe(pM.id));
+
+    // 2) Cambiar la fecha: la entrada de cada equipo se muda a la clave nueva
+    await editar(porId(pM.id), { fecha: 5 });
+    const tM5 = teso();
+    const n1 = await netos();
+    check(porId(pM.id).fecha === 5 && clavesDe(pM.id).every(k => k.startsWith('F5_')) && clavesDe(pM.id).length === 2
+        && tM5[`F5_${pM.id}_local_eq${idEq(A)}`].ef === 10000 && tM5[`F5_${pM.id}_local_eq${idEq(A)}`].asistencia === 'presente' && tM5[`F5_${pM.id}_visita_eq${idEq(B)}`].tr === 5000
+        && fsTeso().filter(k => k.split('_')[1] === String(pM.id)).every(k => k.startsWith('F5_')) && cierra(n1) && n1.totalTeso === n0.totalTeso,
+        'Cambiar la fecha (4→5): pagos y asistencia se mudan a la clave nueva, en Firestore no queda la vieja y el neto sigue cerrando', { claves: clavesDe(pM.id), n1 });
+
+    // 3) Invertir local y visitante: cada equipo se lleva lo suyo
+    await editar(porId(pM.id), { local: B, visitante: A });
+    const tSw = teso();
+    const pSw = porId(pM.id);
+    const n2 = await netos();
+    check(pSw.local === B && pSw.visitante === A && tSw[`F5_${pM.id}_local_eq${idEq(B)}`] && tSw[`F5_${pM.id}_local_eq${idEq(B)}`].tr === 5000
+        && tSw[`F5_${pM.id}_visita_eq${idEq(A)}`] && tSw[`F5_${pM.id}_visita_eq${idEq(A)}`].ef === 10000 && tSw[`F5_${pM.id}_visita_eq${idEq(A)}`].asistencia === 'presente'
+        && clavesDe(pM.id).length === 2 && cierra(n2) && n2.totalTeso === n0.totalTeso,
+        'Invertir local y visitante: los pagos y la asistencia siguen a cada equipo (buscado por id, no por lado)', { claves: clavesDe(pM.id), n2 });
+    const dniTildado = jug(A, 5).dni;
+    out('  info (para el reporte): tras invertir, la lista de buena fe tiene al jugador de ' + A + ' en asistentesLocal=' + (pSw.asistentesLocal || []).includes(dniTildado)
+        + ' / asistentesVisitante=' + (pSw.asistentesVisitante || []).includes(dniTildado) + ' (' + A + ' ahora es visitante)');
+
+    // 4) Sacar del partido a un equipo con plata: se bloquea y no cambia nada
+    const antesBloqueo = JSON.stringify({ p: porId(pM.id), t: clavesDe(pM.id).map(k => [k, teso()[k]]) });
+    await editar(porId(pM.id), { visitante: E });
+    const alertaSacar = ultimaAlerta();
+    check(/No se guardó el cambio/.test(alertaSacar) && new RegExp(`${A}: \\$10[.,]000 \\(FECHA 5\\)`).test(alertaSacar) && /poné esos pagos en \$0/.test(alertaSacar)
+        && JSON.stringify({ p: porId(pM.id), t: clavesDe(pM.id).map(k => [k, teso()[k]]) }) === antesBloqueo,
+        'Cambiar un equipo que tiene plata cargada: se bloquea con el aviso (equipo, monto, fecha, qué hacer) y ni el partido ni los pagos cambian', alertaSacar);
+
+    // 5) Con su pago en $0 el cambio pasa; su asistencia se descarta y la devolución queda en la Caja
+    await abrirTeso(5);
+    await pagar(pM.id, 'visita', 'in-p-ef', 0);
+    const movDevol = (LS('liga_caja_movimientos') || []).slice(-1)[0] || {};
+    await editar(porId(pM.id), { visitante: E });
+    const n3 = await netos();
+    check(porId(pM.id).visitante === E && !clavesDe(pM.id).some(k => k.endsWith('_eq' + idEq(A))) && clavesDe(pM.id).length === 1 && movDevol.monto === -10000 && cierra(n3),
+        'Con el pago en $0 el equipo se puede cambiar: su entrada (asistencia incluida) se descarta y la devolución de $10.000 quedó en la Caja', { claves: clavesDe(pM.id), movDevol, n3 });
+
+    // 6) Borrar con plata: bloqueado. En $0: se borra sin dejar entradas.
+    const borrar = async id => {
+        await tab('sec-jornada');
+        setv('filtro-fecha-cronograma-admin', 'todas');
+        const b = D().querySelector(`.btn-borrar-partido[data-id="${id}"]`);
+        if (b) { b.click(); await esperar(200); }
+    };
+    await borrar(pM.id);
+    check(!!porId(pM.id) && /No se puede eliminar este partido/.test(ultimaAlerta()) && new RegExp(`${B}: \\$5[.,]000`).test(ultimaAlerta()) && teso()[`F5_${pM.id}_local_eq${idEq(B)}`].tr === 5000,
+        'Borrar un partido con plata: bloqueado con aviso, el partido y el pago siguen', ultimaAlerta());
+    await abrirTeso(5);
+    await pagar(pM.id, 'local', 'in-p-tr', 0);
+    await borrar(pM.id);
+    const n4 = await netos();
+    check(!porId(pM.id) && clavesDe(pM.id).length === 0 && !fsTeso().some(k => k.split('_')[1] === String(pM.id)) && cierra(n4),
+        'Borrar un partido sin plata: se borra y no quedan entradas de Tesorería (ni en Firestore)', { claves: clavesDe(pM.id), n4 });
+
+    // 7) Sanción automática al mudar: una sola, con la clave nueva, y sigue igual si ya estaba levantada
+    const sAntes = autoDe(pS.id)[0];
+    await editar(porId(pS.id), { fecha: 5 });
+    const sF5 = autoDe(pS.id);
+    check(sF5.length === 1 && sF5[0].claveTeso === `F5_${pS.id}_visita_eq${idEq(E)}` && sF5[0].id !== sAntes.id && Number(sF5[0].acta) === 5 && /^Fecha 5/.test(sF5[0].motivo) && !sF5[0].levantada
+        && !(LS('liga_sanciones') || []).some(s => s.claveTeso === sAntes.claveTeso) && fsSanciones().filter(s => String(s.claveTeso || '').split('_')[1] === String(pS.id)).length === 1
+        && porId(pS.id).resultadoAuto && porId(pS.id).golesLocal === 3,
+        'Mudar un partido con sanción automática (Art. 17 Bis): queda una sola, con la clave, el acta y el motivo de la Fecha 5, sin huérfana ni duplicada', sF5.map(s => ({ id: s.id, clave: s.claveTeso, acta: s.acta, motivo: s.motivo })));
+    await abrirTeso(5);
+    await pagar(pS.id, 'visita', 'in-p-ef', 15000);
+    const levantada = autoDe(pS.id)[0] || {};
+    await editar(porId(pS.id), { local: E, visitante: C });
+    const sSw = autoDe(pS.id);
+    const pSsw = porId(pS.id);
+    check(levantada.levantada && sSw.length === 1 && sSw[0].levantada && sSw[0].fechaLevantada === levantada.fechaLevantada && sSw[0].claveTeso === `F5_${pS.id}_local_eq${idEq(E)}`
+        && pSsw.resultadoAuto && pSsw.golesLocal === 0 && pSsw.golesVisitante === 3 && teso()[`F5_${pS.id}_local_eq${idEq(E)}`].ef === 15000,
+        'Invertir local y visitante con la quita ya levantada: sigue levantada (misma fecha), una sola, y el 3-0 automático se da vuelta con los equipos', { sanciones: sSw.map(s => s.claveTeso + ' levantada=' + s.levantada), goles: [pSsw.golesLocal, pSsw.golesVisitante] });
+
+    // 8) Sanción automática descartada a mano: la marca viaja con el partido y no se vuelve a crear
+    await abrirTeso(6);
+    await asistencia(pD.id, 'visita', 'sin_aviso');
+    const sD = autoDe(pD.id)[0];
+    await tab('sec-tribunal');
+    const bSanc = sD && D().querySelector(`.btn-borrar-sancion[data-id="${sD.id}"]`);
+    if (bSanc) { bSanc.click(); await esperar(3); }
+    await editar(porId(pD.id), { fecha: 7 });
+    const tD = teso()[`F7_${pD.id}_visita_eq${idEq(C)}`] || {};
+    check(!!sD && tD.sancionDescartada === true && tD.asistencia === 'sin_aviso' && autoDe(pD.id).length === 0 && !teso()[`F6_${pD.id}_visita_eq${idEq(C)}`],
+        'Sanción automática borrada a mano y partido mudado (6→7): la marca "descartada" viaja con el equipo y no se vuelve a crear', { tD, auto: autoDe(pD.id).length });
+
+    // 9) Pagos sueltos de antes del arreglo: detalle en Recaudación por Fecha
+    const conSueltos = { ...teso(), [`F3_999_local_eq${idEq(A)}`]: { ef: 4000, tr: 0 }, 'F2_998_visita_equipo viejo': { ef: 0, tr: 2500 } };
+    W().almacen.setItem('liga_tesoreria_partidos_v2', JSON.stringify(conSueltos));
+    await esperar(300);
+    await cargar('admin.html');
+    const n5 = await netos();
+    const caja = D().querySelector('#contenedor-recaudacion-fecha .teso-recaud-total');
+    const filas = [...caja.querySelectorAll('.teso-recaud-suelto')].map(f => f.textContent.replace(/\s+/g, ' ').trim());
+    check(/\$6[.,]500 cargados en partidos que ya no existen/.test(caja.textContent) && filas.length === 2
+        && filas.some(f => new RegExp(`^${A} · FECHA 3\\s*\\$4[.,]000$`).test(f)) && filas.some(f => /^F2_998_visita_equipo viejo · FECHA 2\s*\$2[.,]500$/.test(f)) && cierra(n5),
+        'Pagos sueltos de antes: la nota lista equipo (o la clave si no hay equipo), fecha y monto de cada uno, y el neto sigue igual al Balance', { filas, n5 });
+    const sinSueltos = teso(); delete sinSueltos[`F3_999_local_eq${idEq(A)}`]; delete sinSueltos['F2_998_visita_equipo viejo'];
+    W().almacen.setItem('liga_tesoreria_partidos_v2', JSON.stringify(sinSueltos));
+    await esperar(300);
+
+    out('\n=== FECHAS DE FASE DE GRUPOS CONFIGURABLES POR CICLO ===');
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    const opciones = id => [...el(id).options].map(o => o.value);
+    const PO = ['108', '104', '102', '100'];
+    const rango = n => Array.from({ length: n }, (_, i) => String(i + 1));
+    setv('partido-ciclo', 'superior');
+    check(LS('liga_fechas_grupos') === null && el('fechas-grupos-superior').value === '7' && el('fechas-grupos-basico').value === '7'
+        && JSON.stringify(opciones('partido-fecha')) === JSON.stringify([...rango(7), ...PO]),
+        'Sin configurar: 7 fechas por ciclo (campos en 7 y Fecha 1 a 7 más los playoffs)', opciones('partido-fecha'));
+    setv('fechas-grupos-superior', '10', false); setv('fechas-grupos-basico', '5', false);
+    el('btn-guardar-fechas-grupos').click(); await esperar(300);
+    const fsConfig = (JSON.parse(localStorage.getItem('fakefs') || '{}').config || {}).fechasGrupos;
+    check(JSON.stringify(LS('liga_fechas_grupos')) === '{"superior":10,"basico":5}' && fsConfig && JSON.stringify(fsConfig).includes('10') && /guardadas: Superior 10, Básico 5\.$/.test(ultimaAlerta()),
+        'Guardar Superior 10 / Básico 5: queda en liga_fechas_grupos (config/fechasGrupos en Firestore)', { valor: LS('liga_fechas_grupos'), fsConfig, alerta: ultimaAlerta() });
+    setv('partido-ciclo', 'superior');
+    const opSup = opciones('partido-fecha');
+    setv('partido-ciclo', 'basico');
+    const opBas = opciones('partido-fecha');
+    const opEg = opciones('egreso-fecha');
+    const etiquetaEg10 = ([...el('egreso-fecha').options].find(o => o.value === '10') || {}).textContent;
+    check(JSON.stringify(opSup) === JSON.stringify([...rango(10), ...PO]) && JSON.stringify(opBas) === JSON.stringify([...rango(5), ...PO])
+        && JSON.stringify(opEg) === JSON.stringify(['', ...rango(10), ...PO]) && etiquetaEg10 === 'FECHA 10',
+        'Superior ofrece Fecha 1-10, Básico 1-5 (más playoffs) y los egresos 1-10 (el máximo) más playoffs y "General"', { opSup, opBas, opEg });
+    setv('partido-ciclo', 'basico'); setv('partido-fecha', '5');
+    setv('partido-ciclo', 'superior');
+    check(el('partido-fecha').value === '5', 'Cambiar de ciclo conserva la fecha elegida si existe en los dos', el('partido-fecha').value);
+    setv('partido-fecha', '9'); setv('partido-ciclo', 'basico');
+    check(el('partido-fecha').value === '5', 'Pasar de Superior (Fecha 9) a Básico (5 fechas) cae en la Fecha 5', el('partido-fecha').value);
+
+    // Partido en la Fecha 9 con resultado: aparece en el fixture público
+    setv('partido-ciclo', 'superior');
+    setv('goles-local', '', false);
+    await crearPartido(9, 'superior', 'A', A, E, 0);
+    const p9 = P(9, A, E);
+    editarPartido(p9);
+    check(el('partido-fecha').value === '9', 'Editar el partido de la Fecha 9: el selector muestra la Fecha 9', el('partido-fecha').value);
+    setv('goles-local', '2', false); setv('goles-visitante', '1', false);
+    await enviar('form-partido'); await esperar(3);
+    check(porId(p9.id).fecha === 9 && porId(p9.id).jugado, 'Partido de la Fecha 9 guardado con resultado 2-1', porId(p9.id));
+    await cargar('index.html');
+    const btn9 = D().querySelector('#botones-fecha-fixture .btn-fecha-select[data-fecha="9"]');
+    if (btn9) { btn9.click(); await esperar(5); }
+    const textoFixture = (D().getElementById('contenedor-partidos-fecha') || {}).textContent || '';
+    check(!!btn9 && btn9.textContent.trim() === 'Fecha 9' && textoFixture.includes(A) && textoFixture.includes(E),
+        'Web pública: el fixture tiene el botón "Fecha 9" y muestra ese partido', { boton: btn9 && btn9.textContent });
+
+    // Bajar Superior a 8 con partidos en la Fecha 9: avisa y no borra nada
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    setv('fechas-grupos-superior', '8', false);
+    el('btn-guardar-fechas-grupos').click(); await esperar(300);
+    setv('partido-ciclo', 'superior');
+    check(/Ojo:/.test(ultimaAlerta()) && /Ciclo Superior: ya hay partidos en la Fecha 9/.test(ultimaAlerta()) && /No se borró nada/.test(ultimaAlerta())
+        && !!porId(p9.id) && JSON.stringify(opciones('partido-fecha')) === JSON.stringify([...rango(9), ...PO]) && LS('liga_fechas_grupos').superior === 8,
+        'Bajar Superior a 8 con un partido en la Fecha 9: avisa, guarda, no borra nada y la Fecha 9 sigue en el selector', { alerta: ultimaAlerta(), opciones: opciones('partido-fecha') });
+    setv('fechas-grupos-superior', '0', false);
+    el('btn-guardar-fechas-grupos').click(); await esperar(50);
+    check(/entre 1 y 30/.test(ultimaAlerta()) && LS('liga_fechas_grupos').superior === 8, 'Un valor fuera de 1-30 se rechaza', ultimaAlerta());
+
+    // A 390 px los campos nuevos no desbordan
+    const anchoOriginal = marco.style.width;
+    marco.style.width = '390px';
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    const seccion = el('btn-guardar-fechas-grupos').closest('section');
+    const w = D().documentElement.clientWidth;
+    const desb = [seccion, ...seccion.querySelectorAll('*')].map(e => ({ e, r: e.getBoundingClientRect() })).filter(x => x.r.width > 0 && x.r.right > w + 1)
+        .map(x => (x.e.id ? '#' + x.e.id : x.e.tagName) + ' right=' + Math.round(x.r.right));
+    check(desb.length === 0, 'A 390 px la sección "Fechas de Fase de Grupos" no desborda', { ancho: w, desb, scrollWidthPagina: D().body.scrollWidth });
+    marco.style.width = anchoOriginal;
+
+    // Dejar la configuración como estaba (7/7) y sacar el partido de prueba
+    await cargar('admin.html');
+    await borrar(p9.id);
+    setv('fechas-grupos-superior', '7', false); setv('fechas-grupos-basico', '7', false);
+    el('btn-guardar-fechas-grupos').click(); await esperar(300);
+    check(!porId(p9.id) && JSON.stringify(LS('liga_fechas_grupos')) === '{"superior":7,"basico":7}', 'Limpieza: partido de la Fecha 9 borrado y configuración de vuelta en 7/7');
+}
+
 (async () => {
     try {
         planificar();
@@ -1682,10 +2148,13 @@ async function bordes() {
         await finanzas();
         await campanita();
         await responsive780();
+        await resumenPublico();
         localStorage.setItem('__snapshot', localStorage.getItem('fakefs') || '{}');
         await bordes();
         await suspensionPorFechasJugadas();
         await suspension30();
+        await beneficiosYRecaudacion();
+        await partidosYFechas();
         await tablaUnica();
     } catch (e) {
         out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);

@@ -18,6 +18,7 @@ const btnReintentar = document.getElementById('auth-gate-reintentar');
 const btnSalirGate = document.getElementById('auth-gate-salir');
 const btnSalirHeader = document.getElementById('btn-cerrar-sesion');
 const elUsuario = document.getElementById('staff-sesion-usuario');
+const elBienvenida = document.getElementById('staff-bienvenida');
 const avisoCambios = document.getElementById('aviso-cambios-ajenos');
 
 function mostrarAvisoCambiosAjenos() {
@@ -29,6 +30,19 @@ function bloquear(mensaje, accion) {
     elMensaje.textContent = mensaje;
     btnReintentar.hidden = accion !== 'reintentar';
     btnSalirGate.hidden = accion !== 'salir';
+}
+
+// Saludo neutro (decisión de Joaquín, 29/09/2026). Sin nombre cargado queda "¡Hola!": el email en grande no se lee bien.
+function mostrarBienvenida(nombre) {
+    const primerNombre = String(nombre || '').trim().split(/\s+/)[0];
+    if (!primerNombre) {
+        elBienvenida.replaceChildren('¡Hola!');
+        return;
+    }
+    const elNombre = document.createElement('span');
+    elNombre.className = 'staff-bienvenida-nombre';
+    elNombre.textContent = primerNombre;
+    elBienvenida.replaceChildren('¡Hola, ', elNombre, '!');
 }
 
 function cerrarSesion() {
@@ -76,6 +90,7 @@ async function verificarRol(usuario) {
     document.body.classList.remove('rol-admin', 'rol-staff');
     document.body.classList.add(clase);
     elUsuario.textContent = `${datos.nombre || usuario.email} · ${NOMBRE_ROL[datos.rol]}`;
+    mostrarBienvenida(datos.nombre);
     activarGuardado();
     document.dispatchEvent(new Event('liga:datos-listos'));
     document.body.classList.remove('auth-pendiente');

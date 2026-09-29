@@ -32,12 +32,14 @@ service cloud.firestore {
     match /notificaciones/{id} { allow read: if true; allow write: if esStaff(); }
     match /crucesPlayoffs/{id} { allow read: if true; allow write: if esStaff(); }
     match /config/{id} { allow read: if true; allow write: if esStaff(); }
+    // Copia de todo lo anterior en 4 documentos, que arma el panel: la web pública lee solo estos.
+    match /resumen/{id} { allow read: if true; allow write: if esStaff(); }
 
     // Datos personales de los jugadores (DNI, ficha médica, contactos de emergencia),
     // tesorería del día a día y avisos internos: solo staff y coordinador.
     match /equiposPrivado/{id} { allow read, write: if esStaff(); }
     match /tesoreriaPartidos/{id} { allow read, write: if esStaff(); }
-    match /tesoreriaInscripciones/{id} { allow read, write: if esStaff(); }
+    // Sin uso desde el 29/09/2026 (el valor de inscripción pasó a configCoordinador).
     match /configStaff/{id} { allow read, write: if esStaff(); }
     match /avisosStaff/{id} { allow read, write: if esStaff(); }
 
@@ -48,7 +50,9 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Solo el coordinador: egresos, balance y la calculadora de arancel.
+    // Solo el coordinador: inscripciones (con sus beneficios), egresos, balance, la calculadora
+    // de arancel y el valor de inscripción por jugador (en configCoordinador).
+    match /tesoreriaInscripciones/{id} { allow read, write: if esCoordinador(); }
     match /egresos/{id} { allow read, write: if esCoordinador(); }
     match /configCoordinador/{id} { allow read, write: if esCoordinador(); }
 

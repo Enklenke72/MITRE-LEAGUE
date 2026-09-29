@@ -27,9 +27,9 @@ function error(code, msg) {
 }
 
 // ---------------- Reglas (espejo de firestore.rules) ----------------
-const PUBLICAS = ['equipos', 'partidos', 'sanciones', 'noticias', 'albumes', 'sponsors', 'notificaciones', 'crucesPlayoffs', 'config'];
-const DE_STAFF = ['equiposPrivado', 'tesoreriaPartidos', 'tesoreriaInscripciones', 'configStaff', 'avisosStaff'];
-const DE_COORDINADOR = ['egresos', 'configCoordinador'];
+const PUBLICAS = ['equipos', 'partidos', 'sanciones', 'noticias', 'albumes', 'sponsors', 'notificaciones', 'crucesPlayoffs', 'config', 'resumen'];
+const DE_STAFF = ['equiposPrivado', 'tesoreriaPartidos', 'configStaff', 'avisosStaff'];
+const DE_COORDINADOR = ['tesoreriaInscripciones', 'egresos', 'configCoordinador'];
 
 function permitido(accion, col, id) {
     const rol = haySesion() ? rolFake() : null;
@@ -92,6 +92,10 @@ const copia = x => JSON.parse(JSON.stringify(x));
 // locales); los de otra página del banco (otro iframe) llegan por el evento 'storage'.
 const METADATOS = { fromCache: false, hasPendingWrites: false };
 const oyentes = [];
+// Documentos leídos al cargar (primera respuesta de cada escucha y cada getDoc/getDocs), como los cobra
+// Firestore: una consulta sin resultados cuenta 1. Las actualizaciones no se cuentan.
+window.__lecturasIniciales = 0;
+const contarLecturas = n => { window.__lecturasIniciales += Math.max(1, n); };
 
 function snapshotDe(ref) {
     if (ref.id !== undefined) {
@@ -131,6 +135,7 @@ const fsSdk = {
                 return { id: ref.id, exists: () => true, data: () => datos };
             }
             const d = (store[ref.col] || {})[ref.id];
+            contarLecturas(1);
             return { id: ref.id, exists: () => d !== undefined, data: () => (d === undefined ? undefined : copia(d)) };
         });
     },
@@ -140,6 +145,7 @@ const fsSdk = {
             refrescar();
             exigir('read', ref.col);
             const docs = Object.entries(store[ref.col] || {}).map(([id, d]) => ({ id, data: () => copia(d) }));
+            contarLecturas(docs.length);
             return { docs, size: docs.length };
         });
     },
@@ -154,7 +160,11 @@ const fsSdk = {
         }
         const oyente = { ref, siguiente };
         oyentes.push(oyente);
-        setTimeout(() => siguiente(snapshotDe(ref)), 0);
+        setTimeout(() => {
+            const snap = snapshotDe(ref);
+            contarLecturas(snap.docs ? snap.docs.length : 1);
+            siguiente(snap);
+        }, 0);
         return () => { const i = oyentes.indexOf(oyente); if (i >= 0) oyentes.splice(i, 1); };
     },
 
@@ -167,6 +177,11 @@ const fsSdk = {
             validarValor(datos, `${ref.col}/${ref.id}`, false, false);
             validarTamano(ref.col, ref.id, datos);
             (store[ref.col] = store[ref.col] || {})[ref.id] = copia(datos);
+            if (ref.col === 'resumen') {
+                const cuenta = JSON.parse(localStorage.getItem('fake_publicaciones_resumen') || '{}');
+                cuenta[ref.id] = (cuenta[ref.id] || 0) + 1;
+                localStorage.setItem('fake_publicaciones_resumen', JSON.stringify(cuenta));
+            }
             guardarStore();
             notificar([ref.col]);
         });

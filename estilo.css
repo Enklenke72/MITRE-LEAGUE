@@ -3719,6 +3719,76 @@ body.rol-staff .solo-admin {
     font-weight: bold;
 }
 
+/* Beneficio de inscripción (exento o % de descuento) */
+.teso-chip-dorado { background: rgba(242, 192, 14, 0.1); border: 1px solid rgba(242, 192, 14, 0.35); color: #f2c00e; }
+.teso-insc-benef-estado:empty { display: none; }
+.teso-insc-benef-estado .teso-chip { display: block; text-align: left; word-break: break-word; }
+
+.teso-insc-bonif,
+.teso-balance-bonif {
+    display: block;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    font-weight: normal;
+    color: #f2c00e;
+}
+
+.teso-balance-bonif { font-size: 10px; margin-top: 4px; }
+
+.teso-insc-benef { border-top: 1px dashed rgba(255, 255, 255, 0.08); padding-top: 6px; }
+.teso-insc-benef summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; font-family: 'Oswald', sans-serif; font-size: 12px; color: #869bd8; }
+.teso-insc-benef summary::-webkit-details-marker { display: none; }
+.teso-insc-benef summary::before { content: '\25B8'; margin-right: 6px; }
+.teso-insc-benef[open] summary::before { content: '\25BE'; }
+.teso-insc-benef[open] summary { margin-bottom: 8px; }
+.teso-insc-benef .teso-inputs-row { margin-bottom: 8px; }
+.teso-insc-benef [hidden] { display: none !important; }
+.teso-insc-fila-motivo label { display: block; font-size: 12px; color: #a9bce8; margin-bottom: 4px; }
+.teso-insc-benef .in-insc-benef-motivo { max-width: 100% !important; text-align: left !important; font-size: 13px !important; font-weight: normal !important; }
+
+/* Recaudación por Fecha (solo Coordinador) */
+.teso-recaud-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.teso-recaud-titulo {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.teso-recaud-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    color: #a9bce8;
+}
+
+.teso-recaud-fila strong { font-size: 14px; color: #ffffff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.teso-recaud-fila strong.teso-recaud-ingreso { color: #4ade80; }
+.teso-recaud-fila strong.teso-recaud-egreso { color: #f43f5e; }
+.teso-recaud-neto { border-top: 1px dashed rgba(255, 255, 255, 0.12); padding-top: 8px; }
+.teso-recaud-neto span { color: #ffffff; font-weight: bold; }
+.teso-recaud-bonif { color: #f2c00e; font-size: 11px; }
+.teso-recaud-bonif span:last-child { white-space: nowrap; }
+.teso-recaud-sueltos { margin: 2px 0 6px; padding: 6px 8px; border: 1px dashed rgba(242, 192, 14, 0.4); border-radius: 3px; }
+.teso-recaud-sueltos .teso-nota { margin: 0 0 4px; }
+.teso-recaud-suelto { font-size: 11px; }
+.teso-recaud-suelto span { overflow-wrap: anywhere; }
+.teso-recaud-suelto strong { font-size: 12px; color: #f2c00e; }
+
+.teso-recaud-total { border-color: #f2c00e !important; }
+.teso-recaud-total-titulo { font-family: 'Michroma', sans-serif; font-size: 13px; color: #f2c00e; text-transform: uppercase; }
+.teso-recaud-total .teso-recaud-neto strong { font-family: 'Michroma', sans-serif; font-size: 15px; }
+
 .teso-avisos-partido {
     display: flex;
     flex-direction: column;
@@ -4468,6 +4538,27 @@ body.auth-pendiente .auth-gate {
     font-size: 12px;
     margin-top: 6px;
     letter-spacing: 2px;
+}
+
+.staff-bienvenida {
+    font-family: 'Michroma', sans-serif;
+    font-size: 20px;
+    color: #ffffff;
+    letter-spacing: 1px;
+    margin: 18px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.staff-bienvenida-nombre {
+    color: #2edae3;
+    text-shadow: 0 0 10px rgba(46, 218, 227, 0.35);
+}
+
+@media (max-width: 480px) {
+    .staff-bienvenida {
+        font-size: 16px;
+        margin-top: 14px;
+    }
 }
 
 .staff-nav {

@@ -1756,11 +1756,10 @@ document.addEventListener('liga:datos-listos', () => {
                     }
 
                     // 4. Calculamos cuál es la fecha más reciente de su fixture
-                    // Preferimos fechas de temporada regular: el selector de fechas del
-                    // fixture (.btn-fecha-select) sólo tiene botones 1-7, no para los
-                    // códigos de playoff (108/104/102/100, que además son más altos que
-                    // cualquier fecha real y "ganaban" siempre en el Math.max). Si el
-                    // equipo sólo jugó playoffs, usamos esos partidos igual como fallback.
+                    // Preferimos fechas de temporada regular: los códigos de playoff
+                    // (108/104/102/100) son más altos que cualquier fecha real y "ganaban"
+                    // siempre en el Math.max. Si el equipo sólo jugó playoffs, usamos esos
+                    // partidos igual como fallback.
                     const partidosRegularesDelEquipo = partidosDelEquipo.filter(p => !p.esPlayoff);
                     const fechasParaCalcular = partidosRegularesDelEquipo.length > 0 ? partidosRegularesDelEquipo : partidosDelEquipo;
                     const ultimaFecha = Math.max(...fechasParaCalcular.map(p => p.fecha));

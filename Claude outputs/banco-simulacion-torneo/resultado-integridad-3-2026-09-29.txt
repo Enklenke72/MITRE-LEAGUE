@@ -8,13 +8,13 @@ PASS La sanción automática sigue siendo una sola y apunta a la clave nueva  �
 
 === Goles calculados desde los partidos ===
 PASS Goleadores: salen de los partidos (Carla, de un partido viejo sin id, por su dorsal)  → ["Ana Uno:2","Beto Dos:1","Carla Tres:1"]
-PASS En Firestore el goleador va con código, no con DNI  → "j3yNvnjnY3bzMjtMh"
+PASS En Firestore el goleador va con código, no con DNI  → "jkbhabw3UBnF4iHkG"
 PASS El panel lo vuelve a ver con el DNI real
 PASS Al borrar un partido, sus goles desaparecen de la tabla (antes el contador los dejaba)  → ["Ana Uno:2","Carla Tres:1"]
 
 === Renombrar un equipo no le borra los pagos ===
 PASS Tesorería del partido: el equipo renombrado conserva su pago de $30.000  → "30000"
-PASS Inscripción: el equipo renombrado conserva lo pagado ($9.000)  → "Rojo FC Campeón 2 jug. — Exigido $6,000 Pago Efectivo ($): Pago Transf. ($): Total pagado: $9,000 AL DÍA"
+PASS Inscripción: el equipo renombrado conserva lo pagado ($9.000)  → "Rojo FC Campeón 2 jug. — Exigido $6,000 Pago Efectivo ($): Pago Transf. ($): Total pagado: $9,000 A favor $3,000 Benefic"
 
 === Dos paneles marcan la misma ausencia: una sola sanción ===
 PASS Una sola sanción automática, con id fijo derivado de la clave  → [1004380498269643]

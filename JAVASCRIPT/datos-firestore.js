@@ -15,6 +15,8 @@
 // asistencia, tarjetas y sanciones va un código (HMAC del DNI con una sal que
 // solo lee el staff). El panel lo vuelve a traducir a DNI al cargar, así que
 // admin.js sigue viendo DNIs; la web pública solo compara códigos entre sí.
+// La web pública no lee esas colecciones: lee "resumen", unos pocos documentos que el panel
+// arma con copia de todo lo público (ver RESUMEN).
 
 import { cargarFirestore } from './firebase-sdk.js';
 
@@ -41,14 +43,30 @@ const ESQUEMA = [
     { clave: 'liga_formato_torneo', tipo: 'config', col: 'config', id: 'formato', nivel: 'publico' },
     { clave: 'liga_playoffs_config', tipo: 'config', col: 'config', id: 'playoffs', nivel: 'publico' },
     { clave: 'liga_playoffs_publicados', tipo: 'config', col: 'config', id: 'playoffsPublicados', nivel: 'publico' },
+    { clave: 'liga_fechas_grupos', tipo: 'config', col: 'config', id: 'fechasGrupos', nivel: 'publico' },
     { clave: 'liga_avisos_staff', tipo: 'lista', col: 'avisosStaff', nivel: 'staff' },
     { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
-    { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'staff' },
-    { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configStaff', id: 'valorInscripcion', nivel: 'staff' },
+    { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },
+    { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configCoordinador', id: 'valorInscripcion', nivel: 'coordinador' },
     { clave: 'liga_egresos', tipo: 'lista', col: 'egresos', nivel: 'coordinador' },
     { clave: 'liga_caja_movimientos', tipo: 'lista', col: 'cajaMovimientos', nivel: 'coordinador', escribeStaff: true },
     { clave: 'liga_calculadora_arancel', tipo: 'config', col: 'configCoordinador', id: 'calculadoraArancel', nivel: 'coordinador' }
 ];
+
+// El plan gratuito de Firebase corta a las 50.000 lecturas por día y cada documento leído cuenta:
+// con una por partido, equipo, sanción, etc., una visita costaba ~250. Cada sección del resumen es
+// un documento con esas colecciones como texto JSON (sin tope de campos ni índices), así que una
+// visita lee 4.
+const RESUMEN = {
+    equipos: ['equipos'],
+    partidos: ['partidos'],
+    tribunal: ['sanciones'],
+    general: ['noticias', 'albumes', 'sponsors', 'notificaciones', 'crucesPlayoffs', 'config']
+};
+const VERSION_RESUMEN = 1;
+const TOPE_RESUMEN = 900000;
+// Como mucho una publicación cada 10 s por sección: tildar la lista de buena fe no la reescribe en cada clic.
+const ESPERA_RESUMEN_MS = 10000;
 
 let fs = null;
 let rolActual = 'publico';
@@ -57,6 +75,8 @@ const codigoPorDni = new Map();
 const dniPorCodigo = new Map();
 // Último estado conocido de cada colección, tal como está en Firestore (con códigos, no DNIs).
 const cache = new Map();
+// Última respuesta de cada escucha (en el panel incluye lo que cargaron otros, aunque no se aplique).
+let vigente = {};
 let colaEscritura = Promise.resolve();
 
 function memoria(nombre) {
@@ -326,12 +346,13 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
     if (rol !== 'publico') await prepararClaveDni();
 
     const defs = ESQUEMA.filter(puedeLeer);
+    if (rol === 'publico' && await cargarDesdeResumen(defs)) return;
     const defsEquipos = defs.filter(d => d.tipo === 'equipos');
     const otras = defs.filter(d => d.tipo !== 'equipos');
     const esPanel = rol !== 'publico';
-    // Última respuesta de cada escucha: si algo cambia mientras se termina la carga inicial,
-    // la carga usa lo más nuevo en vez de pisarlo con la respuesta anterior.
-    const vigente = {};
+    // Si algo cambia mientras se termina la carga inicial, la carga usa lo más nuevo de vigente
+    // en vez de pisarlo con la respuesta anterior.
+    vigente = {};
     let cargaHecha = false;
     const docsPrivados = () => (vigente.equiposPrivado ? vigente.equiposPrivado.docs : null);
 
@@ -339,6 +360,7 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
         vigente[clave] = snap;
         if (!cargaHecha) return;
         if (esPanel) {
+            programarResumen();
             if (alCambiarAjeno && difiereDeLoConocido(col, def, snap)) alCambiarAjeno();
         } else if (def) {
             aplicar(def, snap);
@@ -362,6 +384,139 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
     aplicarEquipos(defsEquipos, vigente.equipos.docs, docsPrivados());
     otras.forEach(def => aplicar(def, vigente[def.clave]));
     cargaHecha = true;
+    if (esPanel) {
+        revisarResumen();
+        const publicarAlSalir = () => { if (seccionesPendientes.size) publicarResumen(); };
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') publicarAlSalir(); });
+        window.addEventListener('pagehide', publicarAlSalir);
+    }
+}
+
+// ------------------------------------------------------------
+// Resumen para la web pública
+// ------------------------------------------------------------
+function seccionDe(col) {
+    return Object.keys(RESUMEN).find(s => RESUMEN[s].includes(col));
+}
+
+// Contenido de una sección según lo último que escuchó el panel (lo que cargaron otros y lo propio
+// aún sin confirmar). null si algo viene de la copia del dispositivo (sin señal): podría estar vieja.
+function armarResumen(seccion) {
+    const colecciones = {};
+    for (const col of RESUMEN[seccion]) {
+        const snaps = col === 'equipos' ? [vigente.equipos] : ESQUEMA.filter(d => d.col === col).map(d => vigente[d.clave]);
+        const docs = {};
+        for (const snap of snaps) {
+            if (!snap || snap.metadata.fromCache) return null;
+            if (snap.docs) snap.docs.forEach(d => { docs[d.id] = d.data(); });
+            else if (snap.exists()) docs[snap.id] = snap.data();
+        }
+        colecciones[col] = docs;
+    }
+    return colecciones;
+}
+
+function documentoResumen(colecciones) {
+    const datos = JSON.stringify(colecciones);
+    return new Blob([datos]).size > TOPE_RESUMEN ? { v: VERSION_RESUMEN, demasiadoGrande: true } : { v: VERSION_RESUMEN, datos };
+}
+
+const seccionesPendientes = new Set();
+let temporizadorResumen = null;
+
+function programarResumen(seccion) {
+    if (seccion) seccionesPendientes.add(seccion);
+    if (!temporizadorResumen && seccionesPendientes.size) temporizadorResumen = setTimeout(publicarResumen, ESPERA_RESUMEN_MS);
+}
+
+// Lo que no se puede armar (sin señal) queda pendiente y se reintenta con la próxima respuesta del servidor.
+function publicarResumen() {
+    clearTimeout(temporizadorResumen);
+    temporizadorResumen = null;
+    const { db, fsSdk } = fs;
+    [...seccionesPendientes].forEach(seccion => {
+        const colecciones = armarResumen(seccion);
+        if (!colecciones) return;
+        seccionesPendientes.delete(seccion);
+        const documento = documentoResumen(colecciones);
+        if (documento.demasiadoGrande) console.warn(`[Datos] El resumen "${seccion}" pasa el tope: la web pública va a leer las colecciones una por una.`);
+        fsSdk.setDoc(fsSdk.doc(db, 'resumen', seccion), documento)
+            .catch(error => console.warn(`[Datos] No se pudo publicar el resumen "${seccion}" (¿reglas sin actualizar?):`, error));
+    });
+}
+
+// Al abrir el panel se corrige un resumen que no coincide con los datos: todavía no existe, lo dejó
+// atrás un panel viejo o se cerró el panel antes de publicar.
+async function revisarResumen() {
+    const { db, fsSdk } = fs;
+    await Promise.all(Object.keys(RESUMEN).map(async seccion => {
+        let guardado;
+        try {
+            const snap = await fsSdk.getDoc(fsSdk.doc(db, 'resumen', seccion));
+            guardado = snap.exists() ? snap.data() : null;
+        } catch (error) {
+            console.warn(`[Datos] No se pudo leer el resumen "${seccion}" (¿reglas sin actualizar?):`, error);
+            return;
+        }
+        const colecciones = armarResumen(seccion);
+        const documento = colecciones && documentoResumen(colecciones);
+        const coincide = documento && guardado && guardado.v === documento.v && !!guardado.demasiadoGrande === !!documento.demasiadoGrande &&
+            (documento.demasiadoGrande || textoEstable(JSON.parse(guardado.datos || 'null')) === textoEstable(colecciones));
+        if (!coincide) programarResumen(seccion);
+    }));
+}
+
+function docsDeResumen(docs) {
+    return Object.entries(docs || {}).map(([id, datos]) => ({ id, data: () => datos }));
+}
+
+function aplicarResumen(defs, colecciones) {
+    const claves = [];
+    if (colecciones.equipos) {
+        const defsEquipos = defs.filter(d => d.tipo === 'equipos');
+        aplicarEquipos(defsEquipos, docsDeResumen(colecciones.equipos), null);
+        defsEquipos.forEach(d => claves.push(d.clave));
+    }
+    defs.filter(d => d.tipo !== 'equipos' && colecciones[d.col]).forEach(def => {
+        const docs = colecciones[def.col];
+        if (def.tipo === 'config') aplicarConfig(def, { exists: () => def.id in docs, data: () => docs[def.id] });
+        else aplicarLista(def, { docs: docsDeResumen(docs) });
+        claves.push(def.clave);
+    });
+    return claves;
+}
+
+// false si el resumen no está disponible (ningún panel lo publicó todavía, reglas sin actualizar o una
+// sección demasiado pesada): entonces se leen las colecciones una por una, como antes.
+async function cargarDesdeResumen(defs) {
+    const { db, fsSdk } = fs;
+    const secciones = Object.keys(RESUMEN);
+    const ultimas = {};
+    const cancelar = [];
+    let activo = false;
+    const contenido = snap => {
+        const d = snap.exists() ? snap.data() : null;
+        return d && d.v === VERSION_RESUMEN && d.datos ? JSON.parse(d.datos) : null;
+    };
+    await Promise.all(secciones.map(seccion => new Promise(resolve => {
+        cancelar.push(fsSdk.onSnapshot(fsSdk.doc(db, 'resumen', seccion), snap => {
+            const primera = !(seccion in ultimas);
+            ultimas[seccion] = contenido(snap);
+            if (primera) resolve();
+            else if (activo && ultimas[seccion]) avisarActualizacion(aplicarResumen(defs, ultimas[seccion]));
+        }, () => {
+            if (seccion in ultimas) return;
+            ultimas[seccion] = null;
+            resolve();
+        }));
+    })));
+    if (secciones.some(s => !ultimas[s])) {
+        cancelar.forEach(f => f());
+        return false;
+    }
+    aplicarResumen(defs, Object.assign({}, ...secciones.map(s => ultimas[s])));
+    activo = true;
+    return true;
 }
 
 // ------------------------------------------------------------
@@ -555,6 +710,7 @@ async function guardar(def, valor) {
     else if (def.tipo === 'mapa') planMapa(def, JSON.parse(valor) || {}, ops);
     else planConfig(def, valor, ops);
     enviar(ops);
+    new Set(ops.map(op => seccionDe(op.col)).filter(Boolean)).forEach(programarResumen);
 }
 
 export function activarGuardado() {

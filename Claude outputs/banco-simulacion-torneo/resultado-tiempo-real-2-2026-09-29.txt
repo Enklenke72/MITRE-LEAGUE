@@ -23,14 +23,14 @@ PASS El panel 1 NO se avisa a sí mismo por su propio guardado
 PASS El panel 2 sigue con la versión vieja del partido (sin resultado)
 PASS Varios tildados seguidos no reescriben el resumen en cada clic (una publicación por panel)  → {"publicaciones":2}
 PASS El guardado del panel desactualizado NO borró el resultado  → {"jugado":true,"gl":3,"gv":1}
-PASS Quedaron los dos tildados (uno de cada panel), guardados con código y no con DNI  → ["jadB3nh8zWrDtGTYf","jCwdctcomTsOoQDFD"]
+PASS Quedaron los dos tildados (uno de cada panel), guardados con código y no con DNI  → ["jP3fuUdnIlKKpB2hJ","jtbugjEhnkeC-R7Y6"]
 PASS Ahora el panel 1 también ve el aviso (el tilde lo hizo el panel 2)
 PASS El perfil abierto en la web ya muestra 1 PJ para los dos tildados  → ["Ana Uno:1","Beto Dos:1"]
 
 === Aviso y Tribunal en vivo ===
 PASS La campanita muestra el aviso nuevo y prende el puntito, sin recargar
 PASS El Tribunal abierto muestra la sanción nueva, sin recargar
-PASS La web pública nunca recibe DNIs (ni en sanciones ni en planteles)  → "jmahvO0f2TUVOxqYV"
+PASS La web pública nunca recibe DNIs (ni en sanciones ni en planteles)  → "j724iW7f62-a-lHWH"
 
 === Cerrar el panel enseguida después de guardar ===
 PASS Si el panel se cierra antes de los 10 s, publica el resumen al salir
