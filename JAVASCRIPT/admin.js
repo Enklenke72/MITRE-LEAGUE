@@ -457,6 +457,69 @@ document.addEventListener('liga:datos-listos', () => {
         });
     }
 
+    // Al rearmar Local/Visitante (cambio de fecha, grupo o ciclo) se conservan los equipos elegidos si
+    // siguen disponibles. Si no: en un partido nuevo, los primeros de la lista como siempre; editando uno,
+    // ese lado queda vacío y hay que elegirlo (no se cambia un equipo sin que el staff lo vea).
+    function restaurarEquiposElegidos(nombres, previoLocal, previoVisitante) {
+        const disponible = n => !!n && nombres.includes(n);
+        let local = disponible(previoLocal) ? previoLocal : null;
+        let visita = disponible(previoVisitante) && previoVisitante !== local ? previoVisitante : null;
+        if (idPartidoEnEdicion === null) {
+            if (local === null) local = nombres.find(n => n !== visita) || null;
+            if (visita === null) visita = nombres.find(n => n !== local) || null;
+            if (local !== null) localSelect.value = local;
+            if (visita !== null) visitanteSelect.value = visita;
+            return;
+        }
+        // Editando: si un lado quedó vacío (por ejemplo, se pasó por otro grupo y se volvió), vuelve el equipo del partido.
+        const editado = partidos.find(p => p.id === idPartidoEnEdicion);
+        if (local === null && editado && disponible(editado.local) && editado.local !== visita) local = editado.local;
+        if (visita === null && editado && disponible(editado.visitante) && editado.visitante !== local) visita = editado.visitante;
+        [[localSelect, local], [visitanteSelect, visita]].forEach(([select, valor]) => {
+            if (valor !== null) { select.value = valor; return; }
+            select.insertAdjacentHTML('afterbegin', '<option value="">-- Elegí el equipo --</option>');
+            select.value = '';
+        });
+        alinearCamposConEquipos();
+    }
+
+    // Campos que dependen del lado. equiposDeLosCampos dice a qué equipo corresponde hoy cada lado de
+    // esos campos: si los dos equipos se invierten, los campos se van con su equipo (el marcador, los
+    // goleadores y las tarjetas de cada equipo siguen siendo los mismos).
+    const CAMPOS_POR_LADO = [
+        ['goles-local', 'goles-visitante'], ['penales-local', 'penales-visitante'],
+        ['dorsales-goles-local', 'dorsales-goles-visitante'],
+        ['dorsales-amarillas-local', 'dorsales-amarillas-visitante'], ['dorsales-rojas-local', 'dorsales-rojas-visitante']
+    ];
+    let equiposDeLosCampos = null;
+
+    function alinearCamposConEquipos() {
+        if (!equiposDeLosCampos || !localSelect || !visitanteSelect || !localSelect.value || localSelect.value === visitanteSelect.value) return;
+        if (equiposDeLosCampos.local !== visitanteSelect.value || equiposDeLosCampos.visitante !== localSelect.value) return;
+        CAMPOS_POR_LADO.forEach(([idA, idB]) => {
+            const a = document.getElementById(idA), b = document.getElementById(idB);
+            if (a && b) [a.value, b.value] = [b.value, a.value];
+        });
+        equiposDeLosCampos = { local: localSelect.value, visitante: visitanteSelect.value };
+    }
+
+    // Elegir en un lado al equipo que estaba del otro los intercambia, con sus campos.
+    [[localSelect, visitanteSelect], [visitanteSelect, localSelect]].forEach(([select, otro]) => {
+        if (!select || !otro) return;
+        select.addEventListener('focus', () => { select.dataset.previo = select.value; });
+        select.addEventListener('change', () => {
+            const previo = select.dataset.previo || '';
+            if (select.value && select.value === otro.value && previo && [...otro.options].some(o => o.value === previo)) {
+                if (!equiposDeLosCampos) {
+                    equiposDeLosCampos = select === localSelect ? { local: previo, visitante: select.value } : { local: select.value, visitante: previo };
+                }
+                otro.value = previo;
+            }
+            alinearCamposConEquipos();
+            select.dataset.previo = select.value;
+        });
+    });
+
     // Filtrar Equipos según Grupo en Fase Regular
     function filtrarEquiposPorGrupo() {
         recargarPools();
@@ -466,6 +529,7 @@ document.addEventListener('liga:datos-listos', () => {
         const filtrados = pool.filter(e => e.grupo === grupo);
 
         if (!localSelect || !visitanteSelect) return;
+        const previoLocal = localSelect.value, previoVisitante = visitanteSelect.value;
 
         localSelect.innerHTML = '';
         visitanteSelect.innerHTML = '';
@@ -481,7 +545,7 @@ document.addEventListener('liga:datos-listos', () => {
             visitanteSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
         });
 
-        if (visitanteSelect.options.length > 1) visitanteSelect.selectedIndex = 1;
+        restaurarEquiposElegidos(filtrados.map(e => e.nombre), previoLocal, previoVisitante);
     }
 
     // Filtrar Equipos para Cruces Libres en Playoffs
@@ -496,6 +560,7 @@ document.addEventListener('liga:datos-listos', () => {
         const pool = ciclo === 'superior' ? poolSuperior : poolBasico;
 
         if (!localSelect || !visitanteSelect) return;
+        const previoLocal = localSelect.value, previoVisitante = visitanteSelect.value;
 
         localSelect.innerHTML = '';
         visitanteSelect.innerHTML = '';
@@ -549,7 +614,7 @@ document.addEventListener('liga:datos-listos', () => {
             visitanteSelect.innerHTML += pendiente;
         }
 
-        if (equipos.length > 1) visitanteSelect.selectedIndex = 1;
+        restaurarEquiposElegidos(equipos.map(e => e.nombre), previoLocal, previoVisitante);
     }
 
     // Detección de Modo Regular vs Modo Playoffs en el Formulario
@@ -610,6 +675,7 @@ document.addEventListener('liga:datos-listos', () => {
             const [eqLocal, eqVisita] = e.target.value.split('|');
             if (localSelect) localSelect.value = eqLocal;
             if (visitanteSelect) visitanteSelect.value = eqVisita;
+            alinearCamposConEquipos();
         });
     }
 
@@ -708,6 +774,7 @@ document.addEventListener('liga:datos-listos', () => {
                 const p = partidos.find(part => part.id === idEditar);
                 if (p) {
                     idPartidoEnEdicion = p.id;
+                    equiposDeLosCampos = null;
                     if (cicloSelect) cicloSelect.value = p.ciclo;
                     armarOpcionesFechaPartido(p.fecha);
                     actualizarOpcionesGrupo();
@@ -744,6 +811,7 @@ document.addEventListener('liga:datos-listos', () => {
                     document.getElementById('dorsales-rojas-local').value = dorsalesDeIds(p.rojasLocal, equipoEdLocal);
                     document.getElementById('dorsales-amarillas-visitante').value = dorsalesDeIds(p.amarillasVisitante, equipoEdVisita);
                     document.getElementById('dorsales-rojas-visitante').value = dorsalesDeIds(p.rojasVisitante, equipoEdVisita);
+                    equiposDeLosCampos = { local: p.local, visitante: p.visitante };
 
                     if (submitBtnPartido) {
                         submitBtnPartido.textContent = 'Actualizar Partido';
@@ -796,6 +864,7 @@ document.addEventListener('liga:datos-listos', () => {
 
     function cancelarEdicionPartido() {
         idPartidoEnEdicion = null;
+        equiposDeLosCampos = null;
 
         // El staff carga varios partidos seguidos de la misma fecha, ciclo, grupo y día.
         // Conservamos ese contexto y limpiamos sólo lo que cambia de un partido al otro
@@ -848,6 +917,7 @@ document.addEventListener('liga:datos-listos', () => {
     if (formPartido) {
         formPartido.addEventListener('submit', (e) => {
             e.preventDefault();
+            alinearCamposConEquipos();
 
             const localInput = localSelect.value;
             const visitanteInput = visitanteSelect ? visitanteSelect.value : "";
@@ -855,6 +925,11 @@ document.addEventListener('liga:datos-listos', () => {
             const golesVisitanteInput = document.getElementById('goles-visitante').value;
             const ciclo = cicloSelect.value;
             const fechaVal = parseInt(inputFechaPartido.value);
+
+            if (!localInput || !visitanteInput) {
+                alert('Elegí el equipo local y el visitante del partido.');
+                return;
+            }
 
             if (localInput === visitanteInput) {
                 alert('¡Un equipo no puede jugar contra sí mismo!');
@@ -943,9 +1018,21 @@ document.addEventListener('liga:datos-listos', () => {
             const arrayGolesVisita = esJugado ? procesarDorsales(dorsalesVisitaTxt, eqVisitanteObj, eqLocalObj ? eqLocalObj.nombre : localInput) : [];
 
             const partidoPrevio = idPartidoEnEdicion !== null ? partidos.find(p => p.id === idPartidoEnEdicion) : null;
+            // De qué lado estaba cada equipo en el partido guardado ('Local', 'Visitante' o null si es nuevo en el partido).
+            const ladoPrevioDe = equipo => {
+                if (!partidoPrevio || !equipo) return null;
+                const coincide = lado => {
+                    const id = buscarEquipoIdTeso(partidoPrevio, lado);
+                    if (id != null) return id === equipo.id;
+                    return ((lado === 'local' ? partidoPrevio.local : partidoPrevio.visitante) || '').trim().toLowerCase() === equipo.nombre.trim().toLowerCase();
+                };
+                return coincide('local') ? 'Local' : (coincide('visita') ? 'Visitante' : null);
+            };
+            const ladoPrevioLocal = ladoPrevioDe(eqLocalObj), ladoPrevioVisitante = ladoPrevioDe(eqVisitanteObj);
+            const invertido = ladoPrevioLocal === 'Visitante' && ladoPrevioVisitante === 'Local';
             const conservaResultadoAuto = !!(partidoPrevio && partidoPrevio.resultadoAuto && esJugado
-                && parseInt(golesLocalInput) === partidoPrevio.golesLocal
-                && parseInt(golesVisitanteInput) === partidoPrevio.golesVisitante);
+                && parseInt(golesLocalInput) === partidoPrevio[invertido ? 'golesVisitante' : 'golesLocal']
+                && parseInt(golesVisitanteInput) === partidoPrevio[invertido ? 'golesLocal' : 'golesVisitante']);
 
             const datosPartido = {
                 fecha: fechaVal,
@@ -981,6 +1068,13 @@ document.addEventListener('liga:datos-listos', () => {
                 jugado: esJugado,
                 resultadoAuto: conservaResultadoAuto
             };
+
+            // La lista de buena fe (y de ahí los PJ) es de cada equipo: se va con él si cambia de lado, y la de un
+            // equipo que deja el partido se descarta (como su entrada de Tesorería).
+            if (partidoPrevio) {
+                datosPartido.asistentesLocal = ladoPrevioLocal ? [...(partidoPrevio['asistentes' + ladoPrevioLocal] || [])] : [];
+                datosPartido.asistentesVisitante = ladoPrevioVisitante ? [...(partidoPrevio['asistentes' + ladoPrevioVisitante] || [])] : [];
+            }
 
             if (idPartidoEnEdicion !== null) {
                 partidos = partidos.map(p => p.id === idPartidoEnEdicion ? { ...p, ...datosPartido } : p);

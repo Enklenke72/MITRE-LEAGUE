@@ -1969,8 +1969,8 @@ async function partidosYFechas() {
         && clavesDe(pM.id).length === 2 && cierra(n2) && n2.totalTeso === n0.totalTeso,
         'Invertir local y visitante: los pagos y la asistencia siguen a cada equipo (buscado por id, no por lado)', { claves: clavesDe(pM.id), n2 });
     const dniTildado = jug(A, 5).dni;
-    out('  info (para el reporte): tras invertir, la lista de buena fe tiene al jugador de ' + A + ' en asistentesLocal=' + (pSw.asistentesLocal || []).includes(dniTildado)
-        + ' / asistentesVisitante=' + (pSw.asistentesVisitante || []).includes(dniTildado) + ' (' + A + ' ahora es visitante)');
+    check(!(pSw.asistentesLocal || []).includes(dniTildado) && (pSw.asistentesVisitante || []).includes(dniTildado),
+        'Invertir local y visitante: el jugador tildado de ' + A + ' pasa a la lista del lado visitante (su equipo)', { local: pSw.asistentesLocal, visitante: pSw.asistentesVisitante });
 
     // 4) Sacar del partido a un equipo con plata: se bloquea y no cambia nada
     const antesBloqueo = JSON.stringify({ p: porId(pM.id), t: clavesDe(pM.id).map(k => [k, teso()[k]]) });
@@ -2131,6 +2131,148 @@ async function partidosYFechas() {
     check(!porId(p9.id) && JSON.stringify(LS('liga_fechas_grupos')) === '{"superior":7,"basico":7}', 'Limpieza: partido de la Fecha 9 borrado y configuración de vuelta en 7/7');
 }
 
+// ---------------- Editar partidos: invertir local y visitante, y conservar los equipos (29/09/2026) ----------------
+async function invertirYConservarEquipos() {
+    out('\n=== EDITAR UN PARTIDO: invertir local y visitante, y conservar los equipos al cambiar fecha o grupo ===');
+    const [A, B, C, E] = SUP.A; // 4to 1ra, 5to 2da, 6to 3ra, 7mo 1ra
+    const porId = id => (LS('liga_partidos') || []).find(p => p.id === id);
+    const fsPartido = id => ((JSON.parse(localStorage.getItem('fakefs') || '{}')).partidos || {})[String(id)] || {};
+    const ordenado = a => (a || []).slice().sort().join();
+    const dnis = (eq, ds) => ds.map(d => jug(eq, d).dni).sort().join();
+    const statsWeb = async equipos => {
+        await cargar('index.html');
+        const res = {};
+        for (const equipo of equipos) {
+            D().querySelector('.tabs-sup .tab-btn[data-grupo-val="A"]').click();
+            const celda = [...D().querySelectorAll('.td-team-name')].find(c => c.textContent.trim() === equipo);
+            celda.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            [...D().querySelectorAll('#modal-equipo-tbody-jugadores tr')].forEach(tr => {
+                res[equipo + ' | ' + tr.cells[2].textContent.trim()] = [3, 4, 5, 6].map(i => +tr.cells[i].textContent).join('/');
+            });
+            D().getElementById('modal-equipo').classList.add('seccion-oculta');
+        }
+        return res;
+    };
+    const editarDeNuevo = async id => {
+        await tab('sec-jornada');
+        setv('filtro-fecha-cronograma-admin', 'todas');
+        editarPartido(porId(id));
+    };
+
+    // Preparación: B 3-1 E en la Fecha 6, con lista de buena fe, goleadores y tarjetas en los dos lados
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    await crearPartido(6, 'superior', 'A', B, E, 0);
+    const pI = P(6, B, E);
+    // Un jugador suspendido por las fases anteriores no se puede tildar: se eligen 4 que no lo estén.
+    const suspendidos = (LS('liga_sanciones') || []).filter(s => s.tipo === 'Sanción Disciplinaria').map(s => String(s.jugadorId));
+    const libres = eq => [1, 5, 7, 9, 10, 11].filter(d => !suspendidos.includes(jug(eq, d).dni)).slice(0, 4);
+    const tildB = libres(B), tildE = libres(E);
+    const dnisOrig = dnis;
+    const dnisTild = eq => dnisOrig(eq, eq === B ? tildB : tildE);
+    await abrirTeso(6);
+    await tildar(pI.id, 'local', tildB.map(d => jug(B, d).dni));
+    await tildar(pI.id, 'visita', tildE.map(d => jug(E, d).dni));
+    await editarDeNuevo(pI.id);
+    setv('goles-local', '3', false); setv('goles-visitante', '1', false);
+    setv('dorsales-goles-local', '5, 5, 7', false); setv('dorsales-goles-visitante', '9', false);
+    setv('dorsales-amarillas-local', '1', false); setv('dorsales-rojas-visitante', '5', false);
+    await enviar('form-partido'); await esperar(300);
+    const base = porId(pI.id);
+    check(base.jugado && base.golesLocal === 3 && ordenado(base.asistentesLocal) === dnisTild(B) && ordenado(base.asistentesVisitante) === dnisTild(E)
+        && base.goleadoresLocal.reduce((a, g) => a + g.cantidad, 0) === 3 && base.rojasVisitante.join() === jug(E, 5).dni,
+        'Preparación: ' + B + ' 3-1 ' + E + ' con 4 tildados por lado, goleadores y tarjetas', { goles: [base.golesLocal, base.golesVisitante] });
+    const fsAntes = fsPartido(pI.id);
+    const statsAntes = await statsWeb([B, E]);
+
+    // 1) Invertir desde el formulario: elegir de Local al que era Visitante
+    await cargar('admin.html');
+    await editarDeNuevo(pI.id);
+    const sl = el('partido-local');
+    sl.dispatchEvent(new Event('focus'));
+    sl.value = E; sl.dispatchEvent(new Event('change', { bubbles: true }));
+    const form = {
+        visitante: el('partido-visitante').value, gl: el('goles-local').value, gv: el('goles-visitante').value,
+        dl: el('dorsales-goles-local').value, dv: el('dorsales-goles-visitante').value,
+        al: el('dorsales-amarillas-local').value, av: el('dorsales-amarillas-visitante').value, rl: el('dorsales-rojas-local').value, rv: el('dorsales-rojas-visitante').value
+    };
+    check(form.visitante === B && form.gl === '1' && form.gv === '3' && form.dl === '9' && form.dv === '5, 5, 7' && form.al === '' && form.av === '1' && form.rl === '5' && form.rv === '',
+        'Formulario: elegir de Local al que era Visitante los intercambia, y el marcador, los goleadores y las tarjetas se van con cada equipo', form);
+    await enviar('form-partido'); await esperar(300);
+    const sw = porId(pI.id);
+    const golesDeLado = (lista, eq, d) => (lista || []).filter(g => g.id === jug(eq, d).dni).reduce((a, g) => a + g.cantidad, 0);
+    check(sw.local === E && sw.visitante === B && sw.golesLocal === 1 && sw.golesVisitante === 3
+        && ordenado(sw.asistentesLocal) === dnisTild(E) && ordenado(sw.asistentesVisitante) === dnisTild(B)
+        && golesDeLado(sw.goleadoresLocal, E, 9) === 1 && golesDeLado(sw.goleadoresVisitante, B, 5) === 2 && golesDeLado(sw.goleadoresVisitante, B, 7) === 1
+        && sw.amarillasVisitante.join() === jug(B, 1).dni && sw.rojasLocal.join() === jug(E, 5).dni && sw.amarillasLocal.length === 0 && sw.rojasVisitante.length === 0,
+        'Guardado invertido: marcador 1-3 (el de cada equipo) y lista de buena fe, goleadores y tarjetas del lado de su equipo',
+        { goles: [sw.golesLocal, sw.golesVisitante], goleadoresLocal: sw.goleadoresLocal, goleadoresVisitante: sw.goleadoresVisitante, amarillas: [sw.amarillasLocal, sw.amarillasVisitante], rojas: [sw.rojasLocal, sw.rojasVisitante] });
+    const fsDesp = fsPartido(pI.id);
+    check((fsDesp.asistentesLocal || []).length === 4 && ordenado(fsDesp.asistentesLocal) === ordenado(fsAntes.asistentesVisitante) && ordenado(fsDesp.asistentesVisitante) === ordenado(fsAntes.asistentesLocal),
+        'En Firestore las listas de buena fe (con códigos) también quedaron intercambiadas', { antes: [fsAntes.asistentesLocal, fsAntes.asistentesVisitante], despues: [fsDesp.asistentesLocal, fsDesp.asistentesVisitante] });
+    const statsDesp = await statsWeb([B, E]);
+    const cambiados = Object.keys(statsAntes).filter(k => statsAntes[k] !== statsDesp[k]);
+    check(Object.keys(statsAntes).length === 12 && statsAntes[B + ' | ' + jug(B, 5).nombre].split('/')[1] !== '0' && cambiados.length === 0 && Object.keys(statsDesp).length === 12,
+        'Web pública: PJ, goles y tarjetas de los 12 jugadores de los dos equipos quedan iguales después de invertir', { cambiados: cambiados.map(k => k + ': ' + statsAntes[k] + ' → ' + statsDesp[k]), ejemplo: statsDesp[B + ' | ' + jug(B, 5).nombre] });
+
+    // 2) Invertir de vuelta cambiando los dos equipos a mano (sin pasar por el intercambio del formulario)
+    await cargar('admin.html');
+    await editarDeNuevo(pI.id);
+    setv('partido-local', B, false); setv('partido-visitante', E, false);
+    await enviar('form-partido'); await esperar(300);
+    const back = porId(pI.id);
+    check(back.local === B && back.golesLocal === 3 && back.golesVisitante === 1 && ordenado(back.asistentesLocal) === dnisTild(B)
+        && golesDeLado(back.goleadoresLocal, B, 5) === 2 && back.amarillasLocal.join() === jug(B, 1).dni && back.rojasVisitante.join() === jug(E, 5).dni,
+        'Invertir eligiendo los dos equipos a mano: al guardar, los campos igual se van con su equipo (vuelve a 3-1 con todo en su lado)', { goles: [back.golesLocal, back.golesVisitante] });
+
+    // 3) Playoffs: invertir un partido jugado no toca el bracket ni el ganador
+    const pPo = (LS('liga_partidos') || []).find(p => p.esPlayoff && p.jugado && p.ronda !== 'final' && p.golesLocal !== p.golesVisitante);
+    if (pPo) {
+        const crucesAntes = JSON.stringify(LS('liga_cruces_playoffs'));
+        const confirmsAntes = confirms.length;
+        await editarDeNuevo(pPo.id);
+        setv('partido-local', pPo.visitante, false); setv('partido-visitante', pPo.local, false);
+        await enviar('form-partido'); await esperar(300);
+        const q = porId(pPo.id);
+        check(q.local === pPo.visitante && q.visitante === pPo.local && q.golesLocal === pPo.golesVisitante && q.golesVisitante === pPo.golesLocal
+            && q.penalesLocal === pPo.penalesVisitante && q.penalesVisitante === pPo.penalesLocal && JSON.stringify(LS('liga_cruces_playoffs')) === crucesAntes && confirms.length === confirmsAntes,
+            'Playoffs: invertir un partido jugado conserva el marcador y los penales de cada equipo, y el bracket no cambia', { antes: [pPo.local, pPo.golesLocal, pPo.golesVisitante, pPo.visitante], despues: [q.local, q.golesLocal, q.golesVisitante, q.visitante] });
+    } else {
+        out('  (no encontré un partido de playoffs jugado para invertir)');
+    }
+
+    // 4) Editando: cambiar la fecha conserva los equipos; un grupo donde no están los deja vacíos
+    await cargar('admin.html');
+    await editarDeNuevo(pI.id);
+    setv('partido-fecha', '7');
+    const conservaFecha = { local: el('partido-local').value, visitante: el('partido-visitante').value };
+    check(conservaFecha.local === B && conservaFecha.visitante === E, 'Editando: cambiar la Fecha conserva Local y Visitante (antes volvían a los dos primeros del grupo)', conservaFecha);
+    setv('partido-grupo-select', 'B');
+    const vacios = { local: el('partido-local').value, visitante: el('partido-visitante').value, primera: el('partido-local').options[0].textContent };
+    await enviar('form-partido'); await esperar(50);
+    check(vacios.local === '' && vacios.visitante === '' && vacios.primera === '-- Elegí el equipo --' && /Elegí el equipo local y el visitante/.test(ultimaAlerta())
+        && porId(pI.id).fecha === 6 && porId(pI.id).local === B,
+        'Editando: pasar a un grupo donde no están deja los dos lados en "-- Elegí el equipo --" y no deja guardar sin elegirlos', { vacios, alerta: ultimaAlerta() });
+    setv('partido-grupo-select', 'A');
+    const vuelven = { local: el('partido-local').value, visitante: el('partido-visitante').value };
+    check(vuelven.local === B && vuelven.visitante === E, 'Editando: volver al grupo del partido recupera sus equipos', vuelven);
+    setv('partido-fecha', '6');
+    await enviar('form-partido'); await esperar(200);
+    const final = porId(pI.id);
+    check(final.fecha === 6 && final.local === B && final.visitante === E && final.golesLocal === 3 && ordenado(final.asistentesLocal) === dnisTild(B),
+        'Después de pasear por otra fecha y otro grupo, el partido se guarda igual que estaba', { fecha: final.fecha, local: final.local, goles: [final.golesLocal, final.golesVisitante] });
+
+    // 5) Partido nuevo: cambiar la fecha conserva la elección; un grupo donde no están pone los primeros, como siempre
+    setv('partido-ciclo', 'superior'); setv('partido-fecha', '6'); setv('partido-grupo-select', 'A');
+    setv('partido-local', C, false); setv('partido-visitante', E, false);
+    setv('partido-fecha', '7');
+    const nuevoConserva = { local: el('partido-local').value, visitante: el('partido-visitante').value };
+    setv('partido-grupo-select', 'B');
+    const nuevoDefault = { local: el('partido-local').value, visitante: el('partido-visitante').value };
+    check(nuevoConserva.local === C && nuevoConserva.visitante === E && nuevoDefault.local === SUP.B[0] && nuevoDefault.visitante === SUP.B[1],
+        'Partido nuevo: cambiar la Fecha conserva los equipos elegidos; en un grupo donde no están se proponen los dos primeros, como antes', { nuevoConserva, nuevoDefault });
+}
+
 (async () => {
     try {
         planificar();
@@ -2155,6 +2297,7 @@ async function partidosYFechas() {
         await suspension30();
         await beneficiosYRecaudacion();
         await partidosYFechas();
+        await invertirYConservarEquipos();
         await tablaUnica();
     } catch (e) {
         out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
