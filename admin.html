@@ -7,6 +7,10 @@
     <title>Panel Staff - Mitre League</title>
     <link rel="stylesheet" href="estilo.css">
     <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
+    <link rel="manifest" href="manifest-staff.json">
+    <meta name="theme-color" content="#0a1d54">
+    <link rel="apple-touch-icon" href="Recursos/icono-app-apple-180.png">
+    <meta name="apple-mobile-web-app-title" content="ML Staff">
 </head>
 
 <body class="staff-page auth-pendiente">
@@ -49,6 +53,7 @@
         <button class="staff-tab-btn" data-target="sec-tesoreria">Tesorería & Aranceles</button>
         <button class="staff-tab-btn" data-target="sec-alertas">Avisos</button>
         <button class="staff-tab-btn" data-target="sec-avisos-staff">Avisos Internos</button>
+        <button class="staff-tab-btn solo-admin" data-target="sec-historial-cambios">Historial de Cambios</button>
         <a href="index.html" class="staff-tab-btn"
             style="text-decoration: none; border-color: #e11d48; color: #f43f5e;">← Volver a la Web</a>
     </nav>
@@ -1285,6 +1290,19 @@
             </section>
         </div>
 
+        <!-- MÓDULO: HISTORIAL DE CAMBIOS (solo Coordinador: qué cargó o cambió cada persona del staff) -->
+        <div id="sec-historial-cambios" class="staff-modulo seccion-oculta-staff solo-admin">
+            <section class="admin-card-panel">
+                <div class="historial-cabecera">
+                    <h3 class="historial-titulo">Historial de Cambios</h3>
+                    <button type="button" id="btn-vaciar-historial-cambios" class="historial-btn-vaciar">Vaciar Historial</button>
+                </div>
+                <p class="historial-ayuda">Resultados, pagos, beneficios, resoluciones del Tribunal y altas o bajas de
+                    jugadores, con quién los cargó y cuándo. Solo lo ve el Coordinador; el Staff no lo puede borrar.</p>
+                <div id="lista-historial-cambios"></div>
+            </section>
+        </div>
+
     </main>
 
     <script src="JAVASCRIPT/data.js"></script>
@@ -1293,6 +1311,7 @@
     <script src="JAVASCRIPT/cloudinary-config.js"></script>
     <script src="JAVASCRIPT/admin.js"></script>
     <script type="module" src="JAVASCRIPT/auth-admin.js"></script>
+    <script src="JAVASCRIPT/registro-sw.js"></script>
 
     <!-- MODAL FLOTANTE DE EMERGENCIA MÉDICA Y CONTACTOS -->
     <div id="modal-emergencia" class="modal-noticia-overlay seccion-oculta">

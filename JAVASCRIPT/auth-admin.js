@@ -92,7 +92,10 @@ async function verificarRol(usuario) {
     elUsuario.textContent = `${datos.nombre || usuario.email} · ${NOMBRE_ROL[datos.rol]}`;
     mostrarBienvenida(datos.nombre);
     activarGuardado();
-    document.dispatchEvent(new Event('liga:datos-listos'));
+    // El historial de cambios firma cada entrada con esto (las reglas exigen el email de la sesión).
+    document.dispatchEvent(new CustomEvent('liga:datos-listos', {
+        detail: { usuario: { nombre: datos.nombre || usuario.email, email: usuario.email, rol: datos.rol } }
+    }));
     document.body.classList.remove('auth-pendiente');
 }
 

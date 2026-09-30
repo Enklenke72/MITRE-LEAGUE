@@ -4907,3 +4907,76 @@ body.auth-pendiente .auth-gate {
     margin-top: 2px !important;
     white-space: nowrap !important;
 }
+
+/* Historial de Cambios (solo Coordinador): una entrada por cada cambio que cargó alguien del staff */
+.historial-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.historial-titulo {
+    color: #2edae3;
+    margin: 0;
+}
+
+.historial-btn-vaciar {
+    background: #475569;
+    color: #fff;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.historial-ayuda {
+    color: #869bd8;
+    font-size: 10px;
+    margin: 4px 0 12px;
+}
+
+.historial-vacio {
+    color: #869bd8;
+    text-align: center;
+    font-size: 11px;
+}
+
+.historial-item {
+    background-color: rgba(255, 255, 255, 0.03);
+    padding: 9px 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border-left: 4px solid #2edae3;
+    text-align: left;
+    min-width: 0;
+}
+
+.historial-tipo-pago { border-left-color: #4ade80; }
+.historial-tipo-beneficio,
+.historial-tipo-inscripcion { border-left-color: #f2c00e; }
+.historial-tipo-sancion { border-left-color: #f43f5e; }
+.historial-tipo-jugador { border-left-color: #4284f2; }
+
+.historial-texto {
+    margin: 0;
+    font-size: 11px;
+    color: #cbd5e1;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.historial-autor {
+    color: #ffffff;
+}
+
+.historial-meta {
+    display: block;
+    margin-top: 3px;
+    font-size: 9px;
+    color: #869bd8;
+    overflow-wrap: anywhere;
+}

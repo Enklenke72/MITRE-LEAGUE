@@ -2273,6 +2273,185 @@ async function invertirYConservarEquipos() {
         'Partido nuevo: cambiar la Fecha conserva los equipos elegidos; en un grupo donde no están se proponen los dos primeros, como antes', { nuevoConserva, nuevoDefault });
 }
 
+// ---------------- Historial de cambios del staff para el Coordinador (30/09/2026) ----------------
+// Va al final (antes de Tabla Única, que pasa Superior a formato único): agrega un partido, una sanción y un pago
+// que ninguna fase anterior espera.
+async function historialDeCambios() {
+    out('\n=== HISTORIAL DE CAMBIOS: cada uno anota lo que carga, solo el Coordinador lo lee y lo vacía ===');
+    const fsHist = () => Object.values((JSON.parse(localStorage.getItem('fakefs') || '{}')).historialCambios || {});
+    // Visible de verdad (un botón dentro de una sección oculta conserva su propio display).
+    const visible = e => !!e && e.getClientRects().length > 0;
+    const tabHist = () => D().querySelector('.staff-tab-btn[data-target="sec-historial-cambios"]');
+    const erroresJS = () => salida.filter(s => /^JS ERROR/.test(s)).length;
+    const [A, B] = SUP.A; // 4to 1ra, 5to 2da
+    const pesos = '\\$[\\d.,]+';
+    const DNI_NUEVO = '47123456';
+    // Resultado de una operación directa contra el Firestore simulado con el rol actual (como alguien que salta el panel).
+    const intento = async fn => { try { await fn(); return 'permitido'; } catch (e) { return e.code || e.message; } };
+    const { cargarFirestore } = await import('./JAVASCRIPT/firebase-sdk.js');
+    const { db, fsSdk } = await cargarFirestore();
+    const refHist = id => fsSdk.doc(db, 'historialCambios', id);
+
+    // 1) Coordinador: el recorrido anterior quedó anotado con el nombre de quien lo hizo; "Vaciar Historial" lo borra
+    localStorage.removeItem('fake_rol');
+    await cargar('admin.html');
+    const previas = fsHist();
+    check(visible(tabHist()) && previas.length > 0 && previas.every(h => h.email === 'prueba@ejemplo.com' && h.autor === 'Prueba ' + h.rol && /^\d+-\d+$/.test(h.id) && h.timestamp > 0)
+        && previas.some(h => h.rol === 'coordinador' && /^cargó el resultado de FECHA 1 \(Superior\): .+ \d+-\d+ .+$/.test(h.detalle))
+        && previas.some(h => h.rol === 'coordinador' && new RegExp('^registró un pago de ' + pesos + ' de .+ \\(Arancel de Partido · FECHA \\d+, (efectivo|transferencia)\\)$').test(h.detalle))
+        && previas.some(h => /^dio de alta a .+ \(#\d+\) en .+$/.test(h.detalle))
+        && previas.some(h => /^emitió el Acta N° \d+ \(Superior\): suspensión de 2 fechas a 5to 2da — .+ \(#9\)$/.test(h.detalle))
+        && previas.some(h => h.rol === 'staff' && /^registró un pago de /.test(h.detalle)),
+        'Coordinador: ve la pestaña Historial y lo cargado en las fases anteriores quedó anotado (resultados, pagos, altas, Tribunal), firmado por quien lo hizo (también el pago que cargó el Staff)',
+        { visible: visible(tabHist()), entradas: previas.length, porRol: previas.reduce((m, h) => (m[h.rol] = (m[h.rol] || 0) + 1, m), {}), ejemplos: previas.slice(0, 4).map(h => h.detalle) });
+    await tab('sec-historial-cambios');
+    check(visible(el('sec-historial-cambios')) && D().querySelectorAll('#lista-historial-cambios .historial-item').length === previas.length,
+        'La pestaña muestra todas las entradas', { items: D().querySelectorAll('#lista-historial-cambios .historial-item').length, esperadas: previas.length });
+    respuestaConfirm = true;
+    const confirmsAntes = confirms.length;
+    el('btn-vaciar-historial-cambios').click();
+    await esperar(200);
+    check(confirms.length === confirmsAntes + 1 && fsHist().length === 0 && /Todavía no hay cambios/.test(el('lista-historial-cambios').textContent),
+        'Coordinador: "Vaciar Historial" pide confirmación y borra todas las entradas del servidor', { quedan: fsHist().length, confirm: confirms[confirms.length - 1] });
+    const lecturaCoord = await intento(() => fsSdk.getDocs(fsSdk.collection(db, 'historialCambios')));
+    check(lecturaCoord === 'permitido', 'Reglas: el Coordinador puede leer historialCambios', lecturaCoord);
+
+    // 2) Staff: no recibe el historial ni ve la pestaña; carga resultado, pago, sanción, alta y baja
+    localStorage.setItem('fake_rol', 'staff');
+    const erroresAntes = erroresJS();
+    const alertasAntes = alertas.length;
+    await cargar('admin.html');
+    if (tabHist()) tabHist().click();
+    await esperar(2);
+    check(LS('liga_historial_cambios') === null && !visible(tabHist()) && !visible(el('sec-historial-cambios')) && !visible(el('btn-vaciar-historial-cambios')),
+        'Rol Staff: no descarga el historial y no ve la pestaña, la lista ni "Vaciar Historial" (ni forzando el clic en la pestaña)',
+        { almacen: LS('liga_historial_cambios'), tab: visible(tabHist()), seccion: visible(el('sec-historial-cambios')), boton: visible(el('btn-vaciar-historial-cambios')) });
+
+    await tab('sec-jornada');
+    setv('partido-ciclo', 'superior');
+    setv('partido-fecha', '4');
+    setv('partido-grupo-select', 'A');
+    setv('partido-local', A, false); setv('partido-visitante', B, false);
+    setv('partido-dia', '2026-10-31', false);
+    setv('partido-arancel-monto', '30000', false);
+    setv('goles-local', '2', false); setv('goles-visitante', '1', false);
+    setv('dorsales-goles-local', '5, 7', false); setv('dorsales-goles-visitante', '9', false);
+    ['amarillas-local', 'rojas-local', 'amarillas-visitante', 'rojas-visitante'].forEach(c => setv('dorsales-' + c, '', false));
+    await enviar('form-partido');
+    const pNuevo = (LS('liga_partidos') || []).filter(p => p.fecha === 4 && p.local === A && p.visitante === B).sort((x, y) => y.id - x.id)[0];
+    setv('filtro-fecha-cronograma-admin', 'todas');
+    editarPartido(pNuevo);
+    setv('goles-local', '3', false);
+    setv('dorsales-goles-local', '5, 7, 9', false);
+    await enviar('form-partido');
+
+    await abrirTeso(4);
+    const inpEf = cajaEquipo(pNuevo.id, 'local').querySelector('.in-p-ef');
+    const efAntes = Number(inpEf.value) || 0;
+    await pagar(pNuevo.id, 'local', 'in-p-ef', efAntes + 5000);
+
+    await tab('sec-tribunal');
+    setv('sancion-acta-num', '4', false); setv('sancion-ciclo', 'superior'); setv('sancion-equipo', B);
+    setv('sancion-jugador-id', jug(B, 9).dni, false);
+    setv('sancion-tipo', 'Sanción Disciplinaria', false); setv('sancion-puntos', '1', false);
+    setv('sancion-motivo', 'Roja en la Fecha 4 (prueba del historial).', false);
+    await enviar('form-sancion');
+
+    await tab('sec-planteles');
+    el('btn-sub-plantel-jugadores').click();
+    setv('plantel-ciclo', 'superior'); setv('plantel-equipo-select', A);
+    setv('jugador-nombre', 'Nuevo Historial', false); setv('jugador-dni', DNI_NUEVO, false); setv('jugador-dorsal', '42', false);
+    setv('jugador-instagram', '', false);
+    await enviar('form-jugador');
+    respuestaConfirm = true;
+    const btnBaja = D().querySelector(`.btn-borrar-jugador[data-dni="${DNI_NUEVO}"]`);
+    if (btnBaja) btnBaja.click(); else out('  no encontré el botón de baja del jugador nuevo');
+    await esperar(300);
+
+    const deStaff = fsHist().filter(h => h.rol === 'staff');
+    const esperadas = [
+        /^cargó el resultado de FECHA 4 \(Superior\): 4to 1ra 2-1 5to 2da$/,
+        /^cambió el resultado de FECHA 4 \(Superior\): 4to 1ra 3-1 5to 2da \(era 4to 1ra 2-1 5to 2da\)$/,
+        new RegExp('^registró un pago de \\$5[.,]?000 de 4to 1ra \\(Arancel de Partido · FECHA 4, efectivo\\)$'),
+        /^emitió el Acta N° 4 \(Superior\): suspensión de 1 fecha a 5to 2da — .+ \(#9\)$/,
+        /^dio de alta a Nuevo Historial \(#42\) en 4to 1ra$/,
+        /^dio de baja a Nuevo Historial \(#42\) de 4to 1ra$/
+    ];
+    const faltan = esperadas.filter(re => !deStaff.some(h => re.test(h.detalle))).map(String);
+    check(faltan.length === 0 && deStaff.length === esperadas.length && deStaff.every(h => h.autor === 'Prueba staff' && h.email === 'prueba@ejemplo.com'),
+        'Staff: resultado cargado y corregido, pago, sanción, alta y baja quedan como 6 entradas legibles firmadas "Prueba staff"', { faltan, entradas: deStaff.map(h => h.detalle) });
+    const alertasNuevas = alertas.slice(alertasAntes);
+    check(!alertasNuevas.some(a => /No se pudo guardar/.test(a)) && erroresJS() === erroresAntes,
+        'Staff: anotar en el historial no genera errores de guardado (las reglas le dejan crear) ni errores de JS', alertasNuevas.filter(a => /No se pudo/.test(a)));
+    check(!deStaff.some(h => h.detalle.includes(DNI_NUEVO) || h.detalle.includes(jug(B, 9).dni)), 'El historial no guarda DNIs en el texto', deStaff.map(h => h.detalle));
+
+    // 3) Reglas con rol Staff, probadas directo contra el Firestore simulado (no alcanza con esconder la pestaña)
+    const idAlguna = deStaff[0] && deStaff[0].id;
+    const reglas = {
+        leerColeccion: await intento(() => fsSdk.getDocs(fsSdk.collection(db, 'historialCambios'))),
+        leerDocumento: await intento(() => fsSdk.getDoc(refHist(idAlguna))),
+        escuchar: await new Promise(res => fsSdk.onSnapshot(fsSdk.collection(db, 'historialCambios'), () => res('permitido'), e => res(e.code))),
+        borrar: await intento(() => fsSdk.deleteDoc(refHist(idAlguna))),
+        editar: await intento(() => fsSdk.updateDoc(refHist(idAlguna), { detalle: 'no hizo nada' })),
+        pisarConSet: await intento(() => fsSdk.setDoc(refHist(idAlguna), { ...deStaff[0], detalle: 'no hizo nada' })),
+        firmarComoOtro: await intento(() => fsSdk.setDoc(refHist('falsa-1'), { id: 'falsa-1', tipo: 'pago', detalle: 'x', autor: 'Otro', email: 'otro@ejemplo.com', rol: 'coordinador', timestamp: 1 }))
+    };
+    check(Object.values(reglas).every(r => r === 'permission-denied') && fsHist().filter(h => h.rol === 'staff').length === esperadas.length && !fsHist().some(h => h.id === 'falsa-1'),
+        'Reglas con rol Staff: no puede leer (colección, documento ni escucha), ni borrar, ni editar entradas, ni firmar una con otro email', reglas);
+    const vaciarAntes = fsHist().length;
+    const confirmsStaff = confirms.length;
+    el('btn-vaciar-historial-cambios').click(); // oculto para el Staff: aun forzando el clic no hace nada
+    await esperar(200);
+    check(fsHist().length === vaciarAntes && confirms.length === confirmsStaff && !alertas.slice(alertasAntes).some(a => /No se pudo guardar/.test(a)),
+        'Rol Staff: forzar el clic en "Vaciar Historial" no borra nada ni pide confirmación', { antes: vaciarAntes, despues: fsHist().length });
+
+    // 4) Coordinador: ve lo del Staff (lo más nuevo arriba) y sus propios cambios de beneficio
+    localStorage.removeItem('fake_rol');
+    await cargar('admin.html');
+    await tab('sec-historial-cambios');
+    const items = [...D().querySelectorAll('#lista-historial-cambios .historial-item')];
+    const textos = items.map(i => i.textContent.replace(/\s+/g, ' ').trim());
+    check(items.length === esperadas.length && textos[0].startsWith('Prueba staff dio de baja a Nuevo Historial (#42) de 4to 1ra') && /· Staff · prueba@ejemplo\.com$/.test(textos[0])
+        && textos[textos.length - 1].startsWith('Prueba staff cargó el resultado de FECHA 4'),
+        'Coordinador: ve las 6 entradas del Staff con nombre, rol y email, la más nueva arriba', textos);
+    const alertasCoord = alertas.length;
+    await tab('sec-tesoreria');
+    el('btn-sub-teso-inscripciones').click();
+    setv('filtro-inscripciones-ciclo', 'superior');
+    await esperar(2);
+    // Un equipo sin beneficio (las fases anteriores le dieron uno a otros equipos).
+    const sinBenef = [...D().querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')].find(c => !c.querySelector('.in-insc-benef-tipo').value).dataset.nombre;
+    const cardB = () => [...D().querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')].find(c => c.dataset.nombre === sinBenef);
+    const cambiarCampo = async (sel, v) => { const c = cardB().querySelector(sel); c.value = v; c.dispatchEvent(new Event('change', { bubbles: true })); await esperar(2); };
+    await cambiarCampo('.in-insc-benef-tipo', 'descuento');
+    await cambiarCampo('.in-insc-benef-pct', '40');
+    await cambiarCampo('.in-insc-benef-motivo', 'Campeones 2025');
+    await cambiarCampo('.in-insc-benef-tipo', '');
+    await esperar(200);
+    const deCoord = fsHist().filter(h => h.rol === 'coordinador').sort((x, y) => x.timestamp - y.timestamp).map(h => h.detalle);
+    check(deCoord.length === 4 && deCoord[0] === `le puso a ${sinBenef} un descuento del 50% en la inscripción` && deCoord[1] === `le puso a ${sinBenef} un descuento del 40% en la inscripción`
+        && deCoord[2] === `le puso a ${sinBenef} un descuento del 40% en la inscripción (motivo: Campeones 2025)` && deCoord[3] === `le sacó el beneficio de inscripción a ${sinBenef}`
+        && fsHist().filter(h => h.rol === 'coordinador').every(h => h.autor === 'Prueba coordinador'),
+        'Coordinador: cada cambio de beneficio queda anotado con su nombre (tipo, porcentaje, motivo y quitarlo)', deCoord);
+    // El Coordinador agrega entradas a un historial que ya tiene las del Staff: no tiene que reescribir ninguna (las reglas no lo dejan).
+    const posiciones = fsHist().map(h => h._pos);
+    check(!alertas.slice(alertasCoord).some(a => /No se pudo guardar/.test(a)) && fsHist().every(h => h._pos === h.timestamp) && new Set(posiciones).size === posiciones.length,
+        'Coordinador: agregar después de entradas del Staff no reescribe ninguna (cada entrada ordena por su hora) ni da errores de guardado', { alertas: alertas.slice(alertasCoord).filter(a => /No se pudo/.test(a)), posiciones });
+
+    // 5) A 390 px la pestaña no desborda
+    const anchoOriginal = marco.style.width;
+    marco.style.width = '390px';
+    await cargar('admin.html');
+    await tab('sec-historial-cambios');
+    const w = D().documentElement.clientWidth;
+    const desbordes = [...D().querySelectorAll('#sec-historial-cambios *')].filter(e => getComputedStyle(e).display !== 'none')
+        .map(e => ({ e, r: e.getBoundingClientRect() })).filter(x => x.r.width > 0 && x.r.right > w + 1)
+        .map(x => (x.e.id ? '#' + x.e.id : x.e.tagName + '.' + [...x.e.classList].join('.')) + ' right=' + Math.round(x.r.right)).slice(0, 6);
+    check(visible(el('sec-historial-cambios')) && D().querySelectorAll('#lista-historial-cambios .historial-item').length > 0 && desbordes.length === 0 && D().documentElement.scrollWidth <= w,
+        'A 390 px la pestaña Historial de Cambios no desborda', { ancho: w, scrollPagina: D().documentElement.scrollWidth, desbordes });
+    marco.style.width = anchoOriginal;
+}
+
 (async () => {
     try {
         planificar();
@@ -2298,6 +2477,7 @@ async function invertirYConservarEquipos() {
         await beneficiosYRecaudacion();
         await partidosYFechas();
         await invertirYConservarEquipos();
+        await historialDeCambios();
         await tablaUnica();
     } catch (e) {
         out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);

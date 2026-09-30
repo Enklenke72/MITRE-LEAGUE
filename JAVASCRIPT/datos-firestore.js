@@ -29,6 +29,9 @@ const PATRON_CODIGO = /^j[A-Za-z0-9_-]{16}$/;
 
 // nivel = quién puede leerla. escribeStaff: el staff solo agrega (la Caja registra cada pago que marca).
 // conjuntos: arrays sin repetidos que se fusionan con arrayUnion/arrayRemove (dos planilleros tildando a la vez).
+// ordenPor: el orden (_pos) sale de ese campo de cada elemento. Para listas a las que varios paneles solo agregan sin
+// leerlas (el Staff no recibe el historial): si cada panel numerara por su cuenta, las posiciones chocarían y habría
+// que reescribirlas, y las reglas no dejan editar entradas del historial.
 const ESQUEMA = [
     { clave: 'liga_cicloSuperior', tipo: 'equipos', ciclo: 'superior', nivel: 'publico' },
     { clave: 'liga_cicloBasico', tipo: 'equipos', ciclo: 'basico', nivel: 'publico' },
@@ -50,7 +53,8 @@ const ESQUEMA = [
     { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configCoordinador', id: 'valorInscripcion', nivel: 'coordinador' },
     { clave: 'liga_egresos', tipo: 'lista', col: 'egresos', nivel: 'coordinador' },
     { clave: 'liga_caja_movimientos', tipo: 'lista', col: 'cajaMovimientos', nivel: 'coordinador', escribeStaff: true },
-    { clave: 'liga_calculadora_arancel', tipo: 'config', col: 'configCoordinador', id: 'calculadoraArancel', nivel: 'coordinador' }
+    { clave: 'liga_calculadora_arancel', tipo: 'config', col: 'configCoordinador', id: 'calculadoraArancel', nivel: 'coordinador' },
+    { clave: 'liga_historial_cambios', tipo: 'lista', col: 'historialCambios', nivel: 'coordinador', escribeStaff: true, ordenPor: 'timestamp' }
 ];
 
 // El plan gratuito de Firebase corta a las 50.000 lecturas por día y cada documento leído cuenta:
@@ -523,19 +527,21 @@ async function cargarDesdeResumen(defs) {
 // Escritura: almacen → Firestore (solo lo que cambió)
 // ------------------------------------------------------------
 // ids = ids de esta clave que ya existen en Firestore. elementos = [{id, datos}] en el orden del array.
-function planColeccion(col, mem, ids, elementos, conjuntos, ops) {
+// posFija (id → posición): la posición la trae cada elemento y no se recalcula (ver ordenPor en ESQUEMA).
+function planColeccion(col, mem, ids, elementos, conjuntos, ops, posFija) {
     const { fsSdk } = fs;
     const orden = elementos.map(e => e.id);
 
     let reordenar = false;
     let ultima = -Infinity;
-    for (const id of orden) {
+    for (const id of posFija ? [] : orden) {
         if (!ids.has(id)) continue;
         if (mem.get(id).pos <= ultima) { reordenar = true; break; }
         ultima = mem.get(id).pos;
     }
     const pos = new Map();
     orden.forEach((id, i) => {
+        if (posFija) { pos.set(id, ids.has(id) ? mem.get(id).pos : posFija.get(id)); return; }
         if (reordenar) { pos.set(id, i * 1000); return; }
         if (ids.has(id)) { pos.set(id, mem.get(id).pos); return; }
         const anterior = i > 0 ? pos.get(orden[i - 1]) : undefined;
@@ -609,7 +615,8 @@ async function planLista(def, lista, ops) {
     for (const e of elementosConId(lista, def.clave)) {
         elementos.push({ id: String(e.id), datos: await codificarDnis(def, e) });
     }
-    planColeccion(def.col, mem, new Set(mem.keys()), elementos, def.conjuntos || [], ops);
+    const posFija = def.ordenPor ? new Map(elementos.map(e => [e.id, Number(e.datos[def.ordenPor]) || 0])) : null;
+    planColeccion(def.col, mem, new Set(mem.keys()), elementos, def.conjuntos || [], ops, posFija);
 }
 
 async function planEquipos(def, lista, ops) {

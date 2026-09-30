@@ -41,6 +41,8 @@ function permitido(accion, col, id) {
     if (col === 'privado' && id === 'claves') return (accion === 'read' || accion === 'create') && staff;
     if (DE_COORDINADOR.includes(col)) return coord;
     if (col === 'cajaMovimientos') return accion === 'create' ? staff : coord;
+    // La firma (email == el de la sesión) se controla en setDoc, que es donde están los datos.
+    if (col === 'historialCambios') return accion === 'create' ? staff : (accion === 'update' ? false : coord);
     return false;
 }
 
@@ -174,6 +176,9 @@ const fsSdk = {
             validarId(ref.id);
             const existe = !!(store[ref.col] && store[ref.col][ref.id] !== undefined);
             exigir(existe ? 'update' : 'create', ref.col, ref.id);
+            if (ref.col === 'historialCambios' && datos.email !== USUARIO.email) {
+                throw error('permission-denied', `Regla simulada: historialCambios/${ref.id} firmado con "${datos.email}" y la sesión es ${USUARIO.email}`);
+            }
             validarValor(datos, `${ref.col}/${ref.id}`, false, false);
             validarTamano(ref.col, ref.id, datos);
             (store[ref.col] = store[ref.col] || {})[ref.id] = copia(datos);

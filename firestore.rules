@@ -61,5 +61,13 @@ service cloud.firestore {
       allow create: if esStaff();
       allow read, update, delete: if esCoordinador();
     }
+
+    // Historial de cambios: cada uno agrega sus entradas firmadas con el email de su sesión, y solo
+    // el coordinador las lee o las borra ("Vaciar Historial"). Nadie las edita.
+    match /historialCambios/{id} {
+      allow create: if esStaff() && request.resource.data.email == request.auth.token.email;
+      allow read, delete: if esCoordinador();
+      allow update: if false;
+    }
   }
 }

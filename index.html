@@ -10,6 +10,10 @@
     <meta name="description"
         content="Mitre League: torneo de fútbol 5 entre cursos, con fase de grupos, playoffs y dos categorías (Ciclo Básico y Ciclo Superior). Mirá la tabla de posiciones, el fixture y los resultados.">
     <link rel="shortcut icon" href="./Recursos/logonormal 200x200.png" type="image/png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a1d54">
+    <link rel="apple-touch-icon" href="Recursos/icono-app-apple-180.png">
+    <meta name="apple-mobile-web-app-title" content="Mitre League">
 </head>
 
 <body>
@@ -718,8 +722,10 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                                 <li><strong>Arancel:</strong> Todos los equipos abonan el derecho de partido antes de
                                     cada encuentro, en el horario de citación.</li>
                                 <li><strong>Deuda:</strong> Si un equipo no puede abonar el total, queda con deuda hasta
-                                    el próximo encuentro, donde debe abonar ambas fechas. Si no la cancela, se le quita
-                                    1 punto.</li>
+                                    el próximo encuentro, donde debe abonar ambas fechas. Si no la cancela, el Tribunal
+                                    de Disciplina, tras hablar con el capitán, puede quitarle 1 punto de la tabla. La
+                                    quita se aplica una sola vez por deuda (no se repite en las fechas siguientes) y se
+                                    devuelve cuando el equipo salda lo adeudado.</li>
                                 <li><strong>Sin reintegros:</strong> El derecho de partido no se devuelve bajo ningún
                                     concepto. El 50% por ausencia (ver "Tiempos, Puntaje y Citación") no es un
                                     reintegro: es el pago que evita la quita de puntos. Si se paga más del 50%, el
@@ -835,6 +841,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
     <script src="JAVASCRIPT/main.js"></script>
     <script type="module" src="JAVASCRIPT/auth-login.js"></script>
     <script type="module" src="JAVASCRIPT/datos-publicos.js"></script>
+    <script src="JAVASCRIPT/registro-sw.js"></script>
     <!-- ==========================================
      MODAL LIGHTBOX DE NOTICIA AMPLIADA
      ========================================== -->

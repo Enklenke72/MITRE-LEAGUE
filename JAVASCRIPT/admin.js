@@ -1,4 +1,4 @@
-document.addEventListener('liga:datos-listos', () => {
+document.addEventListener('liga:datos-listos', (evento) => {
 
     // ============================================================
     // 1. ESTADO GLOBAL Y MEMORIA (LOCALSTORAGE)
@@ -45,6 +45,62 @@ document.addEventListener('liga:datos-listos', () => {
         almacen.setItem('liga_avisos_staff', JSON.stringify(avisosStaff));
         if (typeof actualizarListaAvisosStaff === 'function') actualizarListaAvisosStaff();
     }
+
+    // Historial de cambios para el Coordinador: quién cargó qué, en frases legibles. Se anota a mano en los guardados
+    // que importan (resultados, pagos, beneficios, Tribunal, altas y bajas de jugadores), no en cada setItem.
+    // El Staff solo agrega entradas: no recibe el historial ni lo puede vaciar (lo hacen cumplir las reglas).
+    const usuarioPanel = (evento.detail && evento.detail.usuario) || {};
+    let historialCambios = JSON.parse(almacen.getItem('liga_historial_cambios')) || [];
+
+    function registrarHistorial(tipo, detalle) {
+        historialCambios.push({
+            id: Date.now() + '-' + Math.floor(Math.random() * 100000),
+            tipo,
+            detalle,
+            autor: usuarioPanel.nombre || usuarioPanel.email || 'Sin identificar',
+            email: usuarioPanel.email || '',
+            rol: usuarioPanel.rol || '',
+            timestamp: Date.now()
+        });
+        almacen.setItem('liga_historial_cambios', JSON.stringify(historialCambios));
+        if (typeof actualizarListaHistorial === 'function') actualizarListaHistorial();
+    }
+
+    function nombreCicloHistorial(ciclo) {
+        return ciclo === 'basico' ? 'Básico' : 'Superior';
+    }
+
+    function marcadorHistorial(p) {
+        const penales = p.esPlayoff && p.golesLocal === p.golesVisitante && p.penalesLocal != null
+            ? ` (penales ${p.penalesLocal}-${p.penalesVisitante})` : '';
+        return `${p.local} ${p.golesLocal}-${p.golesVisitante} ${p.visitante}${penales}`;
+    }
+
+    function textoHistorialPartido(previo, nuevo) {
+        const donde = `${nombreFaseTeso(nuevo.fecha)} (${nombreCicloHistorial(nuevo.ciclo)})`;
+        const cruce = `${nuevo.local} vs ${nuevo.visitante}`;
+        if (!nuevo.jugado) {
+            if (previo && previo.jugado) return `borró el resultado de ${donde}: ${cruce} (era ${marcadorHistorial(previo)})`;
+            return `${previo ? 'editó' : 'cargó'} el partido de ${donde}: ${cruce}`;
+        }
+        if (!previo || !previo.jugado) return `cargó el resultado de ${donde}: ${marcadorHistorial(nuevo)}`;
+        const antes = marcadorHistorial(previo);
+        const ahora = marcadorHistorial(nuevo);
+        return antes === ahora ? `editó el partido de ${donde}: ${ahora}` : `cambió el resultado de ${donde}: ${ahora} (era ${antes})`;
+    }
+
+    function textoHistorialSancion(s) {
+        const n = s.puntosRestados;
+        const que = s.tipo === 'Quita de Puntos' ? `quita de ${n} ${n === 1 ? 'punto' : 'puntos'}`
+            : s.tipo === 'Sanción Disciplinaria' ? `suspensión de ${n} ${n === 1 ? 'fecha' : 'fechas'}`
+            : s.tipo === 'Advertencia / Acta' ? 'advertencia' : (s.tipo || 'sanción');
+        return `Acta N° ${s.acta} (${nombreCicloHistorial(s.ciclo)}): ${que} a ${s.equipo}${s.jugador ? ' — ' + s.jugador : ''}`;
+    }
+
+    function textoJugadorHistorial(j) {
+        return `${j.nombre} (${j.dorsal === undefined || j.dorsal === null || j.dorsal === '' ? 'S/N' : '#' + j.dorsal})`;
+    }
+
     let tesoreriaPartidos = JSON.parse(almacen.getItem('liga_tesoreria_partidos_v2')) || {};
     let tesoreriaInscripciones = JSON.parse(almacen.getItem('liga_tesoreria_inscripciones')) || {};
     let listaEgresos = JSON.parse(almacen.getItem('liga_egresos')) || [];
@@ -65,6 +121,11 @@ document.addEventListener('liga:datos-listos', () => {
         });
         almacen.setItem('liga_caja_movimientos', JSON.stringify(cajaMovimientos));
         if (typeof renderizarCajaPorFecha === 'function') renderizarCajaPorFecha();
+        const mov = cajaMovimientos[cajaMovimientos.length - 1];
+        const queEs = `${mov.concepto}${mov.detalle ? ' · ' + mov.detalle : ''}, ${mov.medio.toLowerCase()}`;
+        registrarHistorial('pago', mov.monto > 0
+            ? `registró un pago de $${mov.monto.toLocaleString()} de ${mov.equipo} (${queEs})`
+            : `descontó $${(-mov.monto).toLocaleString()} de lo pagado por ${mov.equipo} (${queEs})`);
     }
 
     function guardarEquiposEnStorage() {
@@ -757,6 +818,8 @@ document.addEventListener('liga:datos-listos', () => {
                 });
                 partidos = partidos.filter(p => p.id !== idBorrar);
                 almacen.setItem('liga_partidos', JSON.stringify(partidos));
+                if (partidoBorrado) registrarHistorial('partido', `eliminó el partido de ${nombreFaseTeso(partidoBorrado.fecha)} (${nombreCicloHistorial(partidoBorrado.ciclo)}): `
+                    + (partidoBorrado.jugado ? marcadorHistorial(partidoBorrado) : `${partidoBorrado.local} vs ${partidoBorrado.visitante}`));
                 if (planTeso) aplicarPlanTesoreria(planTeso);
                 if (idPartidoEnEdicion === idBorrar) cancelarEdicionPartido();
                 sincronizarAusencias();
@@ -1085,6 +1148,7 @@ document.addEventListener('liga:datos-listos', () => {
             }
 
             almacen.setItem('liga_partidos', JSON.stringify(partidos));
+            registrarHistorial('partido', textoHistorialPartido(partidoPrevio, datosPartido));
             if (planTeso) aplicarPlanTesoreria(planTeso);
 
             if (datosPartido.esPlayoff && datosPartido.jugado) {
@@ -1891,13 +1955,14 @@ document.addEventListener('liga:datos-listos', () => {
                 if (!confirm(`PASO 1: ¿Estás seguro de que deseas eliminar a ${nombre}?`)) return;
                 if (!confirm(`PASO 2 DE SEGURIDAD:\nEsta acción borrará permanentemente la ficha de ${nombre}.\n\n¿Confirmar?`)) return;
 
-                const { equipo } = buscarJugadorPlantel(ciclo, equipoNombre, dni);
+                const { equipo, jugador } = buscarJugadorPlantel(ciclo, equipoNombre, dni);
                 if (!equipo) {
                     alert('No se encontró el equipo en los planteles: no se eliminó nada.');
                     return;
                 }
                 equipo.jugadores = (equipo.jugadores || []).filter(j => String(j.dni) !== dni);
                 guardarEquiposEnStorage();
+                registrarHistorial('jugador', `dio de baja a ${jugador ? textoJugadorHistorial(jugador) : nombre} de ${equipo.nombre}`);
                 if (jugadorEnEdicionDNI === dni) cancelarEdicionJugador();
                 renderizarTablaJugadores();
                 alert(`La ficha de ${nombre} fue eliminada.`);
@@ -1978,6 +2043,9 @@ document.addEventListener('liga:datos-listos', () => {
                     nuevo = { ...traslado.jugador, ...datosJugador, foto: datosJugador.foto || traslado.jugador.foto || '' };
                 }
                 equipoObj.jugadores.push(nuevo);
+                registrarHistorial('jugador', traslado
+                    ? `pasó a ${textoJugadorHistorial(nuevo)} de ${traslado.equipo.nombre} a ${equipoObj.nombre}`
+                    : `dio de alta a ${textoJugadorHistorial(nuevo)} en ${equipoObj.nombre}`);
                 alert(`¡${datosJugador.nombre} añadido a ${equipoNombre}!`);
                 limpiarFormularioJugador();
             }
@@ -2000,6 +2068,8 @@ document.addEventListener('liga:datos-listos', () => {
             }
 
             if (confirm(`¿Estás seguro de eliminar completamente al equipo "${equipoNombre}" y a todos sus jugadores del torneo?`)) {
+                const equipoBorrado = (ciclo === 'superior' ? poolSuperior : poolBasico).find(e => e.nombre.trim().toLowerCase() === equipoNombre.trim().toLowerCase());
+                const cantidadBorrada = equipoBorrado && equipoBorrado.jugadores ? equipoBorrado.jugadores.length : 0;
                 if (ciclo === 'superior') {
                     poolSuperior = poolSuperior.filter(e => e.nombre.trim().toLowerCase() !== equipoNombre.trim().toLowerCase());
                 } else {
@@ -2007,6 +2077,7 @@ document.addEventListener('liga:datos-listos', () => {
                 }
 
                 guardarEquiposEnStorage();
+                registrarHistorial('jugador', `eliminó el equipo ${equipoNombre} (${nombreCicloHistorial(ciclo)}) con sus ${cantidadBorrada} ${cantidadBorrada === 1 ? 'jugador' : 'jugadores'}`);
                 actualizarComboEquiposPlantel();
                 actualizarOpcionesMoverEquipo();
                 actualizarOpcionesGrupo();
@@ -2140,9 +2211,11 @@ document.addEventListener('liga:datos-listos', () => {
         document.querySelectorAll('.btn-borrar-sancion').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
-                desvincularSancionAuto(listaSanciones.find(s => s.id === idBorrar));
+                const sancionBorrada = listaSanciones.find(s => s.id === idBorrar);
+                desvincularSancionAuto(sancionBorrada);
                 listaSanciones = listaSanciones.filter(s => s.id !== idBorrar);
                 almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+                if (sancionBorrada) registrarHistorial('sancion', `eliminó la resolución del ${textoHistorialSancion(sancionBorrada)}`);
                 if (idSancionEnEdicion === idBorrar) cancelarEdicionSancion();
                 actualizarListaSancionesAdmin();
             });
@@ -2235,6 +2308,7 @@ document.addEventListener('liga:datos-listos', () => {
             }
 
             almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+            registrarHistorial('sancion', `${idSancionEnEdicion !== null ? 'editó la resolución del' : 'emitió el'} ${textoHistorialSancion(datosSancion)}`);
             cancelarEdicionSancion();
             actualizarListaSancionesAdmin();
         });
@@ -2824,8 +2898,16 @@ document.addEventListener('liga:datos-listos', () => {
         card.querySelector('.teso-insc-fila-motivo').hidden = !tipo;
         if (!beneficio && !tesoreriaInscripciones[idEq]) return;
         if (!tesoreriaInscripciones[idEq]) tesoreriaInscripciones[idEq] = { ef: 0, tr: 0 };
+        const beneficioAnterior = JSON.stringify(tesoreriaInscripciones[idEq].beneficio || null);
         tesoreriaInscripciones[idEq].beneficio = beneficio;
         almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+        if (JSON.stringify(beneficio) !== beneficioAnterior) {
+            const nombreEq = card.dataset.nombre;
+            const motivo = beneficio && beneficio.motivo ? ` (motivo: ${beneficio.motivo})` : '';
+            registrarHistorial('beneficio', !beneficio ? `le sacó el beneficio de inscripción a ${nombreEq}`
+                : beneficio.tipo === 'exento' ? `marcó a ${nombreEq} como exento de la inscripción${motivo}`
+                : `le puso a ${nombreEq} un descuento del ${beneficio.porcentaje}% en la inscripción${motivo}`);
+        }
         actualizarCardInscripcion(card);
         calcularBalanceGeneral();
     }
@@ -2900,6 +2982,7 @@ document.addEventListener('liga:datos-listos', () => {
     if (document.getElementById('monto-inscripcion-individual')) {
         document.getElementById('monto-inscripcion-individual').addEventListener('change', (e) => {
             almacen.setItem('liga_valor_inscripcion', e.target.value);
+            registrarHistorial('inscripcion', `cambió el valor de la inscripción por jugador a $${(parseFloat(e.target.value) || 0).toLocaleString()}`);
             renderizarTesoreriaInscripciones();
             calcularBalanceGeneral();
         });
@@ -3632,6 +3715,9 @@ document.addEventListener('liga:datos-listos', () => {
         }
         equipo.jugadores.push(nuevo);
         guardarEquiposEnStorage();
+        registrarHistorial('jugador', traslado
+            ? `pasó a ${textoJugadorHistorial(nuevo)} de ${traslado.equipo.nombre} a ${equipo.nombre} (en cancha, desde la lista de buena fe)`
+            : `dio de alta a ${textoJugadorHistorial(nuevo)} en ${equipo.nombre} (en cancha, desde la lista de buena fe)`);
 
         const p = partidos.find(x => String(x.id) === caja.dataset.pid);
         if (p) {
@@ -4384,6 +4470,37 @@ document.addEventListener('liga:datos-listos', () => {
         });
     }
 
+    function fechaHoraHistorial(timestamp) {
+        return new Date(timestamp).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Lo más nuevo arriba. Se ordena por hora y no por el orden guardado: cada panel agrega sus entradas por su cuenta.
+    function actualizarListaHistorial() {
+        const contenedor = document.getElementById('lista-historial-cambios');
+        if (!contenedor) return;
+        if (historialCambios.length === 0) {
+            contenedor.innerHTML = '<p class="historial-vacio">Todavía no hay cambios registrados.</p>';
+            return;
+        }
+        contenedor.innerHTML = [...historialCambios].sort((a, b) => b.timestamp - a.timestamp).map(h => `
+            <div class="historial-item historial-tipo-${attrSeguro(h.tipo)}">
+                <p class="historial-texto"><strong class="historial-autor">${attrSeguro(h.autor)}</strong> ${attrSeguro(h.detalle)}</p>
+                <span class="historial-meta">${fechaHoraHistorial(h.timestamp)}${h.rol ? ' · ' + (h.rol === 'coordinador' ? 'Coordinador' : 'Staff') : ''}${h.email && h.email !== h.autor ? ' · ' + attrSeguro(h.email) : ''}</span>
+            </div>
+        `).join('');
+    }
+
+    const btnVaciarHistorial = document.getElementById('btn-vaciar-historial-cambios');
+    if (btnVaciarHistorial) {
+        btnVaciarHistorial.addEventListener('click', () => {
+            if (usuarioPanel.rol !== 'coordinador' || historialCambios.length === 0) return;
+            if (!confirm('¿Vaciar todo el historial de cambios del staff? Esta acción no se puede deshacer.')) return;
+            historialCambios = [];
+            almacen.setItem('liga_historial_cambios', JSON.stringify(historialCambios));
+            actualizarListaHistorial();
+        });
+    }
+
     if (formAlerta) {
         formAlerta.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -4428,6 +4545,7 @@ document.addEventListener('liga:datos-listos', () => {
     actualizarListaNoticiasAdmin();
     actualizarListaAlertasAdmin();
     actualizarListaAvisosStaff();
+    actualizarListaHistorial();
 
     renderizarTesoreriaInscripciones();
     renderizarTesoreriaPartidos();
