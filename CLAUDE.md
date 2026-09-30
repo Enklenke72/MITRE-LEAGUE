@@ -290,7 +290,7 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
       - Banco completo **327 PASS / 0 FAIL** (`resultado-15-2026-09-30.txt`). La fase nueva `historialDeCambios` tiene 14 controles, entre ellos: las 6 acciones del Staff anotadas y firmadas; el Staff no lee la colección, un documento ni la escucha, no borra, no edita y no firma como otro, probado directo contra el simulador; "Vaciar Historial" solo con el Coordinador; 390 px sin desborde.
       - Integridad **12/0**, tiempo real **28/0**. Se revisó por captura en escritorio y a 390 px.
       - **No verificado contra Firebase real.**
-    - **HAY QUE PEGAR `firestore.rules` EN LA CONSOLA ANTES DE SUBIR ESTE CÓDIGO A NETLIFY.** Con las reglas viejas, cada anotación choca con `permission-denied` y el panel muestra "No se pudo guardar un cambio en el servidor" (como mucho una vez cada 15 s), aunque el dato en sí se haya guardado bien.
+    - **HECHO por Joaquín (30/09/2026):** pegó la regla nueva de `historialCambios` en la consola de Firebase.
     - **Cupo a vigilar:** el panel del Coordinador lee todas las entradas cada vez que se abre (un torneo entero puede dejar cientos). Conviene vaciarlo de vez en cuando, por ejemplo al cerrar cada fecha. "Vaciar" borra lo que el panel tenía cargado: si alguien anotó algo después de abrirlo, eso queda y aparece el aviso de cambios ajenos.
 
 ### Pendiente
