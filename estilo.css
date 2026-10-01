@@ -21,6 +21,7 @@ body {
     margin: 0px;
     padding: 0px;
     min-height: 100vh;
+    min-height: 100dvh;
     min-width: 100%;
 }
 
@@ -98,6 +99,7 @@ font-size: 14px;
     position: sticky;
     top: 60px;                    /* Se clava justo abajo de la top-bar (que mide 60px) */
     height: calc(100vh - 60px);
+    height: calc(100dvh - 60px);
 }
 .dashboard-container {
     flex-grow: 1;
@@ -919,6 +921,7 @@ font-size: 14px;
         position: sticky;
         top: 0;
         height: 100vh;
+        height: 100dvh;
         width: 70px;
         flex-direction: column;
         justify-content: flex-start;
@@ -1937,6 +1940,7 @@ body .top-bar {
     body.scrolled aside.sidebar {
         top: 0 !important;
         height: 100vh !important;
+        height: 100dvh !important;
     }
 
     body .showman {
@@ -2123,6 +2127,7 @@ body.scrolled .dashboard-container #home div {
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
+    height: 100dvh !important;
     background: rgba(0, 0, 0, 0.8) !important; /* Fondo negro con baja opacidad */
     backdrop-filter: blur(5px) !important;    /* Leve desenfoque de fondo */
     z-index: 99999 !important;               /* Por encima de cualquier barra */
@@ -4154,7 +4159,7 @@ body.rol-staff .solo-admin {
     font-family: inherit;
     color: #2edae3;
     font-size: 12px;
-    text-shadow: 0 0 8px rgba(46, 218, 227, 0.4);
+    text-shadow: 0 0 4px rgba(46, 218, 227, 0.35);
     font-weight: bold;
     text-decoration: none;
     cursor: pointer;
@@ -4411,6 +4416,7 @@ body.rol-staff .solo-admin {
 body.staff-page {
     background-color: #040c26;
     min-height: 100vh;
+    min-height: 100dvh;
     padding: 20px;
     font-family: 'Oswald', sans-serif;
     color: white;
@@ -4979,4 +4985,462 @@ body.auth-pendiente .auth-gate {
     font-size: 9px;
     color: #869bd8;
     overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   IMPORTAR PLANILLA DE INSCRIPCIÓN (Planteles)
+   Hasta 800 px cada fila de la vista previa es una tarjeta con
+   sus etiquetas a la vista; más ancho, una línea por jugador.
+   ============================================================ */
+.importar-bloque {
+    margin: 4px 0 16px;
+    padding: 12px;
+    border: 1px dashed rgba(46, 218, 227, 0.45);
+    border-radius: 4px;
+    background: rgba(4, 12, 38, 0.45);
+}
+
+.importar-btn-abrir {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #f2c00e;
+    border-radius: 3px;
+    background: rgba(242, 192, 14, 0.12);
+    color: #f2c00e;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.importar-btn-abrir:hover { background: #f2c00e; color: #040c26; }
+.importar-btn-abrir:disabled { opacity: 0.6; cursor: wait; }
+.importar-btn-abrir:focus-visible { outline: 2px solid #2edae3; outline-offset: 2px; }
+
+.importar-ayuda {
+    margin: 8px 0 0;
+    font-size: 11px;
+    color: #869bd8;
+    line-height: 1.45;
+    text-align: left;
+}
+
+.importar-lectura {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #4ade80;
+    line-height: 1.4;
+    text-align: left;
+}
+
+.importar-lectura:empty { display: none; }
+.importar-lectura-error { color: #f43f5e; }
+
+.importar-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+    border-color: #f2c00e;
+    text-align: left;
+}
+
+.importar-titulo {
+    margin: 0 0 8px;
+    color: #f2c00e;
+    font-family: 'Michroma', sans-serif;
+    font-size: 14px;
+}
+
+.importar-origen,
+.importar-destino,
+.importar-nota {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: #cbd5e1;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.importar-origen strong,
+.importar-destino strong { color: #ffffff; }
+.importar-nota { font-size: 11px; color: #869bd8; }
+.importar-nota-pdf,
+.importar-aviso-tope { color: #f2c00e; }
+
+.importar-encabezado,
+.importar-fila {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 2fr) minmax(0, 1.1fr) 56px 136px minmax(0, 1fr) minmax(0, 1fr) 70px;
+    gap: 6px;
+    align-items: center;
+}
+
+.importar-encabezado {
+    margin-top: 12px;
+    padding: 0 8px 4px 11px;
+    font-size: 10px;
+    color: #869bd8;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.importar-fila {
+    margin-bottom: 6px;
+    padding: 8px;
+    border-left: 3px solid #4ade80;
+    border-radius: 3px;
+    background: rgba(4, 12, 38, 0.55);
+}
+
+.importar-fila-error { border-left-color: #f43f5e; background: rgba(244, 63, 94, 0.08); }
+.importar-fila-pase,
+.importar-fila-pase-pendiente { border-left-color: #f2c00e; }
+.importar-fila-existe { border-left-color: #475569; opacity: 0.75; }
+
+.importar-num { font-size: 12px; color: #869bd8; text-align: center; }
+.importar-campo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+/* En escritorio los títulos van en .importar-encabezado; la etiqueta queda solo para lectores de pantalla. */
+.importar-etiqueta {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.importar-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+}
+
+.importar-input:focus { outline: none; border-color: #2edae3; box-shadow: 0 0 6px rgba(46, 218, 227, 0.35); }
+.importar-input[type="date"] { color-scheme: dark; }
+
+.importar-quitar {
+    min-height: 36px;
+    padding: 0 8px;
+    border: 1px solid #475569;
+    border-radius: 3px;
+    background: transparent;
+    color: #cbd5e1;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.importar-quitar:hover { border-color: #f43f5e; color: #f43f5e; }
+
+.importar-estado {
+    grid-column: 2 / -1;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.importar-estado ul { margin: 0; padding-left: 16px; }
+.importar-msj-errores { color: #fda4af; }
+.importar-msj-avisos { color: #f2c00e; }
+.importar-msj-pase { margin: 0 0 4px; color: #f2c00e; }
+.importar-msj-existe { margin: 0; color: #869bd8; }
+.importar-chip-ok { color: #4ade80; }
+
+.importar-pase { display: flex; align-items: flex-start; gap: 8px; color: #ffffff; cursor: pointer; }
+.importar-pase input { flex-shrink: 0; width: 20px; height: 20px; margin: 0; accent-color: #f2c00e; cursor: pointer; }
+
+.importar-resumen { margin: 10px 0 4px; font-size: 12px; color: #cbd5e1; }
+.importar-bloqueo { margin: 0 0 10px; font-size: 12px; color: #f43f5e; }
+.importar-bloqueo:empty { display: none; }
+
+.importar-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.importar-botones .btn-submit-admin { width: auto; min-height: 44px; }
+
+.importar-btn-cancelar {
+    min-height: 44px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 3px;
+    background: #475569;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.importar-btn-confirmar:disabled { opacity: 0.45; cursor: not-allowed; }
+.importar-btn-confirmar:disabled:hover { background: #1a3274; color: #2edae3; }
+
+@media (max-width: 800px) {
+    .importar-encabezado { display: none; }
+    .importar-fila { grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }
+    .importar-etiqueta {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+        font-size: 10px;
+        color: #869bd8;
+        text-transform: uppercase;
+    }
+    .importar-num { grid-row: 1; grid-column: 1; text-align: left; }
+    .importar-quitar { grid-row: 1; grid-column: 2; justify-self: end; }
+    .importar-c-nombre { grid-row: 2; grid-column: 1 / -1; }
+    .importar-c-dni { grid-row: 3; grid-column: 1; }
+    .importar-c-dorsal { grid-row: 3; grid-column: 2; }
+    .importar-c-nacimiento { grid-row: 4; grid-column: 1; }
+    .importar-c-celular { grid-row: 4; grid-column: 2; }
+    .importar-c-instagram { grid-row: 5; grid-column: 1 / -1; }
+    .importar-estado { grid-row: 6; grid-column: 1 / -1; }
+    .importar-input { min-height: 44px; font-size: 16px; }
+    .importar-botones { flex-direction: column-reverse; }
+    .importar-botones .btn-submit-admin,
+    .importar-btn-cancelar { width: 100%; }
+}
+
+/* ============================================================
+   CALENDARIO DE FECHAS Y FIXTURE AUTOMÁTICO (Carga de Partidos)
+   ============================================================ */
+.calendario-fechas {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(242, 192, 14, 0.35);
+    text-align: left;
+}
+
+.calendario-titulo {
+    margin: 0 0 6px;
+    color: #f2c00e;
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.calendario-ayuda {
+    margin: 0 0 12px;
+    font-size: 11px;
+    color: #869bd8;
+    line-height: 1.45;
+    text-align: left;
+}
+
+.calendario-ciclos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.calendario-ciclo { min-width: 0; }
+
+.calendario-ciclo-nombre {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #ffffff;
+    text-transform: uppercase;
+}
+
+.calendario-grilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+}
+
+.calendario-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    font-size: 10px;
+    color: #869bd8;
+    text-transform: uppercase;
+}
+
+.calendario-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    color-scheme: dark;
+}
+
+.calendario-input:focus { outline: none; border-color: #2edae3; box-shadow: 0 0 6px rgba(46, 218, 227, 0.35); }
+
+.calendario-btn-guardar { margin-top: 14px; background: #854d0e; border-color: #f2c00e; }
+
+.fixture-auto-bloque {
+    grid-column: 1 / -1;
+    min-width: 0;
+    border-color: #2edae3;
+}
+
+.fixture-auto-encabezado { margin-top: 0; color: #2edae3; }
+.fixture-auto-label-arancel { color: #f2c00e !important; }
+
+.fixture-auto-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+    border-color: #2edae3;
+    text-align: left;
+}
+
+.fixture-auto-titulo {
+    margin: 0 0 8px;
+    color: #2edae3;
+    font-family: 'Michroma', sans-serif;
+    font-size: 14px;
+}
+
+.fixture-auto-texto {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: #cbd5e1;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.fixture-auto-texto strong { color: #ffffff; }
+.fixture-auto-nota { margin: 0 0 6px; font-size: 11px; color: #869bd8; }
+.fixture-auto-aviso { color: #f2c00e; }
+
+.fixture-auto-grupos {
+    margin: 4px 0 10px;
+    padding-left: 18px;
+    font-size: 12px;
+    color: #cbd5e1;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.fixture-auto-fechas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.fixture-auto-fecha {
+    min-width: 0;
+    padding: 10px 12px;
+    border-left: 3px solid #2edae3;
+    border-radius: 3px;
+    background: rgba(4, 12, 38, 0.55);
+}
+
+.fixture-auto-fecha-titulo {
+    margin: 0 0 8px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    color: #ffffff;
+    text-transform: uppercase;
+}
+
+.fixture-auto-sin-dia { color: #f2c00e; text-transform: none; }
+
+.fixture-auto-cruces { margin: 0; padding: 0; list-style: none; }
+
+.fixture-auto-cruce {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    color: #ffffff;
+    overflow-wrap: anywhere;
+}
+
+.fixture-auto-cruce:last-child { border-bottom: none; }
+.fixture-auto-grupo { color: #869bd8; }
+.fixture-auto-vs { color: #2edae3; font-weight: bold; }
+.fixture-auto-libre { color: #869bd8; font-style: italic; }
+
+.fixture-auto-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.fixture-auto-botones .btn-submit-admin { width: auto; min-height: 44px; }
+
+@media (max-width: 800px) {
+    .calendario-input { min-height: 44px; font-size: 16px; }
+    .fixture-auto-botones { flex-direction: column-reverse; }
+    .fixture-auto-botones .btn-submit-admin,
+    .fixture-auto-botones .importar-btn-cancelar { width: 100%; }
+}
+
+/* ============================================================
+   📱 ZONAS SEGURAS (index.html usa viewport-fit=cover)
+   env(safe-area-inset-*) vale 0 donde no hay esquinas redondeadas,
+   muesca ni barra de gestos, así que en esos casos no cambia nada.
+   Va al final para ganarle a los !important anteriores de la barra.
+   ============================================================ */
+@media (max-width: 768px) {
+    .sidebar {
+        height: calc(60px + env(safe-area-inset-bottom)) !important;
+        padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
+    }
+
+    .side-nav,
+    .nav-item {
+        min-width: 0 !important;
+    }
+
+    body {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+/* Solo iOS (Safari y Chrome usan WebKit en el iPhone) */
+@supports (-webkit-touch-callout: none) {
+    @supports not (height: 100dvh) {
+        html { height: -webkit-fill-available; }
+        body,
+        body.staff-page { min-height: -webkit-fill-available; }
+        .modal-noticia-overlay { height: -webkit-fill-available !important; }
+    }
+
+    /* Vertical: "Inicio" y "Admin" se alejan de las esquinas redondeadas */
+    @media (max-width: 768px) {
+        .sidebar {
+            padding-left: max(10px, env(safe-area-inset-left)) !important;
+            padding-right: max(10px, env(safe-area-inset-right)) !important;
+        }
+    }
+
+    /* Horizontal: la barra lateral, el encabezado y el contenido no quedan debajo de la isla de la cámara */
+    @media (min-width: 601px) {
+        body aside.sidebar {
+            padding-left: env(safe-area-inset-left) !important;
+            width: calc(70px + env(safe-area-inset-left)) !important;
+        }
+
+        body aside.sidebar:hover,
+        body aside.sidebar.sidebar-fijada {
+            width: calc(210px + env(safe-area-inset-left)) !important;
+        }
+
+        body .showman {
+            margin-left: calc(70px + env(safe-area-inset-left)) !important;
+            width: calc(100% - 70px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
+        }
+
+        body .top-bar {
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+    }
 }

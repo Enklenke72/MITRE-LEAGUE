@@ -298,7 +298,54 @@
                         style="background:#854d0e; border-color:#f2c00e;">
                         Guardar Fechas
                     </button>
+
+                    <!-- CALENDARIO: el día de cada fecha (los campos los arma admin.js) -->
+                    <div class="calendario-fechas">
+                        <h4 class="calendario-titulo">Calendario: día de cada fecha</h4>
+                        <p class="calendario-ayuda">
+                            Cargá una vez qué día se juega cada fecha. Al cargar un partido de esa fecha el día se completa solo (se puede cambiar), y el fixture automático lo usa. Una fecha sin día queda vacía, como siempre.
+                        </p>
+                        <div class="calendario-ciclos">
+                            <div class="calendario-ciclo">
+                                <span class="calendario-ciclo-nombre">Ciclo Superior</span>
+                                <div id="calendario-fechas-superior" class="calendario-grilla"></div>
+                            </div>
+                            <div class="calendario-ciclo">
+                                <span class="calendario-ciclo-nombre">Ciclo Básico</span>
+                                <div id="calendario-fechas-basico" class="calendario-grilla"></div>
+                            </div>
+                        </div>
+                        <button type="button" id="btn-guardar-calendario-fechas" class="btn-submit-admin calendario-btn-guardar">
+                            Guardar Calendario
+                        </button>
+                    </div>
                 </section>
+
+                <!-- FIXTURE AUTOMÁTICO DE FASE DE GRUPOS (vista previa abajo, en #fixture-auto-vista-previa) -->
+                <section class="admin-card-panel fixture-auto-bloque">
+                    <h3 class="fixture-auto-encabezado">Fixture Automático de Fase de Grupos</h3>
+                    <p class="calendario-ayuda">
+                        Arma todos los partidos de cada grupo del ciclo: cada par de equipos se enfrenta una sola vez. El día sale del calendario de arriba; horario y cancha quedan a confirmar. Antes de guardar se ve una vista previa.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ciclo</label>
+                            <select id="fixture-auto-ciclo">
+                                <option value="superior">Superior</option>
+                                <option value="basico">Básico</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="fixture-auto-label-arancel">Arancel Exigido x Equipo ($)</label>
+                            <input type="number" id="fixture-auto-arancel" value="30000" step="500" min="0">
+                        </div>
+                    </div>
+                    <button type="button" id="btn-fixture-auto" class="btn-submit-admin">Armar fixture</button>
+                </section>
+
+                <!-- VISTA PREVIA DEL FIXTURE AUTOMÁTICO (la arma admin.js) -->
+                <section id="fixture-auto-vista-previa" class="admin-card-panel fixture-auto-panel seccion-oculta-staff"
+                    aria-label="Vista previa del fixture"></section>
             </div>
 
             <!-- SUB-VISTA 2: ARMADOR DE PLAYOFFS -->
@@ -458,6 +505,14 @@
                             </button>
                         </div>
 
+                        <!-- IMPORTAR LA PLANILLA DE INSCRIPCIÓN (vista previa abajo, en #importar-vista-previa) -->
+                        <div class="importar-bloque">
+                            <button type="button" id="btn-importar-planilla" class="importar-btn-abrir">Importar planilla del equipo</button>
+                            <input type="file" id="importar-planilla-archivo" accept=".xlsx,.xlsm,.xls,.ods,.csv,.pdf" hidden>
+                            <p class="importar-ayuda">Excel, CSV o PDF. Carga todos los jugadores de la planilla en el equipo elegido arriba. Antes de guardar, se ven en una vista previa para revisarlos y corregirlos.</p>
+                            <p id="importar-planilla-estado" class="importar-lectura" role="status"></p>
+                        </div>
+
                         <div class="form-group">
                             <label>Nombre y Apellido</label>
                             <input type="text" id="jugador-nombre" placeholder="Ej: Santino Gaitan" required>
@@ -592,6 +647,10 @@
                         </table>
                     </div>
                 </section>
+
+                <!-- VISTA PREVIA DE LA IMPORTACIÓN (la arma admin.js al subir una planilla) -->
+                <section id="importar-vista-previa" class="admin-card-panel importar-panel seccion-oculta-staff"
+                    aria-label="Vista previa de la importación"></section>
             </div>
 
             <!-- ==================================================== -->

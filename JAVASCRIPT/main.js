@@ -1,5 +1,23 @@
 document.addEventListener('liga:datos-listos', () => {
 
+    // Todo lo que carga el staff (jugadores, equipos, sponsors, noticias, avisos, Tribunal) se escapa antes de meterlo en
+    // el HTML, así un "<" o una comilla se muestran como texto y no se toman como código.
+    function escaparHtml(texto) {
+        return String(texto ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Un link "javascript:" ejecutaría código al tocarlo: esos quedan en "#".
+    function urlSegura(url, siFalta = '#') {
+        const u = String(url ?? '').trim();
+        if (!u) return siFalta;
+        return escaparHtml(/^(javascript|vbscript|data):/i.test(u.replace(/[\s\u0000-\u001f]/g, '')) ? '#' : u);
+    }
+
+    // Para url('...') dentro de un style: las comillas y los paréntesis cerrarían el url() antes de tiempo.
+    function urlCss(url) {
+        return urlSegura(String(url ?? '').replace(/['"()\\]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()), '');
+    }
+
     // 1. ALGORITMO DE ORDENAMIENTO
     function ordenarTabla(equipos) {
         return [...equipos].sort((a, b) => {
@@ -164,7 +182,7 @@ document.addEventListener('liga:datos-listos', () => {
             tbody.innerHTML += `
                 <tr class="${claseFila}">
                     <td class="${clasePosicion}" ${esMejorCuarto ? 'title="Clasifica como mejor 4° puesto"' : ''}>${index + 1}</td>
-                    <td class="td-team-name">${equipo.nombre}</td>
+                    <td class="td-team-name">${escaparHtml(equipo.nombre)}</td>
                     <td>${equipo.pj}</td>
                     <td>${equipo.g}</td>
                     <td>${equipo.e}</td>
@@ -217,8 +235,8 @@ document.addEventListener('liga:datos-listos', () => {
             tbody.innerHTML += `
                 <tr class="row-normal">
                     <td style="color:#fff; text-align:center;">${i + 1}</td>
-                    <td class="td-team-name">${j.nombre}</td>
-                    <td style="font-size: 12px; color: #a9bce8;">${j.equipo}</td>
+                    <td class="td-team-name">${escaparHtml(j.nombre)}</td>
+                    <td style="font-size: 12px; color: #a9bce8;">${escaparHtml(j.equipo)}</td>
                     <td style="font-weight: bold; color: #2edae3; text-align:center;">${j.goles}</td>
                 </tr>
             `;
@@ -274,7 +292,7 @@ document.addEventListener('liga:datos-listos', () => {
             tbody.innerHTML += `
                 <tr class="row-normal">
                     <td class="td-pos-normal">${i + 1}</td>
-                    <td class="td-team-name">${e.nombre}</td>
+                    <td class="td-team-name">${escaparHtml(e.nombre)}</td>
                     ${metricasHTML}
                 </tr>
             `;
@@ -353,7 +371,7 @@ document.addEventListener('liga:datos-listos', () => {
             const esDePlayoff = partido.esPlayoff || Number(partido.fecha) >= 100;
             const infoSeparador = esDePlayoff
                 ? `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} — ${nombreFechaPublico(partido.fecha)}`
-                : `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} - Grupo ${grupoActual}`;
+                : `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} - Grupo ${escaparHtml(grupoActual)}`;
 
             if (infoSeparador !== ultimoSeparador) {
                 contenedor.innerHTML += `
@@ -367,21 +385,21 @@ document.addEventListener('liga:datos-listos', () => {
             if (partido.jugado) {
                 contenedor.innerHTML += `
                     <div class="match-card">
-                        <span class="team-name">${partido.local}</span>
-                        <span class="score" style="color: #2edae3; font-weight: bold;">${partido.golesLocal} - ${partido.golesVisitante}</span>
-                        <span class="team-name">${partido.visitante}</span>
+                        <span class="team-name">${escaparHtml(partido.local)}</span>
+                        <span class="score" style="color: #2edae3; font-weight: bold;">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>
+                        <span class="team-name">${escaparHtml(partido.visitante)}</span>
                     </div>
                 `;
             } else {
                 contenedor.innerHTML += `
                     <div class="match-card" style="border-left-color: #e11d48; border-right-color: #e11d48;">
-                        <span class="team-name">${partido.local}</span>
+                        <span class="team-name">${escaparHtml(partido.local)}</span>
                         <span class="score" style="color: #f43f5e; font-size: 13px;">VS<br>
-                            ${partido.dia ? `<span class="match-meta-dia">${partido.dia}</span>` : ''}
-                            <span style="font-size: 10px; color: #869bd8; display:block; margin-top:2px;">${partido.horario || 'Horario a confirmar'}</span>
-                            <span style="font-size: 9px; color: #2edae3; display:block; font-family:'Oswald',sans-serif; margin-top:1px;">${partido.cancha || 'Cancha a confirmar'}</span>
+                            ${partido.dia ? `<span class="match-meta-dia">${escaparHtml(partido.dia)}</span>` : ''}
+                            <span style="font-size: 10px; color: #869bd8; display:block; margin-top:2px;">${escaparHtml(partido.horario || 'Horario a confirmar')}</span>
+                            <span style="font-size: 9px; color: #2edae3; display:block; font-family:'Oswald',sans-serif; margin-top:1px;">${escaparHtml(partido.cancha || 'Cancha a confirmar')}</span>
                         </span>
-                        <span class="team-name">${partido.visitante}</span>
+                        <span class="team-name">${escaparHtml(partido.visitante)}</span>
                     </div>
                 `;
             }
@@ -422,8 +440,8 @@ document.addEventListener('liga:datos-listos', () => {
             const esSuperior = ciclo === 'superior';
 
             grupos.forEach((g, idx) => {
-                const label = (g === 'Unico') ? 'Tabla Única' : `Grupo ${g}`;
-                contenedor.innerHTML += `<button class="tab-btn ${idx === 0 ? 'active' : ''}" data-grupo-val="${g}">${label}</button>`;
+                const label = (g === 'Unico') ? 'Tabla Única' : `Grupo ${escaparHtml(g)}`;
+                contenedor.innerHTML += `<button class="tab-btn ${idx === 0 ? 'active' : ''}" data-grupo-val="${escaparHtml(g)}">${label}</button>`;
             });
 
             contenedor.querySelectorAll('.tab-btn').forEach(boton => {
@@ -621,21 +639,21 @@ document.addEventListener('liga:datos-listos', () => {
         const sponsors = obtenerSponsors().slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
         track.innerHTML = sponsors.map((s, i) => `
-            <div class="sponsor-card-full${i === 0 ? ' active-slide' : ''}"${s.colorFondo ? ` style="background-color: ${s.colorFondo};"` : ''}>
-                ${s.categoria ? `<div class="sponsor-badge">${s.categoria}</div>` : ''}
-                <img src="${s.logo || 'Recursos/logo pelota fut.svg'}" alt="Sponsor ${s.nombre}" class="sponsor-logo">
+            <div class="sponsor-card-full${i === 0 ? ' active-slide' : ''}"${s.colorFondo ? ` style="background-color: ${String(s.colorFondo).replace(/[^#a-zA-Z0-9(),.%\s-]/g, '')};"` : ''}>
+                ${s.categoria ? `<div class="sponsor-badge">${escaparHtml(s.categoria)}</div>` : ''}
+                <img src="${urlSegura(s.logo, 'Recursos/logo pelota fut.svg')}" alt="Sponsor ${escaparHtml(s.nombre)}" class="sponsor-logo">
                 <div class="sponsor-info">
-                    <h4>${s.nombre}</h4>
+                    <h4>${escaparHtml(s.nombre)}</h4>
                     <span class="sponsor-support">Apoyan al torneo de la siguiente manera</span>
-                    <p>${s.descripcion || ''}</p>
-                    ${s.instagram ? `<a href="https://instagram.com/${s.instagram.replace('@', '')}" target="_blank" class="sponsor-contacto-link">@${s.instagram.replace('@', '')}</a>` : ''}
-                    ${s.telefono ? `<span class="sponsor-contacto-link">${s.telefono}</span>` : ''}
-                    ${s.ubicacion ? `<br>${s.ubicacion.trim().startsWith('http') ? `<a href="${s.ubicacion}" target="_blank" class="sponsor-contacto-link sponsor-ubicacion">${s.ubicacion}</a>` : `<span class="sponsor-contacto-link sponsor-ubicacion">${s.ubicacion}</span>`}` : ''}
+                    <p>${escaparHtml(s.descripcion || '')}</p>
+                    ${s.instagram ? `<a href="https://instagram.com/${escaparHtml(s.instagram.replace('@', ''))}" target="_blank" class="sponsor-contacto-link">@${escaparHtml(s.instagram.replace('@', ''))}</a>` : ''}
+                    ${s.telefono ? `<span class="sponsor-contacto-link">${escaparHtml(s.telefono)}</span>` : ''}
+                    ${s.ubicacion ? `<br>${s.ubicacion.trim().startsWith('http') ? `<a href="${urlSegura(s.ubicacion)}" target="_blank" class="sponsor-contacto-link sponsor-ubicacion">${escaparHtml(s.ubicacion)}</a>` : `<span class="sponsor-contacto-link sponsor-ubicacion">${escaparHtml(s.ubicacion)}</span>`}` : ''}
                     <br>
                     <button class="sponsor-link-btn btn-beneficio">Ver Beneficio</button>
                     <div class="beneficio-secreto">
-                        <p>${s.beneficio || ''}</p>
-                        ${s.link ? `<a href="${s.link}" target="_blank" class="link-video-futuro">Más información</a>` : ''}
+                        <p>${escaparHtml(s.beneficio || '')}</p>
+                        ${s.link ? `<a href="${urlSegura(s.link)}" target="_blank" class="link-video-futuro">Más información</a>` : ''}
                     </div>
                 </div>
             </div>
@@ -666,10 +684,10 @@ document.addEventListener('liga:datos-listos', () => {
         }
 
         grid.innerHTML = albumes.map(a => `
-            <a href="${a.link || '#'}" target="_blank" class="foto-card">
-                <div class="foto-bg" style="background-image: url('${a.portada || 'Recursos/search.svg'}');"></div>
+            <a href="${urlSegura(a.link)}" target="_blank" class="foto-card">
+                <div class="foto-bg" style="background-image: url('${urlCss(a.portada || 'Recursos/search.svg')}');"></div>
                 <div class="foto-content">
-                    <h4>${a.titulo}</h4>
+                    <h4>${escaparHtml(a.titulo)}</h4>
                     <p>Ver álbum completo</p>
                 </div>
             </a>
@@ -800,15 +818,15 @@ document.addEventListener('liga:datos-listos', () => {
             // Evaluamos si cargaste un link o no
             let htmlLink = '';
             if (n.linkUrl && n.linkUrl !== '') {
-                htmlLink = `<a href="${n.linkUrl}" class="hero-inline-link">${n.linkTexto}</a>`;
+                htmlLink = `<a href="${urlSegura(n.linkUrl)}" class="hero-inline-link">${escaparHtml(n.linkTexto)}</a>`;
             }
 
             heroTrack.innerHTML += `
                 <div class="hero-card-3d">
-                    <div class="hero-card-bg" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.95)), url('${n.foto}');"></div>
+                    <div class="hero-card-bg" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.95)), url('${urlCss(n.foto)}');"></div>
                     <div class="hero-card-content">
-                        <h2>${n.titulo}</h2>
-                        <p>${n.texto} ${htmlLink}</p>
+                        <h2>${escaparHtml(n.titulo)}</h2>
+                        <p>${escaparHtml(n.texto)} ${htmlLink}</p>
                     </div>
                 </div>
             `;
@@ -1051,33 +1069,33 @@ document.addEventListener('liga:datos-listos', () => {
         const sancionesActa = sanciones.filter(s => numeroDeActa(s) === numActa);
 
         if (sancionesActa.length === 0) {
-            contDetalleActa.innerHTML = `<p style="color:#869bd8; font-size:11px;">No hay resoluciones para el Acta N° ${numActa}.</p>`;
+            contDetalleActa.innerHTML = `<p style="color:#869bd8; font-size:11px;">No hay resoluciones para el Acta N° ${escaparHtml(numActa)}.</p>`;
             return;
         }
 
         contDetalleActa.innerHTML = `
             <div style="font-family:'Oswald', sans-serif; font-size:11px; color:#f43f5e; margin-bottom:12px; text-transform:uppercase; border-bottom:1px solid rgba(244,63,94,0.2); padding-bottom:4px;">
-                RESOLUCIONES OFICIALES — ACTA N° ${numActa}
+                RESOLUCIONES OFICIALES — ACTA N° ${escaparHtml(numActa)}
             </div>
         `;
 
         sancionesActa.forEach(s => {
-            const jugadorTexto = s.jugador ? ` — ${s.jugador}` : '';
+            const jugadorTexto = s.jugador ? ` — ${escaparHtml(s.jugador)}` : '';
             const sancionPts = s.levantada
-                ? `<span style="color:#4ade80; font-weight:bold;">(${s.fechaLevantada}) Quita levantada: pagó el 50%</span>`
+                ? `<span style="color:#4ade80; font-weight:bold;">(${escaparHtml(s.fechaLevantada)}) Quita levantada: pagó el 50%</span>`
                 : (s.tipo === 'Quita de Puntos' && s.puntosRestados > 0
-                    ? `<span style="color:#f43f5e; font-weight:bold;">(-${s.puntosRestados} PTS)</span>`
+                    ? `<span style="color:#f43f5e; font-weight:bold;">(-${escaparHtml(s.puntosRestados)} PTS)</span>`
                     : (s.tipo === 'Sanción Disciplinaria' && s.puntosRestados > 0
-                        ? `<span style="color:#f43f5e; font-weight:bold;">(${s.puntosRestados} ${s.puntosRestados === 1 ? 'fecha' : 'fechas'} de suspensión)</span>`
+                        ? `<span style="color:#f43f5e; font-weight:bold;">(${escaparHtml(s.puntosRestados)} ${s.puntosRestados === 1 ? 'fecha' : 'fechas'} de suspensión)</span>`
                         : ''));
 
             contDetalleActa.innerHTML += `
                 <div style="background: rgba(255,255,255,0.03); border-left: 4px solid #f43f5e; padding: 10px; margin-bottom: 8px; border-radius: 3px; text-align: left;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:12px; color:white; font-weight:bold;">${s.equipo}${jugadorTexto}</span>
-                        <span style="font-size:10px; color:#fca5a5; font-weight:bold;">${s.tipo} ${sancionPts}</span>
+                        <span style="font-size:12px; color:white; font-weight:bold;">${escaparHtml(s.equipo)}${jugadorTexto}</span>
+                        <span style="font-size:10px; color:#fca5a5; font-weight:bold;">${escaparHtml(s.tipo)} ${sancionPts}</span>
                     </div>
-                    <p style="color:#cbd5e1; font-size:11px; margin: 5px 0 0 0;"><em>"${s.motivo || 'Sin motivo especificado'}"</em></p>
+                    <p style="color:#cbd5e1; font-size:11px; margin: 5px 0 0 0;"><em>"${escaparHtml(s.motivo || 'Sin motivo especificado')}"</em></p>
                 </div>
             `;
         });
@@ -1231,8 +1249,8 @@ document.addEventListener('liga:datos-listos', () => {
                     esGanadorVisita = ganador === 'visitante';
 
                     if (gLocal === gVisita && golesParaCruce.penalesLocal !== null && golesParaCruce.penalesVisitante !== null) {
-                        penalesLocalTxt = `<span class="score-penal">(${golesParaCruce.penalesLocal})</span>`;
-                        penalesVisitaTxt = `<span class="score-penal">(${golesParaCruce.penalesVisitante})</span>`;
+                        penalesLocalTxt = `<span class="score-penal">(${escaparHtml(golesParaCruce.penalesLocal)})</span>`;
+                        penalesVisitaTxt = `<span class="score-penal">(${escaparHtml(golesParaCruce.penalesVisitante)})</span>`;
                     }
 
                     if (ronda === 'final') {
@@ -1244,12 +1262,12 @@ document.addEventListener('liga:datos-listos', () => {
                 rondaHTML += `
                     <div class="bracket-match">
                         <div class="team-row ${esGanadorLocal ? 'winner' : ''}">
-                            <span class="team-name">${c.local || '(A definir)'}</span>
-                            <div>${penalesLocalTxt}<span class="score-num">${gLocal}</span></div>
+                            <span class="team-name">${escaparHtml(c.local || '(A definir)')}</span>
+                            <div>${penalesLocalTxt}<span class="score-num">${escaparHtml(gLocal)}</span></div>
                         </div>
                         <div class="team-row ${esGanadorVisita ? 'winner' : ''}">
-                            <span class="team-name">${c.visitante || '(A definir)'}</span>
-                            <div>${penalesVisitaTxt}<span class="score-num">${gVisita}</span></div>
+                            <span class="team-name">${escaparHtml(c.visitante || '(A definir)')}</span>
+                            <div>${penalesVisitaTxt}<span class="score-num">${escaparHtml(gVisita)}</span></div>
                         </div>
                     </div>
                 `;
@@ -1276,7 +1294,7 @@ document.addEventListener('liga:datos-listos', () => {
                 <div class="champion-box">
                     <span style="font-size: 9px; color: #869bd8; display: block; text-transform: uppercase; letter-spacing: 1px;">CAMPEÓN CLAUSURA 2026</span>
                     <h3 style="font-size: 15px; color: #fff; margin: 8px 0 0 0; text-shadow: 0 0 10px #f2c00e;">
-                        ${campeonTorneo ? `${campeonTorneo}` : 'POR DEFINIR'}
+                        ${campeonTorneo ? escaparHtml(campeonTorneo) : 'POR DEFINIR'}
                     </h3>
                 </div>
             </div>
@@ -1424,7 +1442,7 @@ document.addEventListener('liga:datos-listos', () => {
             const cicloTxt = partido.ciclo === 'superior' ? 'Superior' : 'Básico';
             const infoSeparador = partido.esPlayoff
                 ? `${cicloTxt} — ${nombreFechaPublico(partido.fecha)}`
-                : `${cicloTxt} — Grupo ${partido.grupo || 'A'}`;
+                : `${cicloTxt} — Grupo ${escaparHtml(partido.grupo || 'A')}`;
 
             if (infoSeparador !== ultimoSeparador) {
                 contenedor.innerHTML += `
@@ -1436,14 +1454,14 @@ document.addEventListener('liga:datos-listos', () => {
             }
 
             const esJugado = partido.jugado;
-            const horarioTxt = partido.horario || 'Horario a confirmar';
-            const canchaTxt = partido.cancha || 'Cancha a confirmar';
-            const diaTxt = partido.dia || '';
+            const horarioTxt = escaparHtml(partido.horario || 'Horario a confirmar');
+            const canchaTxt = escaparHtml(partido.cancha || 'Cancha a confirmar');
+            const diaTxt = escaparHtml(partido.dia || '');
 
             // Goles y Tarjetas Local
             let htmlLocal = '';
             if (partido.goleadoresLocal && partido.goleadoresLocal.length > 0) {
-                htmlLocal += partido.goleadoresLocal.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                htmlLocal += partido.goleadoresLocal.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
             }
             htmlLocal += htmlTarjetasPartido(partido, 'local');
             if (!htmlLocal && esJugado) htmlLocal = '<div style="opacity: 0.4;">Sin incidencias</div>';
@@ -1451,28 +1469,28 @@ document.addEventListener('liga:datos-listos', () => {
             // Goles y Tarjetas Visitante
             let htmlVisita = '';
             if (partido.goleadoresVisitante && partido.goleadoresVisitante.length > 0) {
-                htmlVisita += partido.goleadoresVisitante.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                htmlVisita += partido.goleadoresVisitante.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
             }
             htmlVisita += htmlTarjetasPartido(partido, 'visitante');
             if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin incidencias</div>';
 
-            const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${partido.mvp}` : '';
+            const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${escaparHtml(partido.mvp)}` : '';
 
             contenedor.innerHTML += `
-                <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}" data-pid="${partido.id}">
+                <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}" data-pid="${escaparHtml(partido.id)}">
 
                     <!-- HEADER EN GRILLA 3 COLUMNAS -->
                     <div class="match-header-grid">
-                        
+
                         <!-- Columna 1: Equipo Local -->
                         <div class="col-team col-local">
-                            <span class="team-name">${partido.local}</span>
+                            <span class="team-name">${escaparHtml(partido.local)}</span>
                         </div>
-                        
+
                         <!-- Columna 2: Resultado / Metas (Centro exacto) -->
                         <div class="col-center">
-                            ${esJugado 
-                                ? `<span class="score-main">${partido.golesLocal} - ${partido.golesVisitante}</span>` 
+                            ${esJugado
+                                ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>`
                                 : `<span class="vs-badge">VS</span>`
                             }
                             ${diaTxt ? `<span class="match-meta-dia">${diaTxt}</span>` : ''}
@@ -1483,7 +1501,7 @@ document.addEventListener('liga:datos-listos', () => {
 
                         <!-- Columna 3: Equipo Visitante + Flecha pegadita -->
                         <div class="col-team col-visita">
-                            <span class="team-name">${partido.visitante}</span>
+                            <span class="team-name">${escaparHtml(partido.visitante)}</span>
                             <span class="arrow-indicator">▼</span>
                         </div>
 
@@ -1634,7 +1652,7 @@ document.addEventListener('liga:datos-listos', () => {
             if (coincidencias.length === 0) {
                 searchDropdown.innerHTML = `
                     <div style="padding: 12px; text-align: center; color: #869bd8; font-size: 11px; font-family: Oswald;">
-                        No se encontraron equipos con "${query}"
+                        No se encontraron equipos con "${escaparHtml(query)}"
                     </div>
                 `;
                 searchDropdown.classList.remove('seccion-oculta');
@@ -1646,15 +1664,15 @@ document.addEventListener('liga:datos-listos', () => {
             coincidencias.forEach(eq => {
                 const item = document.createElement('div');
                 item.className = 'search-result-item';
-                const etiquetaGrupo = eq.grupo === 'Unico' ? 'Tabla Única' : `Grupo ${eq.grupo || 'A'}`;
+                const etiquetaGrupo = eq.grupo === 'Unico' ? 'Tabla Única' : `Grupo ${escaparHtml(eq.grupo || 'A')}`;
                 item.innerHTML = `
                     <div class="search-item-header">
-                        <span class="search-item-name">${eq.nombre}</span>
+                        <span class="search-item-name">${escaparHtml(eq.nombre)}</span>
                         <span class="search-item-badge">${eq.ciclo} - ${etiquetaGrupo}</span>
                     </div>
                     <div class="search-item-actions">
-                        <button class="search-action-btn btn-ir-tabla" data-equipo="${eq.nombre}">Posiciones</button>
-                        <button class="search-action-btn btn-ir-partidos" data-equipo="${eq.nombre}">Partidos</button>
+                        <button class="search-action-btn btn-ir-tabla" data-equipo="${escaparHtml(eq.nombre)}">Posiciones</button>
+                        <button class="search-action-btn btn-ir-partidos" data-equipo="${escaparHtml(eq.nombre)}">Partidos</button>
                     </div>
                 `;
                 searchDropdown.appendChild(item);
@@ -1911,9 +1929,9 @@ document.addEventListener('liga:datos-listos', () => {
 
         contenedor.innerHTML += `
             <div class="notif-item ${claseLeida} ${claseUrgente}">
-                <div class="notif-item-title">${n.titulo}</div>
-                <div class="notif-item-desc">${n.texto}</div>
-                <div class="notif-item-time">${tiempoTexto}</div>
+                <div class="notif-item-title">${escaparHtml(n.titulo)}</div>
+                <div class="notif-item-desc">${escaparHtml(n.texto)}</div>
+                <div class="notif-item-time">${escaparHtml(tiempoTexto)}</div>
             </div>
         `;
     });
@@ -2097,7 +2115,7 @@ document.addEventListener('liga:datos-listos', () => {
             return Object.keys(cantidades).map(id => {
                 const jugador = (equipo.jugadores || []).find(j => j.dni === id);
                 if (!jugador) return '';
-                return `<div><span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>${jugador.nombre} (#${jugador.dorsal}) ${cantidades[id] > 1 ? `x${cantidades[id]}` : ''}</div>`;
+                return `<div><span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>${escaparHtml(jugador.nombre)} (#${escaparHtml(jugador.dorsal)}) ${cantidades[id] > 1 ? `x${cantidades[id]}` : ''}</div>`;
             }).join('');
         }).join('');
     }
@@ -2136,17 +2154,18 @@ document.addEventListener('liga:datos-listos', () => {
             equipo.jugadores.sort((a, b) => golesDe.get(b) - golesDe.get(a));
 
             equipo.jugadores.forEach((j, idx) => {
-                const fotoUrl = j.foto || 'Recursos/search.svg';
-                const dorsal = (j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '') ? `#${j.dorsal}` : `-`;
-                const igUser = j.instagram 
-                    ? `<a href="https://instagram.com/${j.instagram.replace('@','')}" target="_blank" class="ig-player-link">@${j.instagram.replace('@','')}</a>` 
+                const fotoUrl = escaparHtml(j.foto || 'Recursos/search.svg');
+                const dorsal = (j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '') ? `#${escaparHtml(j.dorsal)}` : `-`;
+                const ig = j.instagram ? escaparHtml(j.instagram.replace('@','')) : '';
+                const igUser = ig
+                    ? `<a href="https://instagram.com/${ig}" target="_blank" class="ig-player-link">@${ig}</a>`
                     : '-';
 
                 tbodyJugadores.innerHTML += `
                     <tr class="row-normal">
-                        <td><img src="${fotoUrl}" alt="${j.nombre}" class="player-avatar-img"></td>
+                        <td><img src="${fotoUrl}" alt="${escaparHtml(j.nombre)}" class="player-avatar-img"></td>
                         <td style="color: #869bd8; font-size: 11px; text-align: center;">${dorsal}</td>
-                        <td style="text-align: left !important; color: #fff; font-weight: bold;">${j.nombre}</td>
+                        <td style="text-align: left !important; color: #fff; font-weight: bold;">${escaparHtml(j.nombre)}</td>
                         <td style="text-align: center; color:#fff;">${partidosJugadosDeJugador(j, equipo, partidosParaPJ)}</td>
                         <td style="color: #2edae3; font-weight: bold; text-align: center;">${golesDe.get(j)}</td>
                         <td style="color: #f2c00e; text-align: center;">${tarjetasDeJugador(j, equipo, partidosParaPJ).amarillas}</td>
@@ -2180,14 +2199,14 @@ document.addEventListener('liga:datos-listos', () => {
 
             misPartidos.forEach(partido => {
                 const esJugado = partido.jugado;
-                const horarioTxt = partido.horario || 'Horario a confirmar';
-                const canchaTxt = partido.cancha || 'Cancha a confirmar';
-                const diaTxt = partido.dia || '';
+                const horarioTxt = escaparHtml(partido.horario || 'Horario a confirmar');
+                const canchaTxt = escaparHtml(partido.cancha || 'Cancha a confirmar');
+                const diaTxt = escaparHtml(partido.dia || '');
 
                 // Incidencias Local
                 let htmlLocal = '';
                 if (partido.goleadoresLocal && partido.goleadoresLocal.length > 0) {
-                    htmlLocal += partido.goleadoresLocal.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                    htmlLocal += partido.goleadoresLocal.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
                 }
                 htmlLocal += htmlTarjetasPartido(partido, 'local');
                 if (!htmlLocal && esJugado) htmlLocal = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';
@@ -2195,12 +2214,12 @@ document.addEventListener('liga:datos-listos', () => {
                 // Incidencias Visitante
                 let htmlVisita = '';
                 if (partido.goleadoresVisitante && partido.goleadoresVisitante.length > 0) {
-                    htmlVisita += partido.goleadoresVisitante.map(g => `<div>${g.nombre} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                    htmlVisita += partido.goleadoresVisitante.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
                 }
                 htmlVisita += htmlTarjetasPartido(partido, 'visitante');
                 if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';
 
-                const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${partido.mvp}` : '';
+                const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${escaparHtml(partido.mvp)}` : '';
 
                 // Sanción/Descuento de puntos en esa fecha
                 const sancionPartido = sancionesDinamicas.find(s =>
@@ -2210,8 +2229,8 @@ document.addEventListener('liga:datos-listos', () => {
                 );
                 const htmlSancion = sancionPartido 
                     ? (sancionPartido.levantada
-                        ? `<div class="sancion-partido-banner sancion-levantada">(${sancionPartido.fechaLevantada}) Quita levantada: pagó el 50%</div>`
-                        : `<div class="sancion-partido-banner">Sanción/Descuento: -${sancionPartido.puntosRestados} PTS (${sancionPartido.motivo || 'Quita de puntos'})</div>`) 
+                        ? `<div class="sancion-partido-banner sancion-levantada">(${escaparHtml(sancionPartido.fechaLevantada)}) Quita levantada: pagó el 50%</div>`
+                        : `<div class="sancion-partido-banner">Sanción/Descuento: -${escaparHtml(sancionPartido.puntosRestados)} PTS (${escaparHtml(sancionPartido.motivo || 'Quita de puntos')})</div>`)
                     : '';
 
                 contPartidos.innerHTML += `
@@ -2219,13 +2238,13 @@ document.addEventListener('liga:datos-listos', () => {
                         
                         <div class="match-header-grid">
                             <div class="col-team col-local">
-                                <span class="team-name">${partido.local}</span>
+                                <span class="team-name">${escaparHtml(partido.local)}</span>
                             </div>
 
                             <div class="col-center">
-                                <span style="font-size: 9px; color: #869bd8; font-family: 'Oswald'; display: block;">${nombreFechaPublico(partido.fecha)}</span>
+                                <span style="font-size: 9px; color: #869bd8; font-family: 'Oswald'; display: block;">${escaparHtml(nombreFechaPublico(partido.fecha))}</span>
                                 ${esJugado
-                                    ? `<span class="score-main">${partido.golesLocal} - ${partido.golesVisitante}</span>`
+                                    ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>`
                                     : `<span class="vs-badge">VS</span>`
                                 }
                                 ${diaTxt ? `<span class="match-meta-dia">${diaTxt}</span>` : ''}
@@ -2233,7 +2252,7 @@ document.addEventListener('liga:datos-listos', () => {
                             </div>
 
                             <div class="col-team col-visita">
-                                <span class="team-name">${partido.visitante}</span>
+                                <span class="team-name">${escaparHtml(partido.visitante)}</span>
                                 <span class="arrow-indicator">▼</span>
                             </div>
                         </div>

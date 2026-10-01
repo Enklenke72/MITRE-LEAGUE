@@ -2452,9 +2452,684 @@ async function historialDeCambios() {
     marco.style.width = anchoOriginal;
 }
 
+// ---------------- Importar la planilla de inscripción de un equipo (01/10/2026) ----------------
+// Las planillas de prueba (planillas-prueba/, datos inventados) las genera generar-planillas-prueba.py a partir de la
+// estructura de la planilla real del Clausura 2026. En la copia de prueba, admin.js baja SheetJS y pdf.js de /libs/
+// en lugar del CDN (ver REPORTE-7.md). Los casos borde se arman acá mismo con SheetJS.
+const PLANILLA_ESPERADA = [
+    { nombre: 'Valentino Acuña', dni: '50123456', dorsal: '21', nacimiento: '2010-02-18', celular: '11-2345-0001', instagram: 'valen.acu' },
+    { nombre: 'Thiago Ñañez', dni: '50234567', dorsal: '7', nacimiento: '2009-11-03', celular: '11-2345-0002', instagram: 'thiago_nz' },
+    { nombre: 'Bautista Gómez', dni: '49876543', dorsal: '10', nacimiento: '2009-07-25', celular: '11 2345 0003', instagram: 'bauti.gomez' },
+    { nombre: 'Lautaro Pérez', dni: '50345678', dorsal: '0', nacimiento: '2010-05-30', celular: '1123450004', instagram: '' },
+    { nombre: 'Joaquín Ríos', dni: '50456789', dorsal: '99', nacimiento: '2010-01-09', celular: '11-2345-0005', instagram: '' },
+    { nombre: 'Benjamín Sosa Frattini', dni: '49987654', dorsal: '11', nacimiento: '2009-12-31', celular: '11-2345-0006', instagram: 'benja.sf' },
+    { nombre: 'Ignacio Martínez', dni: '50567890', dorsal: '5', nacimiento: '2010-03-14', celular: '11-2345-0007', instagram: 'nacho.mtz' },
+    { nombre: 'Santino Rivero', dni: '50678901', dorsal: '47', nacimiento: '2009-09-09', celular: '11-2345-0008', instagram: 'tinoriv' }
+];
+const CAMPOS_PLANILLA = ['nombre', 'dni', 'dorsal', 'nacimiento', 'celular', 'instagram'];
+
+async function libreriaXlsx() {
+    if (!window.XLSX) {
+        await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'libs/xlsx.full.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+    }
+    return window.XLSX;
+}
+async function planillaDeArchivo(nombre) {
+    return { nombre, blob: await (await fetch('planillas-prueba/' + nombre)).blob() };
+}
+// filas: [nombre, dni, nacimiento, celular, instagram, dorsal], con la numeración "1)" a la izquierda como la real
+async function planillaArmada(nombre, filas, conTitulos = true) {
+    const XLSX = await libreriaXlsx();
+    const aoa = [['PLANILLA DE INSCRIPCIÓN CLAUSURA MITRE LEAGUE 2026'], ['CURSO: Casos Borde'], []];
+    if (conTitulos) aoa.push(['', 'NOMBRE Y APELLIDO', 'DNI', 'FECHA DE NAC.', 'CELULAR', 'INSTAGRAM', 'DORSAL CAMISETA']);
+    filas.forEach((f, i) => aoa.push([`${i + 1})`, ...f]));
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(aoa), 'PLANILLA');
+    return { nombre, blob: new Blob([XLSX.write(libro, { type: 'array', bookType: 'xlsx' })]) };
+}
+async function subirPlanilla(archivo) {
+    const input = el('importar-planilla-archivo');
+    const dt = new (W().DataTransfer)();
+    dt.items.add(new (W().File)([archivo.blob], archivo.nombre));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = 0; i < 3000; i++) {
+        const estado = el('importar-planilla-estado').textContent;
+        if (estado && !/^Leyendo/.test(estado)) break;
+        await esperar(10);
+    }
+    await esperar(5);
+}
+const panelImp = () => D().getElementById('importar-vista-previa');
+const filasVista = () => [...D().querySelectorAll('#importar-vista-previa .importar-fila')].map(f => {
+    const v = c => f.querySelector(`[data-campo="${c}"]`).value;
+    return {
+        n: Number(f.dataset.n), estado: (f.className.match(/importar-fila-(\S+)/) || [])[1],
+        nombre: v('nombre'), dni: v('dni'), dorsal: v('dorsal'), nacimiento: v('nacimiento'), celular: v('celular'), instagram: v('instagram'),
+        texto: f.querySelector('.importar-estado').textContent.replace(/\s+/g, ' ').trim()
+    };
+});
+const soloDatos = filas => filas.map(f => Object.fromEntries(CAMPOS_PLANILLA.map(c => [c, f[c]])));
+const filaVista = n => filasVista().find(f => f.n === n) || {};
+async function editarFila(n, campo, valor) {
+    const input = D().querySelector(`#importar-vista-previa .importar-fila[data-n="${n}"] [data-campo="${campo}"]`);
+    input.value = valor;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await esperar(2);
+}
+const btnConfirmarImp = () => D().querySelector('#importar-vista-previa .importar-btn-confirmar');
+async function accionImp(accion) {
+    D().querySelector(`#importar-vista-previa [data-accion="${accion}"]`).click();
+    await esperar(5);
+}
+const fsSinResumen = () => { const fs = JSON.parse(localStorage.getItem('fakefs') || '{}'); delete fs.resumen; return JSON.stringify(fs); };
+const equipoSup = nombre => (LS('liga_cicloSuperior') || []).find(e => e.nombre === nombre) || { jugadores: [] };
+
+async function importarPlanilla() {
+    out('\n=== IMPORTAR PLANILLA DE INSCRIPCIÓN: vista previa editable, nada se guarda hasta confirmar ===');
+    const visible = e => !!e && e.getClientRects().length > 0;
+    const erroresJS = () => salida.filter(s => /^JS ERROR/.test(s)).length;
+    const erroresAntes = erroresJS();
+    const alertasAntes = alertas.length;
+    localStorage.removeItem('fake_rol');
+    respuestaConfirm = true;
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    el('btn-sub-plantel-admin').click();
+    for (const nombre of ['Importados', 'Casos Borde', 'Pase Origen']) {
+        setv('nuevo-equipo-ciclo', 'superior'); setv('nuevo-equipo-nombre', nombre); setv('nuevo-equipo-grupo', 'B');
+        await enviar('form-nuevo-equipo');
+        await esperar(3);
+    }
+    el('btn-sub-plantel-jugadores').click();
+    setv('plantel-ciclo', 'superior');
+    setv('plantel-equipo-select', 'Pase Origen');
+    // Inscripto a mano y sin partidos: se puede pasar a otro equipo (conserva ficha y contactos)
+    setv('jugador-nombre', 'Origen Pase', false); setv('jugador-dni', '52000001', false); setv('jugador-dorsal', '8', false);
+    setv('jugador-ficha-medica', 'si', false); setv('jugador-familiar-nombre', 'Madre de Origen', false); setv('jugador-familiar-tel', '11 4444-0001', false);
+    await enviar('form-jugador');
+    // Referencia: un alta a mano con los mismos datos que trae la planilla, para comparar la forma del jugador importado
+    const p0 = PLANILLA_ESPERADA[0];
+    setv('jugador-nombre', 'Referencia Manual', false); setv('jugador-dni', '52000002', false); setv('jugador-dorsal', '3', false);
+    setv('jugador-nacimiento', p0.nacimiento, false); setv('jugador-celular', p0.celular, false); setv('jugador-instagram', p0.instagram, false);
+    setv('jugador-ficha-medica', 'no', false); // el formulario no la limpia entre altas
+    await enviar('form-jugador');
+    const referencia = equipoSup('Pase Origen').jugadores.find(j => j.dni === '52000002');
+    const partidoJugado = (LS('liga_partidos') || []).find(p => p.jugado && !p.esPlayoff && (p.asistentesLocal || []).length);
+    const dniQueJugo = partidoJugado ? String(partidoJugado.asistentesLocal[0]) : '';
+
+    // 1) Sin equipo elegido no se puede importar
+    el('plantel-equipo-select').value = '__ninguno__';
+    el('btn-importar-planilla').click();
+    check(/Primero creá o elegí el equipo/.test(ultimaAlerta()), 'Sin equipo destino elegido, "Importar planilla" pide elegirlo primero', ultimaAlerta());
+
+    // 2) La planilla del Clausura 2026 (misma estructura que la real, datos inventados)
+    setv('plantel-equipo-select', 'Importados');
+    await esperar(300);
+    const fsAntes = fsSinResumen();
+    const memAntes = JSON.stringify(LS('liga_cicloSuperior'));
+    await subirPlanilla(await planillaDeArchivo('planilla-valida.xlsx'));
+    let filas = filasVista();
+    const textoPanel = () => (panelImp().textContent || '').replace(/\s+/g, ' ');
+    check(visible(panelImp()) && JSON.stringify(soloDatos(filas)) === JSON.stringify(PLANILLA_ESPERADA) && filas.every(f => f.estado === 'ok'),
+        'Excel con la estructura de la planilla real: 8 jugadores leídos (los renglones 9 y 10 vacíos se saltean), todos listos, con DNI, fecha, celular e Instagram bien leídos',
+        filas.filter((f, i) => JSON.stringify(soloDatos([f])[0]) !== JSON.stringify(PLANILLA_ESPERADA[i]) || f.estado !== 'ok'));
+    check(/CURSO: 5to 4ta/.test(textoPanel()) && /Destino: Importados \(Superior\)/.test(textoPanel()) && !btnConfirmarImp().disabled && btnConfirmarImp().textContent === 'Confirmar importación (8 jugadores)',
+        'La vista previa muestra el curso de la planilla, el equipo destino y "Confirmar importación (8 jugadores)" habilitado', { boton: btnConfirmarImp().textContent, texto: textoPanel().slice(0, 200) });
+    await editarFila(1, 'nombre', 'Valentino Acuña (C)');
+    check(filaVista(1).estado === 'ok' && fsSinResumen() === fsAntes && JSON.stringify(LS('liga_cicloSuperior')) === memAntes,
+        'Editar en la vista previa (marcar al capitán) no guarda nada: ni en Firestore ni en los planteles', filaVista(1));
+    await accionImp('confirmar');
+    const importados = equipoSup('Importados').jugadores;
+    const esperadoConCapitan = PLANILLA_ESPERADA.map((p, i) => ({ ...p, nombre: i === 0 ? 'Valentino Acuña (C)' : p.nombre }));
+    check(importados.length === 8 && JSON.stringify(importados.map(j => ({ ...Object.fromEntries(CAMPOS_PLANILLA.map(c => [c, j[c]])), dorsal: String(j.dorsal) })))
+        === JSON.stringify(esperadoConCapitan) && importados.every(j => typeof j.dorsal === 'number'),
+        'Al confirmar, los 8 quedan en Importados, en el orden de la planilla y con el número de camiseta como número', importados.map(j => j.nombre + ' #' + j.dorsal));
+    const normalizar = j => JSON.stringify(Object.keys(j).sort().map(k => [k, ['nombre', 'dni', 'dorsal'].includes(k) ? '' : j[k]]));
+    check(!!referencia && normalizar(importados[0]) === normalizar(referencia),
+        'El jugador importado queda igual que uno cargado a mano con los mismos datos (mismos campos, ficha pendiente, sin foto ni contactos)', { importado: importados[0], aMano: referencia });
+    check(/^Se importaron 8 jugadores a Importados\.$/.test(ultimaAlerta()) && !visible(panelImp()) && D().querySelectorAll('#tabla-jugadores-body tr').length === 8,
+        'Avisa cuántos se importaron, cierra la vista previa y la lista del equipo muestra a los 8', { alerta: ultimaAlerta(), filasLista: D().querySelectorAll('#tabla-jugadores-body tr').length });
+    await esperar(300);
+    const fsDespues = JSON.parse(localStorage.getItem('fakefs') || '{}');
+    check(JSON.stringify(fsDespues.equiposPrivado || {}).includes('50123456') && !JSON.stringify(fsDespues.equipos || {}).includes('50123456'),
+        'En Firestore los DNI importados quedan en equiposPrivado y no en la colección pública');
+    const histImp = (LS('liga_historial_cambios') || []).map(h => h.detalle).find(d => /^importó 8 jugadores a Importados desde la planilla de inscripción: Valentino Acuña \(C\) \(#21\), Thiago Ñañez \(#7\)/.test(d));
+    check(!!histImp, 'El Historial de Cambios anota la importación en una sola entrada legible', histImp);
+
+    // 3) Volver a subir la misma planilla: todos ya están, no hay nada para importar
+    await subirPlanilla(await planillaDeArchivo('planilla-valida.xlsx'));
+    filas = filasVista();
+    check(filas.length === 8 && filas.every(f => f.estado === 'existe' && /Ya está en este equipo/.test(f.texto)) && btnConfirmarImp().disabled
+        && /No hay jugadores nuevos para importar/.test(textoPanel()),
+        'Subir otra vez la misma planilla: los 8 figuran como "ya está en este equipo" y no se puede confirmar', filas.map(f => f.estado));
+    await accionImp('cancelar');
+    check(!visible(panelImp()), 'Cancelar sin haber editado cierra la vista previa sin preguntar');
+
+    // 4) La misma planilla en CSV (Windows-1252 con ";") y en PDF: se lee igual
+    for (const [archivo, esPdf] of [['planilla-valida.csv', false], ['planilla-valida-impresa.pdf', true], ['planilla-valida-otro-formato.pdf', true]]) {
+        await subirPlanilla(await planillaDeArchivo(archivo));
+        filas = filasVista();
+        const distintas = filas.length !== 8 ? filas : soloDatos(filas).filter((f, i) => JSON.stringify(f) !== JSON.stringify(PLANILLA_ESPERADA[i]));
+        check(visible(panelImp()) && filas.length === 8 && distintas.length === 0 && (!esPdf || /Leído desde un PDF/.test(textoPanel())),
+            `${archivo}: se leen los mismos 8 jugadores que en el Excel (tildes, ñ, DNI con puntos, fechas como texto)` + (esPdf ? ' y avisa que se revise por venir de un PDF' : ''),
+            { estado: el('importar-planilla-estado').textContent, distintas });
+        if (visible(panelImp())) await accionImp('cancelar');
+    }
+
+    // 5) Archivos que no se pueden leer: avisan y no abren la vista previa
+    const casosIlegibles = [
+        [await planillaDeArchivo('planilla-escaneada.pdf'), /no tiene texto: es una foto o un escaneo/],
+        [{ nombre: 'foto-de-la-planilla.png', blob: new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])]) }, /no es una planilla/],
+        [await planillaArmada('sin-titulos.xlsx', [['Alguien', 51000001, '', '', '', 4]], false), /No se encontró la fila de títulos/]
+    ];
+    for (const [archivo, patron] of casosIlegibles) {
+        await subirPlanilla(archivo);
+        const estado = el('importar-planilla-estado');
+        check(patron.test(estado.textContent) && estado.classList.contains('importar-lectura-error') && !visible(panelImp()),
+            `${archivo.nombre}: muestra un error claro y no abre la vista previa`, estado.textContent);
+    }
+
+    // 6) Casos borde en Casos Borde: repetidos dentro del archivo, pase desde otro equipo, DNI que ya jugó, datos faltantes
+    setv('plantel-equipo-select', 'Casos Borde');
+    await esperar(300);
+    const fsAntesBorde = fsSinResumen();
+    await subirPlanilla(await planillaArmada('casos-borde.xlsx', [
+        ['Uno Valido', 53000001, '', '', '', 1],
+        ['Dos Repetido', 53000002, '', '', '', 2],
+        ['Tres Repetido', '53.000.002', '', '', '', 3],
+        ['Cuatro Dorsal', 53000004, '', '', '', 1],
+        ['Origen Pase (C)', 52000001, '', '11-9999-0005', '', 9],
+        ['Ya Jugo', dniQueJugo, '', '', '', 6],
+        ['Sin Numero', 53000007, '', '', '', ''],
+        ['Fecha Rara', 53000008, '31/02/2010', '', '', 12],
+        ['', 53000009, '', '', '', 13],
+        ['Seis Digitos', 530010, '', '', '', 14]
+    ]));
+    filas = filasVista();
+    const estados = filas.map(f => f.estado).join(',');
+    check(estados === 'error,error,error,error,pase-pendiente,error,error,ok,error,ok',
+        'Cada fila queda con su estado: repetidos, pase sin confirmar, ya jugó, sin número, sin nombre; la fecha imposible y el DNI de 6 números solo avisan', estados);
+    check(/DNI repetido en la planilla \(también en la fila 3\)/.test(filaVista(2).texto) && /DNI repetido en la planilla \(también en la fila 2\)/.test(filaVista(3).texto),
+        'Un DNI repetido dentro del mismo archivo (aunque uno venga con puntos) marca error en las dos filas', [filaVista(2).texto, filaVista(3).texto]);
+    check(/Número 1 repetido en la planilla \(también en la fila 4\)/.test(filaVista(1).texto) && /Número 1 repetido en la planilla \(también en la fila 1\)/.test(filaVista(4).texto),
+        'Un número de camiseta repetido dentro del mismo archivo marca error en las dos filas', [filaVista(1).texto, filaVista(4).texto]);
+    check(!!dniQueJugo && /ya jugó con ese equipo, por eso no puede jugar en otro/.test(filaVista(6).texto),
+        'Un DNI de otro equipo que ya jugó partidos se rechaza con el mismo mensaje que el alta a mano', filaVista(6).texto);
+    check(/está inscripto en Pase Origen \(Superior\) y todavía no jugó/.test(filaVista(5).texto) && !!D().querySelector('#importar-vista-previa .importar-fila[data-n="5"] .importar-pase-check:not(:checked)'),
+        'Un DNI de otro equipo sin partidos aparece como pase, con una casilla para confirmarlo (no se pasa solo)', filaVista(5).texto);
+    check(/Falta el número de camiseta/.test(filaVista(7).texto) && /Falta el nombre/.test(filaVista(9).texto)
+        && /No se entendió la fecha de nacimiento «31\/02\/2010»/.test(filaVista(8).texto) && /tiene 6 números/.test(filaVista(10).texto),
+        'Faltantes y avisos con texto claro', [filaVista(7).texto, filaVista(9).texto, filaVista(8).texto, filaVista(10).texto]);
+    check(btnConfirmarImp().disabled && /Corregí o quitá las 7 filas con error para poder importar/.test(textoPanel()), 'Con errores no se puede confirmar', btnConfirmarImp().textContent);
+    await editarFila(3, 'dni', '53000003');
+    check(filaVista(2).estado === 'ok' && filaVista(3).estado === 'ok', 'Corregir el DNI repetido en la vista previa vuelve a revisar y destraba las dos filas', [filaVista(2).texto, filaVista(3).texto]);
+    await editarFila(4, 'dorsal', '4');
+    check(filaVista(1).estado === 'ok' && filaVista(4).estado === 'ok', 'Corregir el número repetido destraba las dos filas');
+    await editarFila(7, 'dorsal', '7');
+    await editarFila(9, 'nombre', 'Nueve Nombre');
+    D().querySelector('#importar-vista-previa .importar-fila[data-n="6"] [data-accion="quitar"]').click();
+    await esperar(3);
+    check(!D().querySelector('#importar-vista-previa .importar-fila[data-n="6"]') && filasVista().every(f => f.estado !== 'error'),
+        'Quitar la fila del que ya jugó y completar los faltantes deja todo sin errores', filasVista().map(f => f.estado).join(','));
+    check(btnConfirmarImp().disabled && /Confirmá o quitá el pase desde otro equipo/.test(textoPanel()), 'El pase sin confirmar sigue trabando la importación');
+    const casilla = D().querySelector('#importar-vista-previa .importar-fila[data-n="5"] .importar-pase-check');
+    casilla.checked = true;
+    casilla.dispatchEvent(new Event('change', { bubbles: true }));
+    await esperar(3);
+    check(filaVista(5).estado === 'pase' && !btnConfirmarImp().disabled && btnConfirmarImp().textContent === 'Confirmar importación (9 jugadores)',
+        'Al tildar el pase se puede confirmar', btnConfirmarImp().textContent);
+    check(fsSinResumen() === fsAntesBorde, 'Después de todas esas correcciones todavía no se guardó nada en Firestore');
+    await accionImp('confirmar');
+    const borde = equipoSup('Casos Borde').jugadores;
+    const pasado = borde.find(j => j.dni === '52000001');
+    check(borde.length === 9 && !equipoSup('Pase Origen').jugadores.some(j => j.dni === '52000001') && equipoSup('Pase Origen').jugadores.some(j => j.dni === '52000002'),
+        'Se importan 9: el pase sale de Pase Origen (el otro jugador de ese equipo queda)', borde.map(j => j.nombre));
+    check(!!pasado && pasado.nombre === 'Origen Pase (C)' && pasado.dorsal === 9 && pasado.fichaMedica === 'si' && pasado.familiarNombre === 'Madre de Origen' && pasado.celular === '11-9999-0005',
+        'El jugador pasado conserva su ficha médica y su contacto, y toma de la planilla el nombre, el número y el celular', pasado);
+    check(borde.find(j => j.nombre === 'Fecha Rara').nacimiento === '' && borde.find(j => j.nombre === 'Seis Digitos').dni === '530010',
+        'La fecha que no se entendió queda vacía; el DNI con aviso se guarda como se escribió');
+    const hist = (LS('liga_historial_cambios') || []).map(h => h.detalle);
+    check(hist.some(d => /^importó 8 jugadores a Casos Borde desde la planilla de inscripción: /.test(d)) && hist.includes('pasó a Origen Pase (C) (#9) de Pase Origen a Casos Borde (desde la planilla de inscripción)'),
+        'El Historial anota las altas y, aparte, el pase', hist.filter(d => /planilla/.test(d)).slice(-2));
+
+    // 7) Cambiar el equipo con la vista previa abierta, y el tope de 10 de la lista
+    setv('plantel-equipo-select', 'Importados');
+    await subirPlanilla(await planillaArmada('tres-mas.xlsx', [['Extra Uno', 54000001, '', '', '', 60], ['Extra Dos', 54000002, '', '', '', 61], ['Extra Tres', 54000003, '', '', '', 62]]));
+    check(/Destino: Importados \(Superior\), hoy con 8 jugadores\. Con esta importación quedaría con 11/.test(textoPanel()), 'Avisa que el equipo pasaría el máximo de 10 de la lista', textoPanel().slice(0, 220));
+    setv('plantel-equipo-select', 'Casos Borde');
+    await esperar(3);
+    check(/Destino: Casos Borde \(Superior\), hoy con 9 jugadores\. Con esta importación quedaría con 12/.test(textoPanel()), 'Cambiar "Equipo Destino" con la vista previa abierta la pasa a ese equipo', textoPanel().slice(0, 220));
+    setv('plantel-equipo-select', 'Importados');
+    await esperar(3);
+    respuestaConfirm = false;
+    await accionImp('confirmar');
+    check(/va a quedar con 11 jugadores y el reglamento permite un máximo de 10/.test(confirms[confirms.length - 1]) && equipoSup('Importados').jugadores.length === 8 && visible(panelImp()),
+        'Pasar el máximo pide confirmación como el alta a mano; si se cancela no se guarda nada', confirms[confirms.length - 1]);
+    respuestaConfirm = true;
+    await accionImp('confirmar');
+    check(equipoSup('Importados').jugadores.length === 11, 'Aceptando, se importan igual', equipoSup('Importados').jugadores.length);
+
+    // 8) Con rol Staff también se puede importar (el Staff carga planteles)
+    localStorage.setItem('fake_rol', 'staff');
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    setv('plantel-ciclo', 'superior');
+    setv('plantel-equipo-select', 'Casos Borde');
+    await subirPlanilla(await planillaArmada('staff.xlsx', [['Cargado Por Staff', 55000001, '2010-04-04', '', '@staff.ig', 30]]));
+    await accionImp('confirmar');
+    localStorage.removeItem('fake_rol');
+    await cargar('admin.html');
+    const porStaff = equipoSup('Casos Borde').jugadores.find(j => j.dni === '55000001');
+    check(!!porStaff && porStaff.nacimiento === '2010-04-04' && porStaff.instagram === 'staff.ig' && !alertas.slice(alertasAntes).some(a => /No se pudo guardar/.test(a)),
+        'El Staff importa y queda guardado (fecha escrita como texto AAAA-MM-DD, Instagram sin @), sin errores de guardado', porStaff);
+
+    // 9) A 390 px la vista previa no desborda
+    const anchoOriginal = marco.style.width;
+    marco.style.width = '390px';
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    setv('plantel-ciclo', 'superior');
+    setv('plantel-equipo-select', 'Pase Origen');
+    await subirPlanilla(await planillaArmada('angosto.xlsx', [
+        ['Benjamín Alejandro Sosa Frattini de la Cruz', 56000001, '', '11-2345-6789', 'un.instagram.bastante.largo_2010', 15],
+        ['Repetido', 56000001, '', '', '', 16],
+        ['Origen Pase (C)', 52000001, '', '', '', 9]
+    ]));
+    const w = D().documentElement.clientWidth;
+    // Solo lo del importador: la tabla "Lista de Buena Fe" de al lado ya tiene su propia caja con scroll horizontal.
+    const desbordes = [...D().querySelectorAll('.importar-bloque, .importar-bloque *, #importar-vista-previa, #importar-vista-previa *')].filter(e => getComputedStyle(e).display !== 'none')
+        .map(e => ({ e, r: e.getBoundingClientRect() })).filter(x => x.r.width > 0 && x.r.right > w + 1)
+        .map(x => (x.e.id ? '#' + x.e.id : x.e.tagName + '.' + [...x.e.classList].join('.')) + ' right=' + Math.round(x.r.right)).slice(0, 6);
+    check(visible(panelImp()) && filasVista().length === 3 && desbordes.length === 0 && D().documentElement.scrollWidth <= w,
+        'A 390 px la vista previa (tarjetas por jugador) no desborda', { ancho: w, scrollPagina: D().documentElement.scrollWidth, desbordes });
+    await accionImp('cancelar');
+    marco.style.width = anchoOriginal;
+    check(erroresJS() === erroresAntes, 'Sin errores de JS en todo el recorrido del importador', erroresJS() - erroresAntes);
+}
+
+// ---------------- Datos de jugadores con código adentro (01/10/2026) ----------------
+// El importador saca < y >, pero el alta a mano no: las tablas del panel y de la web tienen que mostrarlos como texto.
+async function nombresConCodigo() {
+    out('\n=== DATOS DE JUGADORES CON CÓDIGO: se muestran como texto en el panel y en la web ===');
+    const NOMBRE = 'Raro <img src=x onerror="window.__xss=1"> "Comillas"';
+    const IG = 'raro"><img src=y onerror="window.__xss=2">';
+    const FAMILIAR = '<b>Tía</b>';
+    localStorage.removeItem('fake_rol');
+    respuestaConfirm = true;
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    setv('plantel-ciclo', 'superior');
+    setv('plantel-equipo-select', 'Importados');
+    setv('jugador-nombre', NOMBRE, false); setv('jugador-dni', '57000001', false); setv('jugador-dorsal', '77', false);
+    setv('jugador-instagram', IG, false); setv('jugador-ficha-medica', 'no', false); setv('jugador-familiar-nombre', FAMILIAR, false);
+    await enviar('form-jugador');
+    await esperar(500);
+    const fila = [...D().querySelectorAll('#tabla-jugadores-body tr')].find(tr => tr.textContent.includes('57000001'));
+    check(!!fila && fila.cells[1].textContent.trim() === NOMBRE && fila.cells[3].textContent.trim() === '@' + IG && !D().querySelector('#tabla-jugadores-body img') && W().__xss === undefined,
+        'Planteles muestra el nombre y el Instagram con código como texto, sin ejecutarlo', fila && [fila.cells[1].textContent.trim(), fila.cells[3].textContent.trim()]);
+    D().querySelector('.btn-editar-jugador[data-dni="57000001"]').click();
+    await esperar(2);
+    check(el('jugador-nombre').value === NOMBRE && el('jugador-instagram').value === IG, 'Editar ese jugador carga sus datos tal cual (el botón lo encuentra por su DNI)', el('jugador-nombre').value);
+    el('btn-cancelar-edicion-jugador').click();
+    D().querySelector('.btn-ver-emergencia[data-dni="57000001"]').click();
+    await esperar(2);
+    const sos = el('emergencia-modal-body');
+    check(sos.textContent.includes(FAMILIAR) && !sos.querySelector('b'), 'La ficha de emergencia muestra el contacto con código como texto', sos.textContent.replace(/\s+/g, ' ').slice(0, 160));
+    D().getElementById('modal-emergencia').classList.add('seccion-oculta');
+    setv('input-buscador-global', 'Raro');
+    await esperar(300);
+    const resultado = D().querySelector('#resultados-buscador-global .resultado-buscador-nombre');
+    check(!!resultado && resultado.textContent === NOMBRE && !D().querySelector('#resultados-buscador-global img') && W().__xss === undefined,
+        'El buscador del encabezado muestra el nombre con código como texto', resultado && resultado.textContent);
+    setv('input-buscador-global', '');
+
+    await cargar('index.html');
+    D().querySelector('.tabs-sup .tab-btn[data-grupo-val="B"]').click();
+    const celda = [...D().querySelectorAll('.td-team-name')].find(c => c.textContent.trim() === 'Importados');
+    celda.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await esperar(500);
+    const filaWeb = [...D().querySelectorAll('#modal-equipo-tbody-jugadores tr')].find(tr => tr.cells[2].textContent.trim() === NOMBRE);
+    const filasModal = D().querySelectorAll('#modal-equipo-tbody-jugadores tr').length;
+    check(!!filaWeb && filaWeb.cells[7].textContent.trim() === '@' + IG && filaWeb.querySelector('img').alt === NOMBRE
+        && D().querySelectorAll('#modal-equipo-tbody-jugadores img').length === filasModal && W().__xss === undefined,
+        'En la web pública, el perfil del equipo muestra nombre e Instagram con código como texto (solo las fotos de los jugadores son imágenes)',
+        filaWeb && [filaWeb.cells[2].textContent.trim(), filaWeb.cells[7].textContent.trim()]);
+    D().getElementById('modal-equipo').classList.add('seccion-oculta');
+
+    // Lo mismo con un equipo, un sponsor (con un link "javascript:") y un aviso de la campanita
+    const EQUIPO = 'Los <3 & "Cía"';
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    el('btn-sub-plantel-admin').click();
+    setv('nuevo-equipo-ciclo', 'superior'); setv('nuevo-equipo-nombre', EQUIPO); setv('nuevo-equipo-grupo', 'B');
+    await enviar('form-nuevo-equipo');
+    await esperar(3);
+    el('btn-sub-plantel-jugadores').click();
+    setv('plantel-ciclo', 'superior');
+    const opcion = [...el('plantel-equipo-select').options].find(o => o.value === EQUIPO);
+    check(!!opcion && opcion.textContent === EQUIPO && [...el('mover-equipo-select').options].some(o => o.value === EQUIPO),
+        'Un equipo con "<", "&" y comillas en el nombre aparece tal cual en los selectores del panel', opcion && opcion.value);
+    await tab('sec-prensa');
+    await altaSponsor({ nombre: 'Sponsor <b>Negrita</b>', categoria: 'Colaborador', descripcion: 'Descripción <i>rara</i>', beneficio: '10% <u>off</u>', color: '#123456', link: 'javascript:window.__xss=3' });
+    await tab('sec-alertas');
+    setv('alerta-titulo', 'Aviso <img src=z onerror="window.__xss=4">', false); setv('alerta-texto', 'Texto <b>raro</b>', false); setv('alerta-tipo', 'normal', false);
+    await enviar('form-alerta-admin');
+    await esperar(500);
+    check(el('sec-prensa').textContent.includes('Sponsor <b>Negrita</b>') && el('sec-alertas').textContent.includes('Aviso <img src=z')
+        && !D().querySelector('#sec-prensa b, #sec-alertas img[src="z"]') && W().__xss === undefined,
+        'El panel muestra el sponsor y el aviso con código como texto');
+
+    await cargar('index.html');
+    D().querySelector('.tabs-sup .tab-btn[data-grupo-val="B"]').click();
+    const celdaEq = [...D().querySelectorAll('.td-team-name')].find(c => c.textContent.trim() === EQUIPO);
+    if (celdaEq) celdaEq.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await esperar(300);
+    check(!!celdaEq && el('modal-equipo-nombre').textContent === EQUIPO, 'En la web, el equipo aparece tal cual en la tabla y se abre su perfil', celdaEq && celdaEq.textContent);
+    D().getElementById('modal-equipo').classList.add('seccion-oculta');
+    setv('global-search-input', 'los <3');
+    await esperar(300);
+    const buscado = D().querySelector('#search-results-dropdown .search-item-name');
+    const botonTabla = D().querySelector('#search-results-dropdown .btn-ir-tabla');
+    check(!!buscado && buscado.textContent === EQUIPO && botonTabla.getAttribute('data-equipo') === EQUIPO, 'El buscador de la web muestra el equipo tal cual', buscado && buscado.textContent);
+    setv('global-search-input', '');
+    const tarjeta = [...D().querySelectorAll('.sponsor-card-full')].find(c => c.querySelector('h4').textContent === 'Sponsor <b>Negrita</b>');
+    check(!!tarjeta && tarjeta.querySelector('.sponsor-info p').textContent === 'Descripción <i>rara</i>' && !tarjeta.querySelector('h4 b, p i')
+        && tarjeta.querySelector('.link-video-futuro').getAttribute('href') === '#',
+        'El sponsor se ve como texto y su link "javascript:" queda anulado', tarjeta && tarjeta.querySelector('.link-video-futuro').getAttribute('href'));
+    const aviso = [...D().querySelectorAll('.notif-item-title')].find(t => t.textContent.startsWith('Aviso <img'));
+    check(!!aviso && !D().querySelector('img[src="z"]') && W().__xss === undefined, 'La campanita muestra el aviso con código como texto, sin ejecutarlo', aviso && aviso.textContent);
+}
+
+// ---------------- Calendario de fechas y fixture automático de la fase de grupos (01/10/2026) ----------------
+// Corre al final porque vacía la base: arma sus propios equipos (Superior A 5, B 4, C 1, D y E vacíos, uno en
+// Tabla Única; Básico A 3).
+async function fixtureAutomatico() {
+    out('\n=== CALENDARIO DE FECHAS Y FIXTURE AUTOMÁTICO DE LA FASE DE GRUPOS ===');
+    const FX = { A: ['Rojo', 'Azul', 'Verde', 'Negro', 'Blanco'], B: ['Leones', 'Tigres', 'Pumas', 'Halcones'], C: ['Solitario'] };
+    const FXB = ['Delfines', 'Tiburones', 'Ballenas'];
+    const fsDocs = col => (JSON.parse(localStorage.getItem('fakefs') || '{}'))[col] || {};
+    const fsPartidosTxt = () => JSON.stringify(fsDocs('partidos'));
+    const partidosDe = ciclo => (LS('liga_partidos') || []).filter(p => (p.ciclo || 'superior') === ciclo && p.fecha < 100);
+    const porId = id => (LS('liga_partidos') || []).find(p => p.id === id);
+    const visible = e => !!e && e.getClientRects().length > 0;
+    const panel = () => el('fixture-auto-vista-previa');
+    const erroresJS = () => salida.filter(s => /^JS ERROR/.test(s)).length;
+    const erroresAntes = erroresJS();
+    const armar = async ciclo => { setv('fixture-auto-ciclo', ciclo); el('btn-fixture-auto').click(); await esperar(5); };
+    const accion = async nombre => { panel().querySelector(`[data-accion="${nombre}"]`).click(); await esperar(400); };
+    const ponerDias = dias => Object.entries(dias).forEach(([ciclo, porFecha]) => Object.entries(porFecha).forEach(([f, v]) => {
+        const input = D().querySelector(`#calendario-fechas-${ciclo} .calendario-input[data-fecha="${f}"]`);
+        if (input) input.value = v; else out(`  no encontré el día de la Fecha ${f} (${ciclo})`);
+    }));
+    const guardarCalendario = async () => { el('btn-guardar-calendario-fechas').click(); await esperar(300); };
+    const inputsCal = ciclo => [...D().querySelectorAll(`#calendario-fechas-${ciclo} .calendario-input`)];
+    const borrar = async id => {
+        setv('filtro-fecha-cronograma-admin', 'todas');
+        const b = D().querySelector(`.btn-borrar-partido[data-id="${id}"]`);
+        if (b) { b.click(); await esperar(200); } else out('  no encontré Eliminar del partido ' + id);
+    };
+
+    localStorage.removeItem('fake_rol');
+    respuestaConfirm = true;
+    await vaciarFirestore();
+    await cargar('admin.html');
+    await tab('sec-planteles');
+    el('btn-sub-plantel-admin').click();
+    const altas = [...Object.entries(FX).flatMap(([g, eqs]) => eqs.map(n => ['superior', g, n])), ['superior', 'Unico', 'Bombo Uno'], ...FXB.map(n => ['basico', 'A', n])];
+    for (const [ciclo, grupo, nombre] of altas) {
+        setv('nuevo-equipo-ciclo', ciclo); setv('nuevo-equipo-nombre', nombre); setv('nuevo-equipo-grupo', grupo);
+        await enviar('form-nuevo-equipo');
+        await esperar(3); // ids = Date.now()
+    }
+    const sup = LS('liga_cicloSuperior') || [], bas = LS('liga_cicloBasico') || [];
+    check(sup.length === 11 && bas.length === 3 && sup.filter(e => e.grupo === 'A').length === 5 && sup.filter(e => e.grupo === 'B').length === 4,
+        'Preparación: Superior A 5 equipos, B 4, C 1, D y E vacíos y uno en Tabla Única; Básico A 3', { sup: sup.map(e => e.nombre + '/' + e.grupo), bas: bas.length });
+    const idDe = nombre => [...LS('liga_cicloSuperior'), ...LS('liga_cicloBasico')].find(e => e.nombre === nombre).id;
+
+    // 1) Calendario
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    check(LS('liga_calendario_fechas') === null && inputsCal('superior').length === 7 && inputsCal('basico').length === 7
+        && [...inputsCal('superior'), ...inputsCal('basico')].every(i => i.value === '') && el('partido-dia').value === '',
+        'Calendario sin cargar: un campo vacío por cada una de las 7 fechas de cada ciclo, y el Día del formulario vacío como siempre',
+        { sup: inputsCal('superior').length, bas: inputsCal('basico').length, dia: el('partido-dia').value });
+    ponerDias({ superior: { 1: '2026-10-17', 2: '2026-10-24', 3: '2026-10-31' }, basico: { 1: '2026-10-17' } });
+    await guardarCalendario();
+    const cal = LS('liga_calendario_fechas');
+    const fsCal = (fsDocs('config').calendarioFechas || {}).valor;
+    check(JSON.stringify(cal) === JSON.stringify({ superior: { 1: '17/10/2026', 2: '24/10/2026', 3: '31/10/2026' }, basico: { 1: '17/10/2026' } })
+        && typeof fsCal === 'string' && fsCal.includes('31/10/2026') && ultimaAlerta() === 'Calendario guardado.',
+        'Guardar el calendario: queda en liga_calendario_fechas (config/calendarioFechas en Firestore), con el formato del día de los partidos', { cal, fsCal, alerta: ultimaAlerta() });
+
+    // 2) El Día del formulario se completa solo (el formulario arranca en Superior, Fecha 1)
+    const diaAlGuardar = el('partido-dia').value;
+    setv('partido-ciclo', 'superior');
+    setv('partido-fecha', '2');
+    const diaF2 = el('partido-dia').value;
+    setv('partido-fecha', '5');
+    const diaF5 = el('partido-dia').value;
+    check(diaAlGuardar === '2026-10-17' && diaF2 === '2026-10-24' && diaF5 === '',
+        'Formulario: al guardar el calendario la Fecha 1 elegida toma su día; elegir la Fecha 2 lo cambia a 24/10 y la Fecha 5, sin día cargado, lo deja vacío', { diaAlGuardar, diaF2, diaF5 });
+    setv('partido-dia', '2026-11-02', false);
+    setv('partido-fecha', '4');
+    const aManoSeQueda = el('partido-dia').value;
+    setv('partido-fecha', '1');
+    check(aManoSeQueda === '2026-11-02' && el('partido-dia').value === '2026-10-17',
+        'Un día escrito a mano no se borra al pasar a una Fecha sin día; una Fecha con día lo reemplaza', { aManoSeQueda, f1: el('partido-dia').value });
+
+    // 3) Partido a mano en Básico: el Día se completa y se puede escribir otro encima
+    setv('partido-ciclo', 'basico');
+    setv('partido-fecha', '1');
+    setv('partido-grupo-select', 'A');
+    const diaAutoBas = el('partido-dia').value;
+    setv('partido-local', 'Delfines', false); setv('partido-visitante', 'Tiburones', false);
+    setv('goles-local', '', false); setv('goles-visitante', '', false);
+    setv('partido-dia', '2026-10-18', false);
+    await enviar('form-partido');
+    await esperar(200);
+    const manual = partidosDe('basico')[0] || {};
+    check(diaAutoBas === '2026-10-17' && manual.dia === '18/10/2026' && manual.local === 'Delfines',
+        'Partido a mano de Básico: el Día se completó con el calendario (17/10) y se guardó el que se escribió encima (18/10)', { diaAutoBas, guardado: manual.dia });
+
+    // 4) Fechas configuradas que no alcanzan: avisa y no genera nada
+    setv('fechas-grupos-superior', '4', false);
+    el('btn-guardar-fechas-grupos').click(); await esperar(300);
+    const fsAntes = fsPartidosTxt();
+    const histAntes = (LS('liga_historial_cambios') || []).length;
+    await armar('superior');
+    check(/Grupo A \(5 equipos\) necesita 5 fechas y el ciclo Superior tiene 4 configuradas/.test(ultimaAlerta()) && /No se creó nada/.test(ultimaAlerta())
+        && !visible(panel()) && partidosDe('superior').length === 0 && fsPartidosTxt() === fsAntes,
+        'Con 4 fechas configuradas y un grupo de 5 equipos (necesita 5): avisa, no abre la vista previa y no crea nada', ultimaAlerta());
+    setv('fechas-grupos-superior', '7', false);
+    el('btn-guardar-fechas-grupos').click(); await esperar(300);
+
+    // 5) Vista previa: nada se escribe hasta confirmar
+    await armar('superior');
+    const tarjeta = f => panel().querySelector(`.fixture-auto-fecha[data-fecha="${f}"]`);
+    const textoTarjeta = f => (tarjeta(f) || {}).textContent || '';
+    const cantCruces = f => tarjeta(f) ? tarjeta(f).querySelectorAll('.fixture-auto-cruce:not(.fixture-auto-libre)').length : -1;
+    const libres = f => tarjeta(f) ? [...tarjeta(f).querySelectorAll('.fixture-auto-libre')].map(x => x.textContent.replace(/\s+/g, ' ').trim()) : [];
+    const txtPrevia = panel().textContent.replace(/\s+/g, ' ');
+    check(visible(panel()) && panel().querySelectorAll('.fixture-auto-fecha').length === 5
+        && [1, 2, 3].every(f => textoTarjeta(f).includes(['17/10/2026', '24/10/2026', '31/10/2026'][f - 1])) && [4, 5].every(f => /sin día en el calendario/.test(textoTarjeta(f)))
+        && [1, 2, 3].every(f => cantCruces(f) === 4) && [4, 5].every(f => cantCruces(f) === 2)
+        && [1, 2, 3, 4, 5].every(f => libres(f).length === 1 && /^Grupo A — Libre: /.test(libres(f)[0]))
+        && /16 partidos en 5 fechas/.test(txtPrevia) && /Arancel: \$30[.,]000/.test(txtPrevia)
+        && /Grupo C: 1 equipo, sin partidos/.test(txtPrevia) && /Grupo D: sin equipos/.test(txtPrevia) && /No entran .*Bombo Uno \(Tabla Única\)/.test(txtPrevia)
+        && /Confirmar \(16 partidos\)/.test(txtPrevia),
+        'Vista previa: 16 partidos en 5 fechas, el día del calendario en las Fechas 1-3 y "sin día" en la 4 y la 5, uno libre del Grupo A por fecha, los grupos sin partidos y el equipo de Tabla Única nombrados',
+        { fechas: [1, 2, 3, 4, 5].map(f => ({ f, cruces: cantCruces(f), libres: libres(f) })), texto: txtPrevia.slice(0, 400) });
+    check(fsPartidosTxt() === fsAntes && partidosDe('superior').length === 0 && (LS('liga_historial_cambios') || []).length === histAntes,
+        'Con la vista previa abierta no se escribió nada: ni partidos (en el panel ni en Firestore) ni Historial');
+    await accion('cancelar');
+    check(!visible(panel()) && fsPartidosTxt() === fsAntes && partidosDe('superior').length === 0, 'Cancelar cierra la vista previa sin guardar nada');
+    await armar('superior');
+    setv('fixture-auto-arancel', '35000');
+    check(!visible(panel()), 'Cambiar el arancel con la vista previa abierta la cierra (hay que volver a armarla)');
+    setv('fixture-auto-arancel', '30000');
+
+    // 6) Confirmar
+    await armar('superior');
+    await accion('confirmar');
+    const gen = partidosDe('superior');
+    const delGrupo = g => gen.filter(p => p.grupo === g);
+    const par = p => [p.local, p.visitante].sort().join('|');
+    const paresPosibles = eqs => eqs.flatMap((a, i) => eqs.slice(i + 1).map(b => [a, b].sort().join('|'))).sort();
+    const paresOk = g => JSON.stringify(delGrupo(g).map(par).sort()) === JSON.stringify(paresPosibles(FX[g]));
+    const unoPorFecha = gen.every(p => p.local !== p.visitante) && [...new Set(gen.map(p => p.fecha))].every(f => {
+        const eqs = gen.filter(p => p.fecha === f).flatMap(p => [p.local, p.visitante]);
+        return new Set(eqs).size === eqs.length;
+    });
+    check(gen.length === 16 && delGrupo('A').length === 10 && delGrupo('B').length === 6 && paresOk('A') && paresOk('B') && unoPorFecha && delGrupo('C').length === 0
+        && /Fixture del ciclo Superior guardado: 16 partidos en 5 fechas/.test(ultimaAlerta()) && !visible(panel()),
+        'Confirmar: 16 partidos; en el Grupo A los 10 cruces posibles y en el B los 6, cada par una sola vez, nadie contra sí mismo ni dos veces en la misma fecha',
+        { total: gen.length, A: delGrupo('A').map(par), B: delGrupo('B').map(par), unoPorFecha, alerta: ultimaAlerta() });
+    const fechasDe = g => [...new Set(delGrupo(g).map(p => p.fecha))].sort((a, b) => a - b).join();
+    check(fechasDe('A') === '1,2,3,4,5' && fechasDe('B') === '1,2,3',
+        'Los grupos quedan alineados por número de fecha: el A (5 equipos) juega las Fechas 1 a 5 y el B (4) las 1 a 3, los dos desde la misma Fecha 1', { A: fechasDe('A'), B: fechasDe('B') });
+    const diaEsperado = { 1: '17/10/2026', 2: '24/10/2026', 3: '31/10/2026', 4: '', 5: '' };
+    const LISTAS = ['goleadoresLocal', 'goleadoresVisitante', 'amarillasLocal', 'rojasLocal', 'amarillasVisitante', 'rojasVisitante'];
+    const malFormados = gen.filter(p => !(p.horario === '' && p.cancha === '' && p.jugado === false && p.golesLocal === null && p.golesVisitante === null
+        && p.penalesLocal === null && p.esPlayoff === false && p.ronda === null && p.resultadoAuto === false && p.arbitro === 'Por asignar' && p.arancelExigido === 30000
+        && p.dia === diaEsperado[p.fecha] && p.ciclo === 'superior' && p.localId === idDe(p.local) && p.visitanteId === idDe(p.visitante)
+        && LISTAS.every(c => Array.isArray(p[c]) && p[c].length === 0)));
+    check(malFormados.length === 0,
+        'Cada partido generado: sin horario ni cancha (a confirmar), sin resultado, con el día del calendario (vacío en las Fechas 4 y 5), el arancel, "Por asignar" y los ids de sus equipos',
+        malFormados.slice(0, 2));
+    await esperar(300);
+    const ids = gen.map(p => p.id);
+    const fsP = fsDocs('partidos');
+    setv('filtro-fecha-cronograma-admin', 'todas');
+    check(ids.every(Number.isInteger) && new Set(ids).size === 16 && !ids.includes(manual.id) && ids.every(id => fsP[String(id)]) && Object.keys(fsP).length === 17
+        && D().querySelectorAll('#lista-partidos-admin .btn-editar-partido').length === 17,
+        'Ids numéricos y únicos, como los de un alta a mano; los 16 quedan en Firestore y en el Cronograma junto al partido de Básico', { ids: ids.slice(0, 3), docs: Object.keys(fsP).length });
+    const hist = LS('liga_historial_cambios') || [];
+    const ultimaH = hist[hist.length - 1] || {};
+    check(hist.length === histAntes + 1 && ultimaH.tipo === 'partido' && ultimaH.detalle === 'generó el fixture de FASE DE GRUPOS (Superior): 16 partidos en 5 fechas',
+        'Historial de Cambios: una sola entrada "generó el fixture de FASE DE GRUPOS (Superior): 16 partidos en 5 fechas"', ultimaH);
+
+    // 7) Un ciclo que ya tiene partidos de fase de grupos no se vuelve a generar
+    await armar('superior');
+    const alertaSup = ultimaAlerta();
+    await armar('basico');
+    const alertaBas = ultimaAlerta();
+    check(/El ciclo Superior ya tiene 16 partidos de fase de grupos \(Fechas 1, 2, 3, 4, 5\)/.test(alertaSup) && /El ciclo Básico ya tiene 1 partido de fase de grupos \(Fecha 1\)/.test(alertaBas)
+        && /No se creó nada/.test(alertaBas) && !visible(panel()) && partidosDe('superior').length === 16 && partidosDe('basico').length === 1,
+        'Generar de nuevo un ciclo con partidos de fase de grupos (Superior con el fixture, Básico con uno a mano): avisa y no crea nada', { alertaSup, alertaBas });
+
+    // 8) Un partido generado se edita y se borra como cualquier otro
+    const f3 = gen.filter(p => p.fecha === 3 && p.grupo === 'A');
+    const pJ = f3[0], pM = f3[1];
+    setv('filtro-fecha-cronograma-admin', 'todas');
+    editarPartido(pJ);
+    const formEdit = { horarioConf: el('partido-horario-confirmar').checked, canchaConf: el('partido-cancha-confirmar').checked, dia: el('partido-dia').value, fecha: el('partido-fecha').value };
+    const hc = el('partido-horario-confirmar'); hc.checked = false; hc.dispatchEvent(new Event('change'));
+    setv('partido-horario', '15:10', false);
+    const cc = el('partido-cancha-confirmar'); cc.checked = false; cc.dispatchEvent(new Event('change'));
+    setv('partido-cancha', 'Cancha 2', false);
+    setv('goles-local', '2', false); setv('goles-visitante', '1', false);
+    await enviar('form-partido');
+    await esperar(200);
+    const pJd = porId(pJ.id) || {};
+    check(formEdit.horarioConf && formEdit.canchaConf && formEdit.dia === '2026-10-31' && formEdit.fecha === '3'
+        && pJd.horario === '15:10' && pJd.cancha === 'Cancha 2' && pJd.jugado && pJd.golesLocal === 2 && pJd.golesVisitante === 1 && pJd.dia === '31/10/2026'
+        && pJd.local === pJ.local && pJd.visitante === pJ.visitante && partidosDe('superior').length === 16,
+        'Editar un partido generado con el formulario de siempre: abre con horario y cancha "a confirmar" y su día; se le cargan horario, cancha y resultado y conserva el id',
+        { formEdit, guardado: { horario: pJd.horario, cancha: pJd.cancha, goles: [pJd.golesLocal, pJd.golesVisitante], dia: pJd.dia } });
+    editarPartido(porId(pM.id));
+    setv('partido-dia', '2026-11-02', false);
+    await enviar('form-partido');
+    await esperar(200);
+    const pX = gen.find(p => p.fecha === 5);
+    await borrar(pX.id);
+    await esperar(200);
+    check((porId(pM.id) || {}).dia === '02/11/2026' && !porId(pX.id) && partidosDe('superior').length === 15 && !fsDocs('partidos')[String(pX.id)],
+        'Mover a mano el día de un partido generado (02/11) y Eliminar otro desde el Cronograma funcionan (el id numérico se lee bien)', { diaMovido: (porId(pM.id) || {}).dia });
+
+    // 9) Cambiar el calendario con partidos ya cargados: se ofrece actualizarlos
+    const restoF3 = gen.filter(p => p.fecha === 3 && p.id !== pJ.id && p.id !== pM.id).map(p => p.id);
+    const f4 = gen.filter(p => p.fecha === 4).map(p => p.id);
+    const histAntesCal = (LS('liga_historial_cambios') || []).length;
+    respuestaConfirm = true;
+    const confirmsAntes = confirms.length;
+    ponerDias({ superior: { 3: '2026-11-01', 4: '2026-11-07' } });
+    await guardarCalendario();
+    const msjConfirm = confirms.length > confirmsAntes ? confirms[confirms.length - 1] : '';
+    const histCal = (LS('liga_historial_cambios') || []).slice(histAntesCal).map(h => h.detalle);
+    check(/FECHA 3 \(Superior\): 2 partidos pasan del 31\/10\/2026 al 01\/11\/2026/.test(msjConfirm) && /FECHA 4 \(Superior\): 2 partidos sin día pasan al 07\/11\/2026/.test(msjConfirm)
+        && restoF3.every(id => porId(id).dia === '01/11/2026') && f4.every(id => porId(id).dia === '07/11/2026')
+        && porId(pJ.id).dia === '31/10/2026' && porId(pM.id).dia === '02/11/2026' && manual.dia === (partidosDe('basico')[0] || {}).dia
+        && restoF3.every(id => (fsDocs('partidos')[String(id)] || {}).dia === '01/11/2026'),
+        'Cambiar el día de la Fecha 3 y cargar el de la 4: pregunta, y con "sí" pasan los partidos sin jugar con el día anterior o sin día; el jugado, el movido a mano y los de Básico quedan igual',
+        { msjConfirm, dias: gen.filter(p => [3, 4].includes(p.fecha)).map(p => [p.fecha, (porId(p.id) || {}).dia]) });
+    check(histCal.length === 2 && histCal.includes('cambió el día de FECHA 3 (Superior) en 2 partidos: 31/10/2026 → 01/11/2026')
+        && histCal.includes('cambió el día de FECHA 4 (Superior) en 2 partidos: sin día → 07/11/2026') && /Se actualizó el Día/.test(ultimaAlerta()),
+        'Historial: una entrada por fecha cuyo día cambió en los partidos', histCal);
+    const f5 = partidosDe('superior').filter(p => p.fecha === 5).map(p => p.id);
+    respuestaConfirm = false;
+    ponerDias({ superior: { 5: '2026-11-14' } });
+    await guardarCalendario();
+    respuestaConfirm = true;
+    check(f5.length === 1 && f5.every(id => porId(id).dia === '') && LS('liga_calendario_fechas').superior[5] === '14/11/2026' && /quedaron con el día que tenían/.test(ultimaAlerta()),
+        'Con "no", el calendario se guarda igual y los partidos de esa fecha conservan su día', { f5: f5.map(id => porId(id).dia), alerta: ultimaAlerta() });
+
+    // 10) Web pública
+    await cargar('index.html');
+    const botones = [...D().querySelectorAll('#botones-fecha-fixture .btn-fecha-select')].map(b => b.dataset.fecha);
+    const b1 = D().querySelector('#botones-fecha-fixture .btn-fecha-select[data-fecha="1"]');
+    if (b1) { b1.click(); await esperar(5); }
+    const txtFix = (D().getElementById('contenedor-partidos-fecha') || {}).textContent || '';
+    check(['1', '2', '3', '4', '5'].every(f => botones.includes(f)) && gen.filter(p => p.fecha === 1).every(p => txtFix.includes(p.local) && txtFix.includes(p.visitante))
+        && /Horario a confirmar/.test(txtFix) && /Cancha a confirmar/.test(txtFix),
+        'Web pública: el fixture tiene las Fechas 1 a 5 y muestra los partidos generados con horario y cancha "a confirmar"', { botones });
+
+    // 11) Rol Staff, a 390 px: genera el fixture de Básico y el Historial queda firmado por él
+    localStorage.setItem('fake_rol', 'staff');
+    const anchoOriginal = marco.style.width;
+    marco.style.width = '390px';
+    const alertasAntesStaff = alertas.length;
+    await cargar('admin.html');
+    await tab('sec-jornada');
+    await borrar(manual.id);
+    await armar('basico');
+    const w = D().documentElement.clientWidth;
+    const nodos = [el('btn-guardar-calendario-fechas').closest('section'), el('btn-fixture-auto').closest('section'), panel()];
+    const desb = nodos.flatMap(n => [n, ...n.querySelectorAll('*')]).map(e => ({ e, r: e.getBoundingClientRect() }))
+        .filter(x => x.r.width > 0 && x.r.right > w + 1).map(x => (x.e.id ? '#' + x.e.id : x.e.className || x.e.tagName) + ' right=' + Math.round(x.r.right));
+    check(visible(panel()) && desb.length === 0,
+        'A 390 px no desbordan el calendario, el generador ni la vista previa', { ancho: w, desb: desb.slice(0, 5), scrollWidth: D().documentElement.scrollWidth });
+    await accion('confirmar');
+    await esperar(300);
+    const genB = partidosDe('basico');
+    const histStaff = Object.values(fsDocs('historialCambios')).filter(h => h.rol === 'staff' && h.detalle === 'generó el fixture de FASE DE GRUPOS (Básico): 3 partidos en 3 fechas');
+    check(genB.length === 3 && JSON.stringify(genB.map(par).sort()) === JSON.stringify(paresPosibles(FXB)) && genB.map(p => p.fecha).sort().join() === '1,2,3'
+        && genB.every(p => p.dia === (p.fecha === 1 ? '17/10/2026' : '')) && histStaff.length === 1
+        && !alertas.slice(alertasAntesStaff).some(a => /No se pudo guardar/.test(a)),
+        'Rol Staff: borra el partido a mano de Básico y genera su fixture (3 equipos: 3 partidos en 3 fechas, uno libre por fecha); el Historial queda firmado por el Staff en Firestore',
+        { partidos: genB.map(p => [p.fecha, par(p), p.dia]), histStaff: histStaff.length, alertas: alertas.slice(alertasAntesStaff) });
+    marco.style.width = anchoOriginal;
+    localStorage.removeItem('fake_rol');
+    check(erroresJS() === erroresAntes, 'Sin errores de JS en todo el recorrido del fixture automático', erroresJS() - erroresAntes);
+}
+
 (async () => {
     try {
         planificar();
+        if (new URLSearchParams(location.search).get('solo') === 'importar') {
+            // Solo lo que necesita el importador: equipos, jugadores y una fecha jugada (para el DNI que "ya jugó")
+            await fase0();
+            await fase1();
+            await fase2();
+            await jugarFecha(1);
+            await importarPlanilla();
+            await nombresConCodigo();
+            throw { soloImportar: true };
+        }
+        if (new URLSearchParams(location.search).get('solo') === 'fixture') {
+            await fixtureAutomatico(); // arma sus propios equipos sobre la base vacía
+            throw { soloImportar: true };
+        }
         await fase0();
         await fase1();
         await fase2();
@@ -2479,8 +3154,11 @@ async function historialDeCambios() {
         await invertirYConservarEquipos();
         await historialDeCambios();
         await tablaUnica();
+        await importarPlanilla();
+        await nombresConCodigo();
+        await fixtureAutomatico();
     } catch (e) {
-        out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
+        if (!e.soloImportar) out('EXCEPCION DEL BANCO: ' + e.message + '\n' + e.stack);
     }
     check(avisosFalsos === 0, 'Con una sola persona cargando, el panel nunca mostró el aviso de cambios ajenos', avisosFalsos);
     out('Veces que Editar partido dejó Local/Visitante vacíos (bug): ' + bugEditarGrupo);

@@ -101,6 +101,44 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return `${j.nombre} (${j.dorsal === undefined || j.dorsal === null || j.dorsal === '' ? 'S/N' : '#' + j.dorsal})`;
     }
 
+    function textoGrupoHistorial(grupo) {
+        return grupo === 'Unico' ? 'Tabla Única' : `Grupo ${grupo}`;
+    }
+
+    // De lo visible (nombre, número, Instagram, ficha) se anota antes → después; del DNI, la foto y los datos
+    // de contacto y médicos, solo qué cambió (decisión de Joaquín: el historial no duplica datos de menores).
+    const CAMBIOS_VISIBLES_JUGADOR = [
+        ['nombre', 'nombre', v => `«${v}»`],
+        ['dorsal', 'número', v => (v === '' ? 'S/N' : `#${v}`)],
+        ['instagram', 'Instagram', v => (v === '' ? 'sin Instagram' : `@${v}`)],
+        ['fichaMedica', 'ficha médica', v => (v === 'si' ? 'entregada' : 'pendiente')]
+    ];
+    const CAMBIOS_SENSIBLES_JUGADOR = [
+        [['dni'], 'el DNI'],
+        [['foto'], 'la foto'],
+        [['nacimiento'], 'la fecha de nacimiento'],
+        [['celular'], 'el celular'],
+        [['concurrir', 'concurrirDir'], 'el sanatorio'],
+        [['medico', 'medicoDir'], 'el médico de cabecera'],
+        [['familiarNombre', 'familiarParentesco', 'familiarTel'], 'el contacto de emergencia']
+    ];
+
+    function textoEdicionJugadorHistorial(antes, despues, equipoNombre) {
+        const valor = (j, campo) => (j[campo] === undefined || j[campo] === null ? '' : String(j[campo]).trim());
+        const visibles = CAMBIOS_VISIBLES_JUGADOR
+            .filter(([campo]) => valor(antes, campo) !== valor(despues, campo))
+            .map(([campo, etiqueta, formato]) => `${etiqueta} ${formato(valor(antes, campo))} → ${formato(valor(despues, campo))}`);
+        const sensibles = CAMBIOS_SENSIBLES_JUGADOR
+            .filter(([campos]) => campos.some(campo => valor(antes, campo) !== valor(despues, campo)))
+            .map(([, etiqueta]) => etiqueta);
+        if (!visibles.length && !sensibles.length) return null;
+        const partes = [];
+        if (visibles.length) partes.push(visibles.join(', '));
+        if (sensibles.length) partes.push('actualizó ' + (sensibles.length === 1 ? sensibles[0]
+            : sensibles.slice(0, -1).join(', ') + ' y ' + sensibles[sensibles.length - 1]));
+        return `editó la ficha de ${textoJugadorHistorial(despues)} en ${equipoNombre}: ${partes.join('; ')}`;
+    }
+
     let tesoreriaPartidos = JSON.parse(almacen.getItem('liga_tesoreria_partidos_v2')) || {};
     let tesoreriaInscripciones = JSON.parse(almacen.getItem('liga_tesoreria_inscripciones')) || {};
     let listaEgresos = JSON.parse(almacen.getItem('liga_egresos')) || [];
@@ -505,6 +543,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             almacen.setItem('liga_fechas_grupos', JSON.stringify(nuevo));
             armarOpcionesFechaPartido();
             armarOpcionesFechaEgreso();
+            renderizarCalendarioFechas();
 
             const fueraDeRango = [['superior', 'Superior'], ['basico', 'Básico']].map(([ciclo, nombre]) => {
                 const fuera = fechasGruposConPartidos(ciclo).filter(f => f > nuevo[ciclo]).sort((a, b) => a - b);
@@ -515,6 +554,348 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 + (fueraDeRango.length > 0
                     ? '\n\nOjo:\n' + fueraDeRango.join('\n') + '\nNo se borró nada: esas fechas siguen apareciendo en Carga de Partidos para poder editar o borrar esos partidos.'
                     : ''));
+        });
+    }
+
+    // ── Calendario de fechas (liga_calendario_fechas): qué día se juega cada Fecha de la fase de grupos, por ciclo.
+    // Se carga una vez y completa el Día de los partidos (formulario y fixture automático). Se guarda como DD/MM/AAAA,
+    // igual que el día de cada partido.
+    const contenedoresCalendario = {
+        superior: document.getElementById('calendario-fechas-superior'),
+        basico: document.getElementById('calendario-fechas-basico')
+    };
+    const btnGuardarCalendario = document.getElementById('btn-guardar-calendario-fechas');
+    const PATRON_DIA_CALENDARIO = /^\d{2}\/\d{2}\/\d{4}$/;
+    // Día del calendario que corresponde a lo elegido hoy en el formulario de partido: si el Día es ese, se toma como
+    // automático y cambia con la Fecha; un día escrito a mano no se toca.
+    let diaAutocompletado = '';
+
+    function obtenerCalendarioFechas() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_calendario_fechas')); } catch (e) { guardado = null; }
+        const calendario = { superior: {}, basico: {} };
+        ['superior', 'basico'].forEach(ciclo => {
+            const dias = guardado && guardado[ciclo];
+            if (!dias || typeof dias !== 'object') return;
+            Object.keys(dias).forEach(f => { if (PATRON_DIA_CALENDARIO.test(String(dias[f]))) calendario[ciclo][f] = String(dias[f]); });
+        });
+        return calendario;
+    }
+
+    // 'DD/MM/AAAA' de esa Fecha del ciclo, o '' si no se cargó (los playoffs no van en el calendario).
+    function diaDeCalendario(ciclo, fecha) {
+        if (!(Number(fecha) < 100)) return '';
+        return obtenerCalendarioFechas()[ciclo === 'basico' ? 'basico' : 'superior'][String(Number(fecha))] || '';
+    }
+
+    function diaCalendarioDelFormulario() {
+        if (!inputFechaPartido) return '';
+        return diaStorageAInput(diaDeCalendario(cicloSelect ? cicloSelect.value : 'superior', inputFechaPartido.value));
+    }
+
+    // Al cambiar la Fecha o el Ciclo el Día pasa a ser el del calendario. Si esa Fecha no tiene día, se vacía solo si
+    // el que estaba era el automático de la Fecha anterior.
+    function autocompletarDiaPartido() {
+        if (!inputDiaPartido) return;
+        const dia = diaCalendarioDelFormulario();
+        if (dia) inputDiaPartido.value = dia;
+        else if (diaAutocompletado && inputDiaPartido.value === diaAutocompletado) inputDiaPartido.value = '';
+        diaAutocompletado = dia;
+    }
+
+    // Una fila por fecha, las mismas que ofrece "Fecha / Fase". Lo tipeado sin guardar se conserva al redibujar.
+    function renderizarCalendarioFechas() {
+        const calendario = obtenerCalendarioFechas();
+        const config = obtenerFechasGrupos();
+        ['superior', 'basico'].forEach(ciclo => {
+            const contenedor = contenedoresCalendario[ciclo];
+            if (!contenedor) return;
+            const tipeado = {};
+            contenedor.querySelectorAll('.calendario-input').forEach(input => { tipeado[input.dataset.fecha] = input.value; });
+            contenedor.innerHTML = listaFechasGrupos(config[ciclo], fechasGruposConPartidos(ciclo)).map(f => {
+                const valor = f in tipeado ? tipeado[f] : diaStorageAInput(calendario[ciclo][f] || '');
+                return `<label class="calendario-item">Fecha ${f}<input type="date" class="calendario-input" data-ciclo="${ciclo}" data-fecha="${f}" value="${valor}"></label>`;
+            }).join('');
+        });
+    }
+
+    function textoCambioDia(c) {
+        const n = c.afectados.length;
+        const cuantos = `${n} ${n === 1 ? 'partido' : 'partidos'}`;
+        if (!c.antes) return `${cuantos} sin día ${n === 1 ? 'pasa' : 'pasan'} al ${c.despues}`;
+        if (!c.despues) return `${cuantos} del ${c.antes} ${n === 1 ? 'queda' : 'quedan'} sin día`;
+        return `${cuantos} ${n === 1 ? 'pasa' : 'pasan'} del ${c.antes} al ${c.despues}`;
+    }
+
+    if (btnGuardarCalendario) {
+        btnGuardarCalendario.addEventListener('click', () => {
+            const anterior = obtenerCalendarioFechas();
+            // Las fechas que no se ven (por ejemplo, más allá de la cantidad configurada) se conservan.
+            const nuevo = { superior: { ...anterior.superior }, basico: { ...anterior.basico } };
+            ['superior', 'basico'].forEach(ciclo => {
+                const contenedor = contenedoresCalendario[ciclo];
+                if (!contenedor) return;
+                contenedor.querySelectorAll('.calendario-input').forEach(input => {
+                    const dia = diaInputAStorage(input.value);
+                    if (dia) nuevo[ciclo][input.dataset.fecha] = dia;
+                    else delete nuevo[ciclo][input.dataset.fecha];
+                });
+            });
+
+            // Decisión de Joaquín (01/10/2026): si cambia el día de una Fecha que ya tiene partidos, se ofrece pasarlos al
+            // día nuevo. Solo los sin jugar que tienen el Día vacío o el día anterior del calendario: los que se movieron
+            // a mano a otro día y los ya jugados quedan como están.
+            const cambios = [];
+            ['superior', 'basico'].forEach(ciclo => {
+                new Set([...Object.keys(anterior[ciclo]), ...Object.keys(nuevo[ciclo])]).forEach(f => {
+                    const antes = anterior[ciclo][f] || '', despues = nuevo[ciclo][f] || '';
+                    if (antes === despues) return;
+                    const afectados = partidos.filter(p => p && (p.ciclo || 'superior') === ciclo && Number(p.fecha) === Number(f) && !p.esPlayoff && !p.jugado
+                        && ((p.dia || '') === '' || p.dia === antes) && (p.dia || '') !== despues);
+                    if (afectados.length) cambios.push({ ciclo, fecha: Number(f), antes, despues, afectados });
+                });
+            });
+            cambios.sort((a, b) => (a.ciclo === b.ciclo ? a.fecha - b.fecha : (a.ciclo === 'superior' ? -1 : 1)));
+
+            almacen.setItem('liga_calendario_fechas', JSON.stringify(nuevo));
+
+            let actualizados = false;
+            if (cambios.length && confirm('Cambió el día de fechas que ya tienen partidos sin jugar:\n\n'
+                + cambios.map(c => `• ${nombreFaseTeso(c.fecha)} (${nombreCicloHistorial(c.ciclo)}): ${textoCambioDia(c)}`).join('\n')
+                + '\n\nLos partidos que se movieron a mano a otro día y los ya jugados no se tocan. ¿Actualizar el Día de esos partidos?')) {
+                const diaNuevo = new Map();
+                cambios.forEach(c => c.afectados.forEach(p => diaNuevo.set(p.id, c.despues)));
+                partidos = partidos.map(p => (p && diaNuevo.has(p.id) ? { ...p, dia: diaNuevo.get(p.id) } : p));
+                almacen.setItem('liga_partidos', JSON.stringify(partidos));
+                cambios.forEach(c => registrarHistorial('partido', `cambió el día de ${nombreFaseTeso(c.fecha)} (${nombreCicloHistorial(c.ciclo)}) en ${c.afectados.length} ${c.afectados.length === 1 ? 'partido' : 'partidos'}: ${c.antes || 'sin día'} → ${c.despues || 'sin día'}`));
+                actualizarListaAdmin();
+                actualizados = true;
+            }
+
+            if (idPartidoEnEdicion === null && inputDiaPartido) {
+                const dia = diaCalendarioDelFormulario();
+                if (inputDiaPartido.value === '' || inputDiaPartido.value === diaAutocompletado) inputDiaPartido.value = dia;
+                diaAutocompletado = dia;
+            }
+            renderizarCalendarioFechas();
+            alert('Calendario guardado.' + (cambios.length
+                ? (actualizados ? ' Se actualizó el Día de los partidos de esas fechas.' : ' Los partidos ya cargados quedaron con el día que tenían.')
+                : ''));
+        });
+    }
+
+    // ── Fixture automático de la fase de grupos: todos contra todos dentro de cada grupo, cada par una sola vez.
+    // Los grupos del ciclo comparten la numeración (la Fecha 1 de todos es la misma semana). Horario y cancha quedan
+    // a confirmar: los acomoda el staff semana a semana según los pedidos de cada equipo.
+    const selectCicloFixture = document.getElementById('fixture-auto-ciclo');
+    const inputArancelFixture = document.getElementById('fixture-auto-arancel');
+    const btnFixtureAuto = document.getElementById('btn-fixture-auto');
+    const panelFixtureAuto = document.getElementById('fixture-auto-vista-previa');
+    let fixtureAuto = null;
+
+    // Método del círculo: el primero queda fijo y el resto rota. Con cantidad impar, cada ronda uno queda libre.
+    function rondasTodosContraTodos(equipos) {
+        const lista = equipos.slice();
+        if (lista.length % 2 === 1) lista.push(null);
+        const rondas = [];
+        for (let r = 0; r < lista.length - 1; r++) {
+            const cruces = [];
+            let libre = null;
+            for (let i = 0; i < lista.length / 2; i++) {
+                let local = lista[i], visitante = lista[lista.length - 1 - i];
+                if (i === 0 && r % 2 === 1) [local, visitante] = [visitante, local]; // el fijo alterna de lado
+                if (local === null || visitante === null) { libre = local || visitante; continue; }
+                cruces.push([local, visitante]);
+            }
+            rondas.push({ cruces, libre });
+            lista.splice(1, 0, lista.pop());
+        }
+        return rondas;
+    }
+
+    // Mismo criterio que el alta a mano: sin un monto mayor a 0, Tesorería usa el arancel por defecto.
+    function arancelDelFixture() {
+        const valor = parseFloat(inputArancelFixture ? inputArancelFixture.value : '');
+        return valor > 0 ? valor : null;
+    }
+
+    // Arma el fixture del ciclo sin guardar nada. Devuelve {bloqueo} o los partidos y lo que muestra la vista previa.
+    function armarFixtureCiclo(ciclo, arancel) {
+        const nombreCiclo = nombreCicloHistorial(ciclo);
+        const yaCargados = partidos.filter(p => p && (p.ciclo || 'superior') === ciclo && Number(p.fecha) < 100);
+        if (yaCargados.length) {
+            const fechas = [...new Set(yaCargados.map(p => Number(p.fecha)))].sort((a, b) => a - b);
+            return { bloqueo: `El ciclo ${nombreCiclo} ya tiene ${yaCargados.length} ${yaCargados.length === 1 ? 'partido' : 'partidos'} de fase de grupos (${fechas.length === 1 ? 'Fecha' : 'Fechas'} ${fechas.join(', ')}). `
+                + 'El fixture automático arma la fase de grupos completa desde la Fecha 1, así que solo se usa con el ciclo sin partidos: '
+                + 'para no duplicar cruces, seguí cargándolos a mano o eliminá esos partidos desde el Cronograma. No se creó nada.' };
+        }
+
+        recargarPools();
+        const pool = ciclo === 'basico' ? poolBasico : poolSuperior;
+        const gruposCiclo = gruposTorneo[ciclo] || [];
+        const grupos = gruposCiclo.map(g => {
+            const equipos = pool.filter(e => e.grupo === g);
+            return { grupo: g, equipos, rondas: equipos.length >= 2 ? rondasTodosContraTodos(equipos) : [] };
+        });
+        const fechasNecesarias = Math.max(0, ...grupos.map(g => g.rondas.length));
+        if (fechasNecesarias === 0) {
+            return { bloqueo: `No hay ningún grupo del ciclo ${nombreCiclo} con al menos 2 equipos: armá los grupos en Planteles y volvé a armar el fixture. No se creó nada.` };
+        }
+        const configuradas = obtenerFechasGrupos()[ciclo];
+        if (fechasNecesarias > configuradas) {
+            const masLargo = grupos.find(g => g.rondas.length === fechasNecesarias);
+            return { bloqueo: `Para que todos se enfrenten una vez, el ${textoGrupoHistorial(masLargo.grupo)} (${masLargo.equipos.length} equipos) necesita ${fechasNecesarias} fechas y el ciclo ${nombreCiclo} tiene ${configuradas} configuradas. `
+                + 'Subí la cantidad en "Fechas de Fase de Grupos" y volvé a armar el fixture. No se creó nada.' };
+        }
+
+        const nuevos = [];
+        const fechas = [];
+        for (let r = 0; r < fechasNecesarias; r++) {
+            const fecha = r + 1;
+            const dia = diaDeCalendario(ciclo, fecha);
+            const libres = [];
+            grupos.forEach(g => {
+                const ronda = g.rondas[r];
+                if (!ronda) return;
+                // La misma forma que un partido nuevo cargado a mano, sin jugar.
+                ronda.cruces.forEach(([local, visitante]) => nuevos.push({
+                    fecha, ciclo, grupo: g.grupo,
+                    local: local.nombre, visitante: visitante.nombre,
+                    localId: local.id !== undefined ? local.id : null,
+                    visitanteId: visitante.id !== undefined ? visitante.id : null,
+                    golesLocal: null, golesVisitante: null, penalesLocal: null, penalesVisitante: null,
+                    esPlayoff: false, ronda: null, dia, arancelExigido: arancel,
+                    horario: '', cancha: '', arbitro: 'Por asignar',
+                    goleadoresLocal: [], goleadoresVisitante: [],
+                    amarillasLocal: [], rojasLocal: [], amarillasVisitante: [], rojasVisitante: [],
+                    jugado: false, resultadoAuto: false
+                }));
+                if (ronda.libre) libres.push({ grupo: g.grupo, nombre: ronda.libre.nombre });
+            });
+            fechas.push({ fecha, dia, libres });
+        }
+
+        return {
+            ciclo, arancel, nuevos, fechas, configuradas,
+            grupos: grupos.map(g => ({ grupo: g.grupo, equipos: g.equipos.length, fechas: g.rondas.length, partidos: g.rondas.reduce((n, r) => n + r.cruces.length, 0) })),
+            fueraDeGrupo: pool.filter(e => !gruposCiclo.includes(e.grupo)),
+            // Si cambian los equipos, los grupos o el calendario entre la vista previa y la confirmación, se vuelve a revisar.
+            firma: JSON.stringify(nuevos.map(p => [p.fecha, p.grupo, p.localId, p.local, p.visitanteId, p.visitante, p.dia]))
+        };
+    }
+
+    function renderizarFixtureAuto() {
+        if (!panelFixtureAuto || !fixtureAuto) return;
+        const f = fixtureAuto;
+        const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+        const lineaGrupo = g => {
+            const nombre = textoGrupoHistorial(g.grupo);
+            if (g.equipos === 0) return `${nombre}: sin equipos.`;
+            if (g.equipos === 1) return `${nombre}: 1 equipo, sin partidos.`;
+            return `${nombre}: ${plural(g.equipos, 'equipo', 'equipos')} → ${plural(g.partidos, 'partido', 'partidos')} en ${plural(g.fechas, 'fecha', 'fechas')}`
+                + (g.equipos % 2 === 1 ? ' (cada fecha queda uno libre).' : '.');
+        };
+        const dondeEsta = e => (e.grupo === 'Unico' ? 'Tabla Única' : (e.grupo ? `Grupo ${e.grupo}, que no está en los grupos del ciclo` : 'sin grupo'));
+        const arancel = f.arancel ? `$${f.arancel.toLocaleString()}` : `el de siempre ($${ARANCEL_PARTIDO_DEFECTO.toLocaleString()})`;
+        const porFecha = f.fechas.map(fe => {
+            const cruces = f.nuevos.filter(p => p.fecha === fe.fecha).map(p =>
+                `<li class="fixture-auto-cruce"><span class="fixture-auto-grupo">Grupo ${attrSeguro(p.grupo)} — </span>${attrSeguro(p.local)} <span class="fixture-auto-vs">vs</span> ${attrSeguro(p.visitante)}</li>`);
+            const libres = fe.libres.map(l =>
+                `<li class="fixture-auto-cruce fixture-auto-libre"><span class="fixture-auto-grupo">Grupo ${attrSeguro(l.grupo)} — </span>Libre: ${attrSeguro(l.nombre)}</li>`);
+            return `<div class="fixture-auto-fecha" data-fecha="${fe.fecha}">
+                <h4 class="fixture-auto-fecha-titulo">Fecha ${fe.fecha} · ${fe.dia ? attrSeguro(fe.dia) : '<span class="fixture-auto-sin-dia">sin día en el calendario</span>'}</h4>
+                <ul class="fixture-auto-cruces">${[...cruces, ...libres].join('')}</ul>
+            </div>`;
+        }).join('');
+
+        panelFixtureAuto.innerHTML = `
+            <h3 class="fixture-auto-titulo">Vista previa del fixture — Ciclo ${nombreCicloHistorial(f.ciclo)}</h3>
+            <p class="fixture-auto-texto"><strong>${plural(f.nuevos.length, 'partido', 'partidos')} en ${plural(f.fechas.length, 'fecha', 'fechas')}</strong> (el ciclo tiene ${f.configuradas} configuradas). Cada par de equipos se enfrenta una sola vez. Horario y cancha: a confirmar. Arancel: ${arancel} por equipo.</p>
+            <p class="fixture-auto-nota">Todavía no se guardó nada. Al confirmar se crean todos juntos; después cada uno se edita desde el Cronograma (horario, cancha, resultado).</p>
+            <ul class="fixture-auto-grupos">${f.grupos.map(g => `<li>${attrSeguro(lineaGrupo(g))}</li>`).join('')}</ul>
+            ${f.fueraDeGrupo.length
+                ? `<p class="fixture-auto-texto fixture-auto-aviso">No entran (no están en un grupo del ciclo): ${f.fueraDeGrupo.map(e => `${attrSeguro(e.nombre)} (${attrSeguro(dondeEsta(e))})`).join(', ')}.</p>`
+                : ''}
+            <div class="fixture-auto-fechas">${porFecha}</div>
+            <div class="fixture-auto-botones">
+                <button type="button" class="importar-btn-cancelar" data-accion="cancelar">Cancelar</button>
+                <button type="button" class="btn-submit-admin" data-accion="confirmar">Confirmar (${plural(f.nuevos.length, 'partido', 'partidos')})</button>
+            </div>`;
+        panelFixtureAuto.classList.remove('seccion-oculta-staff');
+    }
+
+    function cerrarFixtureAuto() {
+        fixtureAuto = null;
+        if (panelFixtureAuto) {
+            panelFixtureAuto.innerHTML = '';
+            panelFixtureAuto.classList.add('seccion-oculta-staff');
+        }
+    }
+
+    // Ids numéricos como los del alta a mano (Editar y Eliminar los leen con parseInt). Se cuentan hacia atrás desde
+    // ahora salteando los que existen: no chocan entre sí ni con el Date.now() de un partido que se cargue después.
+    function idsNuevosPartido(cantidad) {
+        const usados = new Set(partidos.map(p => p && p.id));
+        const ids = [];
+        for (let id = Date.now(); ids.length < cantidad; id--) {
+            if (!usados.has(id)) ids.push(id);
+        }
+        return ids;
+    }
+
+    function confirmarFixtureAuto() {
+        const actual = armarFixtureCiclo(fixtureAuto.ciclo, fixtureAuto.arancel);
+        if (actual.bloqueo) {
+            cerrarFixtureAuto();
+            alert(actual.bloqueo);
+            return;
+        }
+        if (actual.firma !== fixtureAuto.firma) {
+            fixtureAuto = actual;
+            renderizarFixtureAuto();
+            alert('Cambiaron los equipos, los grupos o el calendario desde que se armó la vista previa: revisala de nuevo antes de confirmar. No se creó nada.');
+            return;
+        }
+        const ids = idsNuevosPartido(actual.nuevos.length);
+        actual.nuevos.forEach((p, i) => partidos.push({ id: ids[i], ...p }));
+        almacen.setItem('liga_partidos', JSON.stringify(partidos));
+        const cantidad = `${actual.nuevos.length} ${actual.nuevos.length === 1 ? 'partido' : 'partidos'}`;
+        const enFechas = `${actual.fechas.length} ${actual.fechas.length === 1 ? 'fecha' : 'fechas'}`;
+        registrarHistorial('partido', `generó el fixture de FASE DE GRUPOS (${nombreCicloHistorial(actual.ciclo)}): ${cantidad} en ${enFechas}`);
+
+        cerrarFixtureAuto();
+        actualizarListaAdmin();
+        actualizarSelectFechasCronograma();
+        armarOpcionesFechaPartido();
+        armarOpcionesFechaEgreso();
+        renderizarCalendarioFechas();
+        if (typeof actualizarFiltroFechasTesoreria === 'function') actualizarFiltroFechasTesoreria();
+        alert(`Fixture del ciclo ${nombreCicloHistorial(actual.ciclo)} guardado: ${cantidad} en ${enFechas}. Horario y cancha quedan a confirmar: completalos con "Editar" en el Cronograma.`);
+    }
+
+    if (btnFixtureAuto && panelFixtureAuto) {
+        btnFixtureAuto.addEventListener('click', () => {
+            const resultado = armarFixtureCiclo(selectCicloFixture ? selectCicloFixture.value : 'superior', arancelDelFixture());
+            if (resultado.bloqueo) {
+                cerrarFixtureAuto();
+                alert(resultado.bloqueo);
+                return;
+            }
+            fixtureAuto = resultado;
+            renderizarFixtureAuto();
+            panelFixtureAuto.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        panelFixtureAuto.addEventListener('click', (e) => {
+            const boton = e.target.closest('[data-accion]');
+            if (!boton || !fixtureAuto) return;
+            if (boton.dataset.accion === 'cancelar') cerrarFixtureAuto();
+            else if (boton.dataset.accion === 'confirmar') confirmarFixtureAuto();
+        });
+
+        // La vista previa es de un ciclo y un arancel: si cambian, hay que volver a armarla.
+        [selectCicloFixture, inputArancelFixture].forEach(campo => {
+            if (campo) campo.addEventListener('change', cerrarFixtureAuto);
         });
     }
 
@@ -602,8 +983,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }
 
         filtrados.forEach(e => {
-            localSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
-            visitanteSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
+            localSelect.innerHTML += `<option value="${attrSeguro(e.nombre)}">${attrSeguro(e.nombre)}</option>`;
+            visitanteSelect.innerHTML += `<option value="${attrSeguro(e.nombre)}">${attrSeguro(e.nombre)}</option>`;
         });
 
         restaurarEquiposElegidos(filtrados.map(e => e.nombre), previoLocal, previoVisitante);
@@ -665,8 +1046,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }
 
         equipos.forEach(e => {
-            localSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
-            visitanteSelect.innerHTML += `<option value="${e.nombre}">${e.nombre}</option>`;
+            localSelect.innerHTML += `<option value="${attrSeguro(e.nombre)}">${attrSeguro(e.nombre)}</option>`;
+            visitanteSelect.innerHTML += `<option value="${attrSeguro(e.nombre)}">${attrSeguro(e.nombre)}</option>`;
         });
 
         if (ladosSinDefinir > 0) {
@@ -706,7 +1087,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     selectCrucePlayoff.innerHTML += '<option value="" disabled>No hay cruces armados (con ambos equipos definidos) en esta ronda</option>';
                 } else {
                     crucesRonda.forEach(c => {
-                        selectCrucePlayoff.innerHTML += `<option value="${c.local}|${c.visitante}">Llave ${c.slot || '?'}: ${c.local} VS ${c.visitante}</option>`;
+                        selectCrucePlayoff.innerHTML += `<option value="${attrSeguro(c.local)}|${attrSeguro(c.visitante)}">Llave ${attrSeguro(c.slot || '?')}: ${attrSeguro(c.local)} VS ${attrSeguro(c.visitante)}</option>`;
                     });
                 }
             }
@@ -722,7 +1103,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const grpAnterior = grupoSelect.value;
                 grupoSelect.innerHTML = '';
                 grupos.forEach(g => {
-                    grupoSelect.innerHTML += `<option value="${g}">Grupo ${g}</option>`;
+                    grupoSelect.innerHTML += `<option value="${attrSeguro(g)}">Grupo ${attrSeguro(g)}</option>`;
                 });
                 if (grupos.includes(grpAnterior)) grupoSelect.value = grpAnterior;
             }
@@ -743,6 +1124,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
     if (inputFechaPartido) inputFechaPartido.addEventListener('change', actualizarOpcionesGrupo);
     if (cicloSelect) cicloSelect.addEventListener('change', actualizarOpcionesGrupo);
     if (grupoSelect) grupoSelect.addEventListener('change', filtrarEquiposPorGrupo);
+    // Después de los de arriba: cuando se completa el Día, la Fecha ya quedó ajustada al ciclo.
+    if (inputFechaPartido) inputFechaPartido.addEventListener('change', autocompletarDiaPartido);
+    if (cicloSelect) cicloSelect.addEventListener('change', autocompletarDiaPartido);
 
     // Dibujar Cronograma de Partidos
     function actualizarListaAdmin() {
@@ -792,8 +1176,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(255,255,255,0.03); padding:8px 10px; margin-bottom:6px; border-radius:3px; border-left: 4px solid ${p.jugado ? '#2c68e7' : '#e11d48'};">
                     <div style="text-align:left;">
-                        <span style="font-size:9px; color:#869bd8; display:block;">${faseLabel} — ${p.dia ? p.dia + ' — ' : ''}${p.cancha || 'Cancha a confirmar'} (${p.ciclo ? p.ciclo.toUpperCase() : 'SUP'})</span>
-                        <span style="font-size:12px; color:white;">${p.local} <strong style="color:#2edae3;">${marcador}</strong> ${p.visitante}</span>
+                        <span style="font-size:9px; color:#869bd8; display:block;">${faseLabel} — ${p.dia ? attrSeguro(p.dia) + ' — ' : ''}${attrSeguro(p.cancha || 'Cancha a confirmar')} (${p.ciclo ? p.ciclo.toUpperCase() : 'SUP'})</span>
+                        <span style="font-size:12px; color:white;">${attrSeguro(p.local)} <strong style="color:#2edae3;">${attrSeguro(marcador)}</strong> ${attrSeguro(p.visitante)}</span>
                     </div>
                     <div style="display:flex; gap:5px;">
                         <button class="btn-editar-partido" data-id="${p.id}" style="background-color:#1a3274; color:white; border:none; padding:4px 7px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Editar</button>
@@ -854,6 +1238,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     if (document.getElementById('penales-local')) document.getElementById('penales-local').value = p.penalesLocal !== null ? p.penalesLocal : '';
                     if (document.getElementById('penales-visitante')) document.getElementById('penales-visitante').value = p.penalesVisitante !== null ? p.penalesVisitante : '';
                     if (inputDiaPartido) inputDiaPartido.value = diaStorageAInput(p.dia);
+                    diaAutocompletado = diaStorageAInput(diaDeCalendario(p.ciclo, p.fecha));
                     if (inputArancelPartido) inputArancelPartido.value = p.arancelExigido || 30000;
                     if (checkHorarioConfirmar) checkHorarioConfirmar.checked = !p.horario;
                     document.getElementById('partido-horario').value = p.horario || '';
@@ -961,6 +1346,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }
 
         if (inputDiaPartido) inputDiaPartido.value = contexto.dia;
+        diaAutocompletado = diaCalendarioDelFormulario();
         if (checkHorarioConfirmar) checkHorarioConfirmar.checked = contexto.horarioAConfirmar;
         if (inputHorarioPartido) inputHorarioPartido.value = contexto.horario;
         aplicarHorarioAConfirmar();
@@ -1260,8 +1646,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         pool.sort((a, b) => a.nombre.localeCompare(b.nombre));
         pool.forEach(eq => {
-            playoffEq1.innerHTML += `<option value="${eq.nombre}">${eq.nombre}</option>`;
-            playoffEq2.innerHTML += `<option value="${eq.nombre}">${eq.nombre}</option>`;
+            playoffEq1.innerHTML += `<option value="${attrSeguro(eq.nombre)}">${attrSeguro(eq.nombre)}</option>`;
+            playoffEq2.innerHTML += `<option value="${attrSeguro(eq.nombre)}">${attrSeguro(eq.nombre)}</option>`;
         });
         if (playoffEq2.options.length > 1) playoffEq2.selectedIndex = 1;
     }
@@ -1332,7 +1718,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(242, 192, 14,0.05); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid #f2c00e;">
                     <div style="text-align:left;">
                         <span style="font-size:10px; color:#f2c00e; display:block; text-transform:uppercase;">${c.ronda.toUpperCase()} — LLAVE ${c.slot || '?'} (${c.ciclo.toUpperCase()})</span>
-                        <span style="font-size:12px; color:white; font-weight:bold;">${c.local || '(A definir)'} VS ${c.visitante || '(A definir)'}</span>
+                        <span style="font-size:12px; color:white; font-weight:bold;">${attrSeguro(c.local || '(A definir)')} VS ${attrSeguro(c.visitante || '(A definir)')}</span>
                     </div>
                     <button class="btn-borrar-cruce" data-id="${c.id}" style="background-color:#991b1b; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Eliminar</button>
                 </div>
@@ -1531,7 +1917,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         nuevoEquipoGrupo.innerHTML = '';
         grupos.forEach(g => {
-            nuevoEquipoGrupo.innerHTML += `<option value="${g}">Grupo ${g}</option>`;
+            nuevoEquipoGrupo.innerHTML += `<option value="${attrSeguro(g)}">Grupo ${attrSeguro(g)}</option>`;
         });
         nuevoEquipoGrupo.innerHTML += `<option value="Unico">Tabla Única</option>`;
     }
@@ -1561,6 +1947,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             });
 
             guardarEquiposEnStorage();
+            registrarHistorial('jugador', `creó el equipo ${nombre} en ${textoGrupoHistorial(grupo)} (${nombreCicloHistorial(ciclo)})`);
             formNuevoEquipo.reset();
             actualizarSelectorGruposFormulario();
             actualizarComboEquiposPlantel(nombre);
@@ -1591,8 +1978,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const item = document.createElement('div');
             item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:3px; border-left:3px solid #f2c00e;';
             item.innerHTML = `
-                <span style="font-size:12px; color:#fff;">Grupo <strong>${g}</strong></span>
-                <button class="btn-borrar-grupo-item" data-grupo="${g}" style="background:#991b1b; color:#fff; border:none; border-radius:2px; padding:3px 8px; cursor:pointer; font-size:10px;">Eliminar</button>
+                <span style="font-size:12px; color:#fff;">Grupo <strong>${attrSeguro(g)}</strong></span>
+                <button class="btn-borrar-grupo-item" data-grupo="${attrSeguro(g)}" style="background:#991b1b; color:#fff; border:none; border-radius:2px; padding:3px 8px; cursor:pointer; font-size:10px;">Eliminar</button>
             `;
             contenedorListaGrupos.appendChild(item);
         });
@@ -1661,13 +2048,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
             pool.sort((a, b) => a.nombre.localeCompare(b.nombre));
             pool.forEach(eq => {
                 const grpLabel = eq.grupo === 'Unico' ? 'Tabla Única' : `Grupo ${eq.grupo || 'A'}`;
-                moverEquipoSelect.innerHTML += `<option value="${eq.nombre}">${eq.nombre} (${grpLabel})</option>`;
+                moverEquipoSelect.innerHTML += `<option value="${attrSeguro(eq.nombre)}">${attrSeguro(eq.nombre)} (${attrSeguro(grpLabel)})</option>`;
             });
         }
 
         moverNuevoGrupo.innerHTML = '';
         grupos.forEach(g => {
-            moverNuevoGrupo.innerHTML += `<option value="${g}">Grupo ${g}</option>`;
+            moverNuevoGrupo.innerHTML += `<option value="${attrSeguro(g)}">Grupo ${attrSeguro(g)}</option>`;
         });
         moverNuevoGrupo.innerHTML += `<option value="Unico">Tabla Única</option>`;
     }
@@ -1690,8 +2077,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const equipoObj = pool.find(e => e.nombre.trim().toLowerCase() === equipoNombre.trim().toLowerCase());
 
             if (equipoObj) {
+                const grupoAnterior = equipoObj.grupo;
                 equipoObj.grupo = nuevoGrupoVal;
                 guardarEquiposEnStorage();
+                if (grupoAnterior !== nuevoGrupoVal) registrarHistorial('jugador', `pasó a ${equipoObj.nombre} de ${textoGrupoHistorial(grupoAnterior)} a ${textoGrupoHistorial(nuevoGrupoVal)} (${nombreCicloHistorial(ciclo)})`);
                 actualizarOpcionesMoverEquipo();
                 actualizarOpcionesGrupo();
                 alert(`¡${equipoNombre} fue movido al Grupo ${nuevoGrupoVal} exitosamente!`);
@@ -1759,7 +2148,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         pool.sort((a, b) => a.nombre.localeCompare(b.nombre));
         pool.forEach(eq => {
-            plantelEquipoSelect.innerHTML += `<option value="${eq.nombre}">${eq.nombre}</option>`;
+            plantelEquipoSelect.innerHTML += `<option value="${attrSeguro(eq.nombre)}">${attrSeguro(eq.nombre)}</option>`;
         });
 
         if (equipoASeleccionar) {
@@ -1862,24 +2251,24 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         equipoObj.jugadores.forEach((j, idx) => {
             const esFichaEntregada = j.fichaMedica === 'si';
-            const igTexto = j.instagram ? `@${j.instagram.replace('@','')}` : '-';
-            
+            const igTexto = j.instagram ? `@${attrSeguro(j.instagram.replace('@',''))}` : '-';
+
             tablaJugadoresBody.innerHTML += `
                 <tr>
                     <td style="color:#2edae3; font-weight:bold;">${dorsalBF(j)}</td>
-                    <td style="font-weight:bold; color:#fff;" title="${j.nombre}">${j.nombre}</td>
-                    <td>${j.dni || '-'}</td>
+                    <td style="font-weight:bold; color:#fff;" title="${attrSeguro(j.nombre)}">${attrSeguro(j.nombre)}</td>
+                    <td>${attrSeguro(j.dni || '-')}</td>
                     <td style="color:#4284f2;" title="${igTexto}">${igTexto}</td>
                     <td>
-                        <button type="button" class="btn-toggle-ficha" data-dni="${j.dni}" style="background:transparent; border:none; cursor:pointer; font-size:10px; font-weight:bold; color:${esFichaEntregada ? '#4ade80' : '#f43f5e'};" title="Cambiar estado ficha">
+                        <button type="button" class="btn-toggle-ficha" data-dni="${attrSeguro(j.dni)}" style="background:transparent; border:none; cursor:pointer; font-size:10px; font-weight:bold; color:${esFichaEntregada ? '#4ade80' : '#f43f5e'};" title="Cambiar estado ficha">
                             ${esFichaEntregada ? 'OK' : 'Debe'}
                         </button>
                     </td>
                     <td>
                         <div style="display:flex; gap:3px; justify-content:center;">
-                            <button type="button" class="btn-accion-plantel btn-editar-jugador" data-dni="${j.dni}" style="background:#0284c7; color:white; border:none; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Editar">Editar</button>
-                            <button type="button" class="btn-accion-plantel btn-ver-emergencia" data-dni="${j.dni}" style="background:#1a3274; border:1px solid #2edae3; color:#2edae3; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Emergencia">SOS</button>
-                            <button type="button" class="btn-accion-plantel btn-borrar-jugador" data-dni="${j.dni}" data-nombre="${j.nombre}" style="background:#991b1b; color:white; border:none; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Eliminar">Baja</button>
+                            <button type="button" class="btn-accion-plantel btn-editar-jugador" data-dni="${attrSeguro(j.dni)}" style="background:#0284c7; color:white; border:none; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Editar">Editar</button>
+                            <button type="button" class="btn-accion-plantel btn-ver-emergencia" data-dni="${attrSeguro(j.dni)}" style="background:#1a3274; border:1px solid #2edae3; color:#2edae3; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Emergencia">SOS</button>
+                            <button type="button" class="btn-accion-plantel btn-borrar-jugador" data-dni="${attrSeguro(j.dni)}" data-nombre="${attrSeguro(j.nombre)}" style="background:#991b1b; color:white; border:none; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Eliminar">Baja</button>
                         </div>
                     </td>
                 </tr>
@@ -2033,6 +2422,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     const despues = { ...antes, ...datosJugador };
                     equipoObj.jugadores[indice] = despues;
                     propagarCambioJugador(equipoObj, antes, despues);
+                    const textoEdicion = textoEdicionJugadorHistorial(antes, despues, equipoObj.nombre);
+                    if (textoEdicion) registrarHistorial('jugador', textoEdicion);
                     alert(`¡Ficha de ${datosJugador.nombre} actualizada correctamente!`);
                 }
                 cancelarEdicionJugador();
@@ -2086,6 +2477,623 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
+    // ── Importar la planilla de inscripción de un equipo (Excel, CSV o PDF) ──
+    // El equipo es el elegido en "Equipo Destino": varias planillas llegan sin el nombre (decisión de Joaquín, 01/10/2026).
+    // Nada se guarda hasta "Confirmar importación": antes se ve una vista previa editable, y cada fila pasa por
+    // validarJugadorEnTorneo (contra lo ya guardado) y por el control de repetidos dentro del mismo archivo.
+    // Las librerías se descargan recién al subir un archivo. SheetJS sale de su CDN oficial porque la versión de cdnjs
+    // tiene fallas conocidas al leer archivos armados a propósito (y las planillas las mandan los equipos); pdf.js va en
+    // su versión "legacy", que anda en celulares más viejos.
+    const URL_SHEETJS = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    const SRI_SHEETJS = 'sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT';
+    const URL_PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/legacy/build/pdf.min.mjs';
+    const URL_PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/legacy/build/pdf.worker.min.mjs';
+    const ESPERA_LIBRERIA_MS = 30000;
+
+    const btnImportarPlanilla = document.getElementById('btn-importar-planilla');
+    const inputPlanilla = document.getElementById('importar-planilla-archivo');
+    const estadoLecturaPlanilla = document.getElementById('importar-planilla-estado');
+    const panelImportacion = document.getElementById('importar-vista-previa');
+    let importacion = null;
+
+    function conPlazo(promesa) {
+        return Promise.race([promesa, new Promise((_, reject) => setTimeout(() => reject(new Error('sin respuesta')), ESPERA_LIBRERIA_MS))]);
+    }
+
+    // Marca los errores de descarga de una librería: en ese caso el problema es la conexión, no el archivo.
+    const errorDeLector = e => Object.assign(e instanceof Error ? e : new Error(String(e)), { sinLector: true });
+
+    let promesaSheetJS = null;
+    function cargarSheetJS() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        if (!promesaSheetJS) {
+            promesaSheetJS = conPlazo(new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = URL_SHEETJS;
+                script.integrity = SRI_SHEETJS;
+                script.crossOrigin = 'anonymous';
+                script.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('no cargó')));
+                script.onerror = () => reject(new Error('no cargó'));
+                document.head.appendChild(script);
+            })).catch(e => { promesaSheetJS = null; throw errorDeLector(e); });
+        }
+        return promesaSheetJS;
+    }
+
+    let promesaPdfJs = null;
+    function cargarPdfJs() {
+        if (!promesaPdfJs) {
+            promesaPdfJs = conPlazo(import(URL_PDFJS)).then(pdfjs => {
+                pdfjs.GlobalWorkerOptions.workerSrc = URL_PDFJS_WORKER;
+                return pdfjs;
+            }).catch(e => { promesaPdfJs = null; throw errorDeLector(e); });
+        }
+        return promesaPdfJs;
+    }
+
+    const normalizarTitulo = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+
+    // Títulos de la planilla de inscripción (Clausura 2026): NOMBRE Y APELLIDO, DNI, FECHA DE NAC., CELULAR, INSTAGRAM y
+    // DORSAL CAMISETA. Se reconocen por el texto, no por la posición; el orden importa ("NÚMERO DE DNI" es el DNI).
+    const COLUMNAS_PLANILLA = [
+        ['dni', /\b(DNI|DOCUMENTO)\b/],
+        ['dorsal', /\b(DORSAL|CAMISETA|NUMERO|NRO)\b/],
+        ['nacimiento', /\bNAC/],
+        ['instagram', /\b(INSTAGRAM|INSTA|IG)\b/],
+        ['celular', /\b(CELULAR|CEL|TELEFONO|TEL)\b/],
+        ['nombre', /\b(NOMBRE|APELLIDO|JUGADOR)/]
+    ];
+
+    function campoDeTitulo(texto) {
+        const t = normalizarTitulo(texto);
+        const hallado = t && COLUMNAS_PLANILLA.find(([, patron]) => patron.test(t));
+        return hallado ? hallado[0] : null;
+    }
+
+    // Lo que llega en el archivo lo escribió cada equipo: se sacan < y > (ningún dato del jugador los usa) para que
+    // no termine como HTML en las tablas del panel o de la web.
+    function textoCelda(v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    const textoOpcional = v => { const t = textoCelda(v); return /^[-–—.\s]*$/.test(t) ? '' : t; };
+
+    function textoDni(v) {
+        if (typeof v === 'number') return String(Math.round(v));
+        const t = textoCelda(v);
+        const digitos = t.replace(/[.,\s-]/g, '');
+        return /^\d+$/.test(digitos) ? digitos : t;
+    }
+
+    function textoDorsal(v) {
+        if (typeof v === 'number') return String(v);
+        return textoCelda(v).replace(/^(N[°º.]?|#)\s*(?=\d)/i, '');
+    }
+
+    // En Excel la fecha es un número de días (desde 1899-12-30, o desde 1904 en libros viejos de Mac); en un CSV o un PDF,
+    // texto como "18/2/2010". Queda como AAAA-MM-DD, igual que el campo de fecha del formulario.
+    function fechaDePlanilla(v, fecha1904) {
+        if (v === null || v === undefined || v === '') return { nacimiento: '' };
+        let y, m, d;
+        if (typeof v === 'number') {
+            const fecha = new Date(Date.UTC(1899, 11, 30) + (Math.floor(v) + (fecha1904 ? 1462 : 0)) * 86400000);
+            [y, m, d] = [fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, fecha.getUTCDate()];
+        } else {
+            const t = textoCelda(v);
+            let p = t.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+            if (p) [y, m, d] = [+p[1], +p[2], +p[3]];
+            else if ((p = t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
+                [d, m, y] = [+p[1], +p[2], +p[3]];
+                if (m > 12 && d <= 12) [d, m] = [m, d];
+                if (y < 100) y += y > new Date().getFullYear() % 100 ? 1900 : 2000;
+            }
+        }
+        const fecha = y ? new Date(Date.UTC(y, m - 1, d)) : null;
+        if (!fecha || fecha.getUTCFullYear() !== y || fecha.getUTCMonth() !== m - 1 || fecha.getUTCDate() !== d) {
+            return { nacimiento: '', nacimientoLeido: textoCelda(v) };
+        }
+        return { nacimiento: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
+    }
+
+    // De una tabla ya leída (filas × celdas) saca los jugadores: busca la fila de títulos y toma las de abajo.
+    function jugadoresDeTabla(tabla, fecha1904) {
+        const iTitulos = tabla.findIndex(fila => {
+            const campos = fila.map(campoDeTitulo);
+            return campos.includes('nombre') && campos.includes('dni');
+        });
+        if (iTitulos === -1) {
+            return { error: 'No se encontró la fila de títulos de la planilla (NOMBRE Y APELLIDO, DNI, FECHA DE NAC., CELULAR, INSTAGRAM, DORSAL CAMISETA).' };
+        }
+        const columnas = {};
+        tabla[iTitulos].forEach((celda, i) => {
+            const campo = campoDeTitulo(celda);
+            if (campo === 'nombre') (columnas.nombre = columnas.nombre || []).push(i);
+            else if (campo && !columnas[campo]) columnas[campo] = [i];
+        });
+        const curso = tabla.slice(0, iTitulos)
+            .map(fila => fila.map(textoCelda).filter(Boolean).join(' '))
+            .find(t => /^(CURSO|EQUIPO)\b/.test(normalizarTitulo(t))) || '';
+
+        const filas = [];
+        tabla.slice(iTitulos + 1).forEach(fila => {
+            const celda = campo => (columnas[campo] ? fila[columnas[campo][0]] : '');
+            const nombre = (columnas.nombre || []).map(i => textoCelda(fila[i])).filter(Boolean).join(' ').replace(/^\d{1,3}\s*[).:-]\s*/, '');
+            const jugador = {
+                nombre,
+                dni: textoDni(celda('dni')),
+                dorsal: textoDorsal(celda('dorsal')),
+                ...fechaDePlanilla(celda('nacimiento'), fecha1904),
+                celular: textoOpcional(celda('celular')),
+                instagram: textoOpcional(celda('instagram')).replace(/^@+/, '')
+            };
+            // Una fila sin nombre ni DNI es un renglón vacío de la planilla (o el número de página de un PDF).
+            if (!jugador.nombre && soloDigitosDni(jugador.dni).length < 5) return;
+            filas.push(jugador);
+        });
+        return { filas, curso };
+    }
+
+    // Excel en castellano guarda el CSV común en Windows-1252: leído como UTF-8, las tildes y la ñ se rompen.
+    function textoDeCsv(datos) {
+        try { return new TextDecoder('utf-8', { fatal: true }).decode(datos); }
+        catch (e) { return new TextDecoder('windows-1252').decode(datos); }
+    }
+
+    async function leerPlanillaExcel(archivo, esCsv) {
+        const XLSX = await cargarSheetJS();
+        const datos = await archivo.arrayBuffer();
+        const libro = esCsv ? XLSX.read(textoDeCsv(datos), { type: 'string', raw: true }) : XLSX.read(datos, { type: 'array' });
+        const fecha1904 = !!(libro.Workbook && libro.Workbook.WBProps && libro.Workbook.WBProps.date1904);
+        let resultado = jugadoresDeTabla([], fecha1904);
+        for (const hoja of libro.SheetNames) {
+            resultado = jugadoresDeTabla(XLSX.utils.sheet_to_json(libro.Sheets[hoja], { header: 1, raw: true, defval: '' }), fecha1904);
+            if (!resultado.error) break;
+        }
+        return resultado;
+    }
+
+    // Un PDF no tiene celdas, solo textos con su posición: se arman los renglones por altura, y cada texto va a la columna
+    // cuyo título tiene más cerca en horizontal (en la planilla todas las celdas están centradas). Lo que cae fuera de los
+    // títulos (la numeración "1)" de la izquierda) se descarta.
+    function renglonesDePdf(items) {
+        const renglones = [];
+        [...items].sort((a, b) => b.y - a.y || a.x - b.x).forEach(item => {
+            const actual = renglones[renglones.length - 1];
+            if (actual && Math.abs(actual.y - item.y) <= Math.max(2, 0.45 * Math.min(actual.alto, item.alto))) actual.items.push(item);
+            else renglones.push({ y: item.y, alto: item.alto, items: [item] });
+        });
+        renglones.forEach(r => r.items.sort((a, b) => a.x - b.x));
+        return renglones;
+    }
+
+    function unirTextosPdf(items) {
+        return items.reduce((texto, item, i) => {
+            const anterior = items[i - 1];
+            const separado = anterior && item.x - (anterior.x + anterior.ancho) > 0.15 * item.alto;
+            return texto + (separado ? ' ' : '') + item.texto;
+        }, '');
+    }
+
+    function columnasDeTitulos(renglones, iTitulo) {
+        const titulo = renglones[iTitulo];
+        const banda = renglones.filter(r => Math.abs(r.y - titulo.y) < titulo.alto).flatMap(r => r.items);
+        const columnas = [];
+        [...banda].sort((a, b) => a.x - b.x).forEach(item => {
+            const ultima = columnas[columnas.length - 1];
+            if (ultima && item.x <= ultima.x1 + 0.6 * item.alto) {
+                ultima.items.push(item);
+                ultima.x1 = Math.max(ultima.x1, item.x + item.ancho);
+            } else {
+                columnas.push({ x0: item.x, x1: item.x + item.ancho, items: [item] });
+            }
+        });
+        columnas.forEach(c => {
+            c.centro = (c.x0 + c.x1) / 2;
+            c.texto = renglonesDePdf(c.items).map(r => unirTextosPdf(r.items)).join(' ');
+        });
+        return { columnas, banda: new Set(banda) };
+    }
+
+    function tablaDePdf(paginas) {
+        const tabla = [];
+        let columnas = null;
+        paginas.forEach(items => {
+            const renglones = renglonesDePdf(items);
+            const iTitulo = renglones.findIndex(r => {
+                const t = normalizarTitulo(r.items.map(i => i.texto).join(' '));
+                return /\b(DNI|DOCUMENTO)\b/.test(t) && /\b(NOMBRE|APELLIDO|JUGADOR)/.test(t);
+            });
+            let enTitulos = new Set();
+            if (iTitulo !== -1) {
+                const encontrado = columnasDeTitulos(renglones, iTitulo);
+                if (!columnas) {
+                    renglones.slice(0, iTitulo).filter(r => !r.items.some(i => encontrado.banda.has(i)))
+                        .forEach(r => tabla.push([unirTextosPdf(r.items)]));
+                    tabla.push(encontrado.columnas.map(c => c.texto));
+                }
+                columnas = encontrado.columnas;
+                enTitulos = encontrado.banda;
+            }
+            if (!columnas) return;
+            const desde = iTitulo === -1 ? 0 : iTitulo;
+            renglones.slice(desde).filter(r => !r.items.some(i => enTitulos.has(i))).forEach(r => {
+                const celdas = columnas.map(() => []);
+                const n = columnas.length;
+                const izquierda = n > 1 ? columnas[0].centro - (columnas[1].centro - columnas[0].centro) / 2 : -Infinity;
+                const derecha = n > 1 ? columnas[n - 1].centro + (columnas[n - 1].centro - columnas[n - 2].centro) / 2 : Infinity;
+                r.items.forEach(item => {
+                    const centro = item.x + item.ancho / 2;
+                    if (centro < izquierda || centro > derecha) return;
+                    let mejor = 0;
+                    columnas.forEach((c, i) => { if (Math.abs(c.centro - centro) < Math.abs(columnas[mejor].centro - centro)) mejor = i; });
+                    celdas[mejor].push(item);
+                });
+                tabla.push(celdas.map(unirTextosPdf));
+            });
+        });
+        return tabla;
+    }
+
+    async function leerPlanillaPdf(archivo) {
+        const pdfjs = await cargarPdfJs();
+        const tarea = pdfjs.getDocument({ data: new Uint8Array(await archivo.arrayBuffer()), isEvalSupported: false });
+        const paginas = [];
+        try {
+            const pdf = await tarea.promise;
+            for (let n = 1; n <= pdf.numPages; n++) {
+                const contenido = await (await pdf.getPage(n)).getTextContent();
+                paginas.push(contenido.items.filter(it => it.str && it.str.trim()).map(it => ({
+                    texto: it.str, x: it.transform[4], y: it.transform[5], ancho: it.width,
+                    alto: Math.abs(it.height) || Math.hypot(it.transform[2], it.transform[3]) || 10
+                })));
+            }
+        } finally {
+            tarea.destroy();
+        }
+        if (!paginas.some(p => p.length)) {
+            return { error: 'Este PDF no tiene texto: es una foto o un escaneo de la planilla, y eso no se puede leer. Pedile al equipo el Excel, o cargá los jugadores a mano.' };
+        }
+        const resultado = jugadoresDeTabla(tablaDePdf(paginas), false);
+        if (!resultado.error) resultado.desdePdf = true;
+        return resultado;
+    }
+
+    async function leerPlanilla(archivo) {
+        const nombre = (archivo.name || '').toLowerCase();
+        if (/\.pdf$/.test(nombre) || archivo.type === 'application/pdf') return leerPlanillaPdf(archivo);
+        if (/\.(xlsx|xlsm|xls|ods)$/.test(nombre)) return leerPlanillaExcel(archivo, false);
+        if (/\.(csv|txt)$/.test(nombre)) return leerPlanillaExcel(archivo, true);
+        return { error: 'Ese archivo no es una planilla: subí el Excel (.xlsx o .xls), un .csv o un PDF.' };
+    }
+
+    function mostrarEstadoLectura(texto, esError) {
+        if (!estadoLecturaPlanilla) return;
+        estadoLecturaPlanilla.textContent = texto;
+        estadoLecturaPlanilla.classList.toggle('importar-lectura-error', !!esError);
+    }
+
+    // El destino se toma de "Ciclo" y "Equipo Destino" al subir la planilla, y cambia solo si se tocan esos dos.
+    // (Otras acciones también cambian el equipo elegido, sin aviso: la importación no se tiene que ir a otro equipo.)
+    function destinoElegido() {
+        return { ciclo: plantelCiclo ? plantelCiclo.value : 'superior', nombre: plantelEquipoSelect ? plantelEquipoSelect.value : '' };
+    }
+
+    function equipoDestinoImportacion() {
+        const { ciclo, nombre } = importacion.destino;
+        const pool = ciclo === 'superior' ? poolSuperior : poolBasico;
+        const equipo = nombre ? (pool || []).find(e => e.nombre.trim().toLowerCase() === nombre.trim().toLowerCase()) : null;
+        return equipo ? { equipo, ciclo } : null;
+    }
+
+    const clavePase = hallado => `${hallado.ciclo}|${hallado.equipo.nombre}`;
+    const dorsalDeFila = f => {
+        const t = String(f.dorsal).trim();
+        const n = Number(t);
+        return t !== '' && Number.isInteger(n) && n >= 0 && n <= 99 ? n : null;
+    };
+
+    // Marca con "error" las filas que repiten un valor de otra fila del archivo (validarJugadorEnTorneo solo compara
+    // contra lo ya guardado, no contra las filas que se están por importar).
+    function marcarRepetidosEnArchivo(filas, valorDe, mensaje) {
+        const porValor = new Map();
+        filas.forEach(f => {
+            const v = valorDe(f);
+            if (v === '' || v === null) return;
+            porValor.set(v, [...(porValor.get(v) || []), f]);
+        });
+        porValor.forEach(grupo => {
+            if (grupo.length < 2) return;
+            grupo.forEach(f => f.errores.push(mensaje(f, grupo.filter(o => o !== f).map(o => o.n).join(', '))));
+        });
+    }
+
+    // Se valida todo junto (los repetidos dependen de las demás filas) y contra los planteles recién leídos.
+    function validarImportacion() {
+        recargarPools();
+        const destino = equipoDestinoImportacion();
+        const activas = importacion.filas.filter(f => !f.quitada);
+        activas.forEach(f => {
+            f.errores = []; f.avisos = []; f.traslado = null; f.existente = null;
+            const digitos = soloDigitosDni(f.dni);
+            if (!f.nombre.trim()) f.errores.push('Falta el nombre.');
+            if (!digitos) f.errores.push('Falta el DNI.');
+            else if (digitos.length < 7 || digitos.length > 8) f.avisos.push(`Revisá el DNI: tiene ${digitos.length} ${digitos.length === 1 ? 'número' : 'números'}.`);
+            if (String(f.dorsal).trim() === '') f.errores.push('Falta el número de camiseta (0 a 99).');
+            else if (dorsalDeFila(f) === null) f.errores.push('El número de camiseta va de 0 a 99.');
+            if (f.nacimientoLeido && !f.nacimiento) f.avisos.push(`No se entendió la fecha de nacimiento «${f.nacimientoLeido}»: completala si la tenés.`);
+            const hallado = destino && digitos ? buscarDniEnTorneo(f.dni, null) : null;
+            if (hallado && hallado.equipo === destino.equipo) f.existente = hallado.jugador;
+        });
+        const nuevas = activas.filter(f => !f.existente);
+        marcarRepetidosEnArchivo(nuevas, f => soloDigitosDni(f.dni), (f, otras) => `DNI repetido en la planilla (también en la fila ${otras}).`);
+        marcarRepetidosEnArchivo(nuevas, dorsalDeFila, (f, otras) => `Número ${dorsalDeFila(f)} repetido en la planilla (también en la fila ${otras}).`);
+        if (destino) {
+            nuevas.filter(f => f.errores.length === 0).forEach(f => {
+                const validacion = validarJugadorEnTorneo(destino.equipo, f.dni, dorsalDeFila(f), null);
+                if (validacion.error) f.errores.push(validacion.error);
+                else if (validacion.traslado) f.traslado = validacion.traslado;
+            });
+        }
+        activas.forEach(f => {
+            f.estado = f.existente ? 'existe'
+                : f.errores.length ? 'error'
+                : f.traslado ? (f.pase === clavePase(f.traslado) ? 'pase' : 'pase-pendiente')
+                : 'ok';
+        });
+        return { destino, activas };
+    }
+
+    function htmlEstadoFila(f, destino) {
+        const lista = (mensajes, clase) => mensajes.length ? `<ul class="${clase}">${mensajes.map(m => `<li>${attrSeguro(m)}</li>`).join('')}</ul>` : '';
+        let html = '';
+        if (f.estado === 'existe') {
+            html = `<p class="importar-msj-existe">Ya está en este equipo como ${attrSeguro(textoJugadorHistorial(f.existente))}: no se vuelve a cargar. Si cambió algún dato, editalo desde la lista.</p>`;
+        } else if (f.estado === 'error') {
+            html = lista(f.errores, 'importar-msj-errores');
+        } else if (f.traslado) {
+            const origen = `${f.traslado.equipo.nombre} (${nombreCicloHistorial(f.traslado.ciclo)})`;
+            html = `<p class="importar-msj-pase">${attrSeguro(f.traslado.jugador.nombre)} está inscripto en ${attrSeguro(origen)} y todavía no jugó ningún partido con ese equipo.</p>
+                <label class="importar-pase"><input type="checkbox" class="importar-pase-check">
+                <span>Pasarlo a ${attrSeguro(destino ? destino.equipo.nombre : 'este equipo')} (se lo saca de ${attrSeguro(f.traslado.equipo.nombre)} y conserva su ficha)</span></label>`;
+        } else {
+            html = '<span class="importar-chip-ok">Listo para importar</span>';
+        }
+        return html + (f.estado === 'existe' ? '' : lista(f.avisos, 'importar-msj-avisos'));
+    }
+
+    function htmlFilaImportacion(f) {
+        const campo = (clave, etiqueta, extra = '') => `
+            <label class="importar-campo importar-c-${clave}"><span class="importar-etiqueta">${etiqueta}</span>
+                <input class="importar-input" data-campo="${clave}" value="${attrSeguro(f[clave])}" ${extra}></label>`;
+        return `
+            <div class="importar-fila" data-n="${f.n}">
+                <span class="importar-num"><span class="importar-etiqueta">Fila </span>${f.n}</span>
+                ${campo('nombre', 'Nombre y apellido', 'type="text" autocomplete="off"')}
+                ${campo('dni', 'DNI', 'type="text" inputmode="numeric" autocomplete="off"')}
+                ${campo('dorsal', 'N° camiseta', 'type="text" inputmode="numeric" maxlength="3" autocomplete="off"')}
+                ${campo('nacimiento', 'Nacimiento', 'type="date"')}
+                ${campo('celular', 'Celular', 'type="text" inputmode="tel" autocomplete="off"')}
+                ${campo('instagram', 'Instagram', 'type="text" autocomplete="off"')}
+                <button type="button" class="importar-quitar" data-accion="quitar">Quitar</button>
+                <div class="importar-estado"></div>
+            </div>`;
+    }
+
+    function renderizarImportacion() {
+        if (!panelImportacion || !importacion) return;
+        const origen = [`Archivo: <strong>${attrSeguro(importacion.archivo)}</strong>`];
+        if (importacion.curso) origen.push(`la planilla dice «${attrSeguro(importacion.curso)}»`);
+        panelImportacion.innerHTML = `
+            <h3 class="importar-titulo">Vista previa de la importación</h3>
+            <p class="importar-origen">${origen.join(' · ')}</p>
+            <p class="importar-destino"></p>
+            ${importacion.desdePdf ? '<p class="importar-nota importar-nota-pdf">Leído desde un PDF: revisá que cada dato haya quedado en su columna.</p>' : ''}
+            <p class="importar-nota">Todavía no se guardó nada. Podés corregir cualquier dato acá mismo (por ejemplo, agregarle «(C)» al nombre del capitán) y se vuelve a revisar al tipear.</p>
+            <div class="importar-encabezado" aria-hidden="true">
+                <span>#</span><span>Nombre y apellido</span><span>DNI</span><span>N°</span><span>Nacimiento</span><span>Celular</span><span>Instagram</span><span></span>
+            </div>
+            <div class="importar-filas">${importacion.filas.map(htmlFilaImportacion).join('')}</div>
+            <p class="importar-resumen" aria-live="polite"></p>
+            <p class="importar-bloqueo"></p>
+            <div class="importar-botones">
+                <button type="button" class="importar-btn-cancelar" data-accion="cancelar">Cancelar</button>
+                <button type="button" class="btn-submit-admin importar-btn-confirmar" data-accion="confirmar">Confirmar importación</button>
+            </div>`;
+        panelImportacion.classList.remove('seccion-oculta-staff');
+        actualizarImportacion();
+    }
+
+    // Actualiza los estados y el resumen sin redibujar los campos (no se pierde el foco mientras se tipea).
+    function actualizarImportacion() {
+        if (!panelImportacion || !importacion) return { bloqueo: 'No hay ninguna importación abierta.' };
+        const { destino, activas } = validarImportacion();
+        activas.forEach(f => {
+            const fila = panelImportacion.querySelector(`.importar-fila[data-n="${f.n}"]`);
+            if (!fila) return;
+            const html = htmlEstadoFila(f, destino);
+            const caja = fila.querySelector('.importar-estado');
+            if (caja.dataset.html !== html) { caja.innerHTML = html; caja.dataset.html = html; }
+            const check = caja.querySelector('.importar-pase-check');
+            if (check) check.checked = f.estado === 'pase';
+            fila.className = `importar-fila importar-fila-${f.estado}`;
+        });
+
+        const cuenta = estado => activas.filter(f => f.estado === estado).length;
+        const importables = activas.filter(f => f.estado === 'ok' || f.estado === 'pase');
+        const [conError, pendientes, existentes] = [cuenta('error'), cuenta('pase-pendiente'), cuenta('existe')];
+        const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+        const sinDestino = importacion.destino.nombre
+            ? `El equipo ${importacion.destino.nombre} ya no está en los planteles: elegí el equipo destino arriba, en "Equipo Destino".`
+            : 'Elegí el equipo destino arriba, en "Equipo Destino".';
+        let bloqueo = '';
+        if (!destino) bloqueo = sinDestino;
+        else if (conError) bloqueo = `Corregí o quitá ${conError === 1 ? 'la fila con error' : `las ${conError} filas con error`} para poder importar.`;
+        else if (pendientes) bloqueo = `Confirmá o quitá ${pendientes === 1 ? 'el pase' : `los ${pendientes} pases`} desde otro equipo.`;
+        else if (!importables.length) bloqueo = 'No hay jugadores nuevos para importar.';
+
+        const total = destino ? (destino.equipo.jugadores || []).length + importables.length : 0;
+        panelImportacion.querySelector('.importar-destino').innerHTML = destino
+            ? `Destino: <strong>${attrSeguro(destino.equipo.nombre)}</strong> (${nombreCicloHistorial(destino.ciclo)}), hoy con ${plural((destino.equipo.jugadores || []).length, 'jugador', 'jugadores')}.`
+                + (total > MAX_JUGADORES_LISTA ? ` <span class="importar-aviso-tope">Con esta importación quedaría con ${total} y el reglamento permite ${MAX_JUGADORES_LISTA} en la lista.</span>` : '')
+            : `<span class="importar-aviso-tope">${attrSeguro(sinDestino)}</span>`;
+        const partes = [`${importables.length} para importar`];
+        if (conError) partes.push(`${conError} con error`);
+        if (pendientes) partes.push(plural(pendientes, 'pase sin confirmar', 'pases sin confirmar'));
+        if (existentes) partes.push(plural(existentes, 'ya cargado', 'ya cargados'));
+        panelImportacion.querySelector('.importar-resumen').textContent = `${plural(activas.length, 'fila', 'filas')}: ${partes.join(' · ')}.`;
+        panelImportacion.querySelector('.importar-bloqueo').textContent = bloqueo;
+        const btnConfirmar = panelImportacion.querySelector('.importar-btn-confirmar');
+        btnConfirmar.disabled = !!bloqueo;
+        btnConfirmar.textContent = importables.length ? `Confirmar importación (${plural(importables.length, 'jugador', 'jugadores')})` : 'Confirmar importación';
+        return { bloqueo, destino, importables, total };
+    }
+
+    function cerrarImportacion() {
+        importacion = null;
+        if (panelImportacion) {
+            panelImportacion.innerHTML = '';
+            panelImportacion.classList.add('seccion-oculta-staff');
+        }
+    }
+
+    function confirmarImportacion() {
+        const { bloqueo, destino, importables, total } = actualizarImportacion();
+        if (bloqueo) { alert(bloqueo); return; }
+        const equipo = destino.equipo;
+        if (total > MAX_JUGADORES_LISTA && !confirm(`${equipo.nombre} va a quedar con ${total} jugadores y el reglamento permite un máximo de ${MAX_JUGADORES_LISTA} en la lista. ¿Importar igual?`)) return;
+        if (!equipo.jugadores) equipo.jugadores = [];
+
+        const altas = [];
+        const pases = [];
+        importables.forEach(f => {
+            const datos = {
+                nombre: textoCelda(f.nombre), dorsal: dorsalDeFila(f), nacimiento: f.nacimiento || '',
+                celular: textoCelda(f.celular), instagram: textoCelda(f.instagram).replace(/^@+/, '')
+            };
+            if (f.traslado) {
+                // Como en el alta a mano: conserva DNI, foto, ficha médica y contactos; de la planilla toma lo que trae.
+                const t = f.traslado;
+                t.equipo.jugadores = t.equipo.jugadores.filter(j => j !== t.jugador);
+                const pasado = { ...t.jugador, nombre: datos.nombre, dorsal: datos.dorsal };
+                ['nacimiento', 'celular', 'instagram'].forEach(c => { if (datos[c]) pasado[c] = datos[c]; });
+                equipo.jugadores.push(pasado);
+                pases.push({ jugador: pasado, origen: t.equipo.nombre });
+                return;
+            }
+            const nuevo = {
+                nombre: datos.nombre, dni: textoCelda(f.dni), dorsal: datos.dorsal,
+                instagram: datos.instagram, foto: '', fichaMedica: 'no', nacimiento: datos.nacimiento, celular: datos.celular,
+                concurrir: '', concurrirDir: '', medico: '', medicoDir: '',
+                familiarNombre: '', familiarParentesco: '', familiarTel: '',
+                goles: 0, amarillas: 0, rojas: 0
+            };
+            equipo.jugadores.push(nuevo);
+            altas.push(nuevo);
+        });
+        guardarEquiposEnStorage();
+        if (altas.length) {
+            registrarHistorial('jugador', `importó ${altas.length} ${altas.length === 1 ? 'jugador' : 'jugadores'} a ${equipo.nombre} desde la planilla de inscripción: ${altas.map(textoJugadorHistorial).join(', ')}`);
+        }
+        pases.forEach(p => registrarHistorial('jugador', `pasó a ${textoJugadorHistorial(p.jugador)} de ${p.origen} a ${equipo.nombre} (desde la planilla de inscripción)`));
+
+        cerrarImportacion();
+        mostrarEstadoLectura('');
+        actualizarComboEquiposPlantel(equipo.nombre);
+        renderizarResumenStaff();
+        alert(`Se ${importables.length === 1 ? 'importó 1 jugador' : `importaron ${importables.length} jugadores`} a ${equipo.nombre}.`);
+    }
+
+    if (btnImportarPlanilla && inputPlanilla && panelImportacion) {
+        btnImportarPlanilla.addEventListener('click', () => {
+            if (!plantelEquipoSelect || !plantelEquipoSelect.value) {
+                alert('Primero creá o elegí el equipo en "Equipo Destino": la planilla se carga en ese equipo.');
+                return;
+            }
+            if (importacion && importacion.editada && !confirm('Ya hay una importación abierta con cambios. ¿Descartarla y subir otra planilla?')) return;
+            inputPlanilla.value = '';
+            inputPlanilla.click();
+        });
+
+        inputPlanilla.addEventListener('change', async () => {
+            const archivo = inputPlanilla.files && inputPlanilla.files[0];
+            if (!archivo) return;
+            const destino = destinoElegido();
+            btnImportarPlanilla.disabled = true;
+            mostrarEstadoLectura('Leyendo la planilla...');
+            let resultado;
+            try {
+                resultado = await leerPlanilla(archivo);
+            } catch (e) {
+                // El worker de pdf.js se descarga recién al abrir el PDF: si falla, también es la conexión.
+                const sinLector = !!(e && (e.sinLector || /fake worker|dynamically imported module/i.test(e.message)));
+                resultado = { error: sinLector
+                    ? 'No se pudo descargar el lector de planillas: hace falta conexión a internet. Probá de nuevo con señal.'
+                    : 'No se pudo leer el archivo: puede estar dañado o tener contraseña. Probá abrirlo y guardarlo de nuevo, o pedile otra copia al equipo.' };
+            } finally {
+                btnImportarPlanilla.disabled = false;
+                inputPlanilla.value = '';
+            }
+            if (resultado.error) { mostrarEstadoLectura(resultado.error, true); return; }
+            if (!resultado.filas.length) { mostrarEstadoLectura('La planilla no tiene jugadores cargados debajo de los títulos.', true); return; }
+            mostrarEstadoLectura(`Planilla leída: ${resultado.filas.length} ${resultado.filas.length === 1 ? 'fila' : 'filas'}. Revisalas en la vista previa de abajo.`);
+            importacion = {
+                archivo: archivo.name, curso: resultado.curso, desdePdf: !!resultado.desdePdf, editada: false, destino,
+                filas: resultado.filas.map((f, i) => ({ n: i + 1, nacimientoLeido: '', ...f, quitada: false, pase: null }))
+            };
+            renderizarImportacion();
+            panelImportacion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        panelImportacion.addEventListener('input', (e) => {
+            const input = e.target.closest('.importar-input');
+            const filaEl = input && input.closest('.importar-fila');
+            if (!filaEl || !importacion) return;
+            const fila = importacion.filas.find(f => String(f.n) === filaEl.dataset.n);
+            fila[input.dataset.campo] = input.value;
+            if (input.dataset.campo === 'nacimiento') fila.nacimientoLeido = '';
+            importacion.editada = true;
+            actualizarImportacion();
+        });
+
+        panelImportacion.addEventListener('change', (e) => {
+            const check = e.target.closest('.importar-pase-check');
+            const filaEl = check && check.closest('.importar-fila');
+            if (!filaEl || !importacion) return;
+            const fila = importacion.filas.find(f => String(f.n) === filaEl.dataset.n);
+            fila.pase = check.checked && fila.traslado ? clavePase(fila.traslado) : null;
+            importacion.editada = true;
+            actualizarImportacion();
+        });
+
+        panelImportacion.addEventListener('click', (e) => {
+            const boton = e.target.closest('[data-accion]');
+            if (!boton || !importacion) return;
+            if (boton.dataset.accion === 'quitar') {
+                const filaEl = boton.closest('.importar-fila');
+                importacion.filas.find(f => String(f.n) === filaEl.dataset.n).quitada = true;
+                importacion.editada = true;
+                filaEl.remove();
+                actualizarImportacion();
+            } else if (boton.dataset.accion === 'cancelar') {
+                if (importacion.editada && !confirm('¿Descartar la importación? No se guardó nada.')) return;
+                cerrarImportacion();
+                mostrarEstadoLectura('');
+            } else if (boton.dataset.accion === 'confirmar') {
+                confirmarImportacion();
+            }
+        });
+
+        // Cambiar el ciclo o el equipo con la vista previa abierta la pasa a ese equipo (por si se eligió mal).
+        [plantelCiclo, plantelEquipoSelect].forEach(select => {
+            if (select) select.addEventListener('change', () => {
+                if (!importacion) return;
+                importacion.destino = destinoElegido();
+                actualizarImportacion();
+            });
+        });
+    }
+
     // Modal de Emergencia
     const modalEmergencia = document.getElementById('modal-emergencia');
     const btnCerrarEmergencia = document.getElementById('btn-cerrar-modal-emergencia');
@@ -2102,24 +3110,24 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (body) {
             body.innerHTML = `
                 <div style="background:rgba(4, 12, 38,0.8); padding:10px; border-radius:3px; border:1px solid #1a3274; margin-bottom:10px;">
-                    <p style="margin:3px 0;"><strong>Equipo:</strong> ${equipoNombre} (${dorsalBF(j)})</p>
-                    <p style="margin:3px 0;"><strong>DNI:</strong> ${j.dni || 'Sin datos'}</p>
-                    <p style="margin:3px 0;"><strong>F. Nacimiento:</strong> ${j.nacimiento || 'Sin datos'}</p>
-                    <p style="margin:3px 0;"><strong>Celular Jugador:</strong> ${j.celular || 'Sin datos'}</p>
+                    <p style="margin:3px 0;"><strong>Equipo:</strong> ${attrSeguro(equipoNombre)} (${dorsalBF(j)})</p>
+                    <p style="margin:3px 0;"><strong>DNI:</strong> ${attrSeguro(j.dni || 'Sin datos')}</p>
+                    <p style="margin:3px 0;"><strong>F. Nacimiento:</strong> ${attrSeguro(j.nacimiento || 'Sin datos')}</p>
+                    <p style="margin:3px 0;"><strong>Celular Jugador:</strong> ${attrSeguro(j.celular || 'Sin datos')}</p>
                     <p style="margin:3px 0;"><strong>Ficha Médica:</strong> ${j.fichaMedica === 'si' ? 'Entregada y Firmada' : 'Pendiente'}</p>
                 </div>
 
                 <div style="background:rgba(244,63,94,0.1); padding:10px; border-radius:3px; border:1px solid rgba(244,63,94,0.3); margin-bottom:10px;">
                     <p style="margin:0 0 6px 0; color:#f43f5e; font-weight:bold; font-size:10px;">EN CASO DE EMERGENCIA AVISAR A:</p>
-                    <p style="margin:3px 0;"><strong>Nombre:</strong> ${j.familiarNombre || 'No especificado'}</p>
-                    <p style="margin:3px 0;"><strong>Parentesco:</strong> ${j.familiarParentesco || 'No especificado'}</p>
-                    <p style="margin:3px 0; font-size:12px; color:#4ade80;"><strong>Teléfono:</strong> ${j.familiarTel || 'Sin teléfono'}</p>
+                    <p style="margin:3px 0;"><strong>Nombre:</strong> ${attrSeguro(j.familiarNombre || 'No especificado')}</p>
+                    <p style="margin:3px 0;"><strong>Parentesco:</strong> ${attrSeguro(j.familiarParentesco || 'No especificado')}</p>
+                    <p style="margin:3px 0; font-size:12px; color:#4ade80;"><strong>Teléfono:</strong> ${attrSeguro(j.familiarTel || 'Sin teléfono')}</p>
                 </div>
 
                 <div style="background:rgba(242, 192, 14,0.08); padding:10px; border-radius:3px; border:1px solid rgba(242, 192, 14,0.2);">
                     <p style="margin:0 0 6px 0; color:#f2c00e; font-weight:bold; font-size:10px;">CENTRO DE SALUD / MÉDICO:</p>
-                    <p style="margin:3px 0;"><strong>Concurrir a:</strong> ${j.concurrir || 'Hospital más cercano'} (${j.concurrirDir || 'Sin dirección'})</p>
-                    <p style="margin:3px 0;"><strong>Médico:</strong> ${j.medico || 'No especificado'} (${j.medicoDir || 'Sin dirección/tel'})</p>
+                    <p style="margin:3px 0;"><strong>Concurrir a:</strong> ${attrSeguro(j.concurrir || 'Hospital más cercano')} (${attrSeguro(j.concurrirDir || 'Sin dirección')})</p>
+                    <p style="margin:3px 0;"><strong>Médico:</strong> ${attrSeguro(j.medico || 'No especificado')} (${attrSeguro(j.medicoDir || 'Sin dirección/tel')})</p>
                 </div>
             `;
         }
@@ -2160,7 +3168,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         pool.sort((a, b) => a.nombre.localeCompare(b.nombre));
         pool.forEach(e => {
-            sancionEquipo.innerHTML += `<option value="${e.nombre.trim()}">${e.nombre.trim()}</option>`;
+            sancionEquipo.innerHTML += `<option value="${attrSeguro(e.nombre.trim())}">${attrSeguro(e.nombre.trim())}</option>`;
         });
         actualizarJugadoresSancion();
     }
@@ -2191,14 +3199,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }
 
         listaSanciones.forEach(s => {
-            const detalleJugador = s.jugador ? ` — ${s.jugador}` : '';
+            const detalleJugador = s.jugador ? ` — ${attrSeguro(s.jugador)}` : '';
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(225,29,72,0.05); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid ${s.levantada ? '#4ade80' : '#ef4444'};">
                     <div style="text-align:left; max-width: 75%;">
                         <span style="font-size:10px; color:#f43f5e; display:block; text-transform:uppercase;">ACTA N° ${s.acta || 1} (${s.ciclo ? s.ciclo.toUpperCase() : 'SUPERIOR'}) — ${s.tipo || 'Sanción'}${s.origenAuto ? ' · AUTOMÁTICA (Tesorería)' : ''}</span>
-                        <span style="font-size:12px; color:white; font-weight:bold;">${s.equipo}${detalleJugador}</span>
-                        <span style="font-size:10px; color:#cbd5e1; display:block; margin-top:2px;">${s.motivo || 'Sin motivo detallado'}</span>
-                        ${s.levantada ? `<span style="font-size:10px; color:#4ade80; display:block; margin-top:2px;">(${s.fechaLevantada}) Quita levantada: pagó el 50%</span>` : ''}
+                        <span style="font-size:12px; color:white; font-weight:bold;">${attrSeguro(s.equipo)}${detalleJugador}</span>
+                        <span style="font-size:10px; color:#cbd5e1; display:block; margin-top:2px;">${attrSeguro(s.motivo || 'Sin motivo detallado')}</span>
+                        ${s.levantada ? `<span style="font-size:10px; color:#4ade80; display:block; margin-top:2px;">(${attrSeguro(s.fechaLevantada)}) Quita levantada: pagó el 50%</span>` : ''}
                     </div>
                     <div style="display:flex; gap:5px;">
                         <button class="btn-editar-sancion" data-id="${s.id}" style="background-color:#1a3274; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Editar</button>
@@ -2333,8 +3341,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(46, 218, 227,0.05); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid #2edae3;">
                     <div style="text-align:left; max-width: 80%;">
-                        <span style="font-size:12px; color:white; font-weight:bold; display:block;">${n.titulo}</span>
-                        <span style="font-size:10px; color:#cbd5e1; display:block;">${n.texto}</span>
+                        <span style="font-size:12px; color:white; font-weight:bold; display:block;">${attrSeguro(n.titulo)}</span>
+                        <span style="font-size:10px; color:#cbd5e1; display:block;">${attrSeguro(n.texto)}</span>
                     </div>
                     <button class="btn-borrar-noticia" data-id="${n.id}" style="background-color:#991b1b; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Eliminar</button>
                 </div>
@@ -2402,8 +3410,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(37,99,235,0.05); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid #4284f2;">
                     <div style="text-align:left; max-width: 80%;">
-                        <span style="font-size:12px; color:white; font-weight:bold; display:block;">${a.titulo}</span>
-                        <span style="font-size:10px; color:#869bd8; display:block;">${a.link}</span>
+                        <span style="font-size:12px; color:white; font-weight:bold; display:block;">${attrSeguro(a.titulo)}</span>
+                        <span style="font-size:10px; color:#869bd8; display:block;">${attrSeguro(a.link)}</span>
                     </div>
                     <button class="btn-borrar-album" data-id="${a.id}" style="background-color:#991b1b; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Eliminar</button>
                 </div>
@@ -2534,10 +3542,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         listaSponsorsAdminCont.innerHTML = ordenados.map((s, idx) => `
             <div style="display:flex; align-items:center; gap:10px; background: rgba(4, 12, 38,0.6); padding:8px; border-radius:4px; margin-bottom:8px; flex-wrap:wrap;">
-                <img src="${s.logo || 'Recursos/logo pelota fut.svg'}" style="width:36px; height:36px; object-fit:contain; border-radius:3px; background:${s.colorFondo || '#0a1d54'};">
+                <img src="${attrSeguro(s.logo || 'Recursos/logo pelota fut.svg')}" style="width:36px; height:36px; object-fit:contain; border-radius:3px; background:${String(s.colorFondo || '#0a1d54').replace(/[^#a-zA-Z0-9(),.%\s-]/g, '')};">
                 <div style="flex:1; min-width:120px; text-align:left;">
-                    <span style="font-size:12px; color:#fff; font-weight:bold; display:block;">${s.nombre}</span>
-                    <span style="font-size:9px; color:#869bd8;">${s.categoria || 'Sin categoría'}</span>
+                    <span style="font-size:12px; color:#fff; font-weight:bold; display:block;">${attrSeguro(s.nombre)}</span>
+                    <span style="font-size:9px; color:#869bd8;">${attrSeguro(s.categoria || 'Sin categoría')}</span>
                 </div>
                 <div style="display:flex; gap:4px; flex-wrap:wrap;">
                     <button type="button" class="btn-sponsor-subir" data-id="${s.id}" ${idx === 0 ? 'disabled' : ''} style="background:#1a3274; color:white; border:none; padding:4px 7px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald'; opacity:${idx === 0 ? '0.3' : '1'};">Subir</button>
@@ -2736,9 +3744,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 filasHtml += `
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:11px; flex-wrap:wrap;">
                         <span style="color:#869bd8; min-width:42px;">${hora}</span>
-                        <span style="color:#fff; font-weight:bold; flex:1; min-width:100px;">${m.equipo}</span>
-                        <span style="color:#869bd8; flex:1; min-width:120px;">${m.concepto}${m.detalle ? ' — ' + m.detalle : ''}</span>
-                        <span style="color:#2edae3; min-width:110px;">${m.medio === 'Efectivo' ? '' : ''} ${m.medio}</span>
+                        <span style="color:#fff; font-weight:bold; flex:1; min-width:100px;">${attrSeguro(m.equipo)}</span>
+                        <span style="color:#869bd8; flex:1; min-width:120px;">${attrSeguro(m.concepto)}${m.detalle ? ' — ' + attrSeguro(m.detalle) : ''}</span>
+                        <span style="color:#2edae3; min-width:110px;">${m.medio === 'Efectivo' ? '' : ''} ${attrSeguro(m.medio)}</span>
                         <span style="color:${esNegativo ? '#f43f5e' : '#4ade80'}; font-weight:bold; min-width:80px; text-align:right;">${esNegativo ? '-' : '+'}$${Math.abs(m.monto).toLocaleString()}</span>
                     </div>
                 `;
@@ -3746,7 +4754,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         } else if (sancion && sancion.activa) {
             chip = `<div class="teso-chip teso-chip-rojo">${t.ausente ? `-${PUNTOS_QUITA_AUSENCIA} PTS en la tabla hasta abonar el 50%` : `Queda como no presentado: -${PUNTOS_QUITA_AUSENCIA} PTS en la tabla`}</div>`;
         } else if (registro && registro.levantada) {
-            chip = `<div class="teso-chip teso-chip-verde">(${registro.fechaLevantada}) Quita levantada: pagó el 50%</div>`;
+            chip = `<div class="teso-chip teso-chip-verde">(${attrSeguro(registro.fechaLevantada)}) Quita levantada: pagó el 50%</div>`;
         }
 
         const notas = [];
@@ -3763,7 +4771,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return `
             <div class="teso-team-box">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                    <span class="teso-team-name">${t.nombre}</span>
+                    <span class="teso-team-name">${attrSeguro(t.nombre)}</span>
                     <span style="font-family:'Michroma',sans-serif; font-size:${cancelado ? '11px' : '15px'}; color:${cancelado ? '#4ade80' : '#f43f5e'};">
                         ${cancelado ? 'CANCELADO' : `FALTA: $${t.falta.toLocaleString()}`}
                     </span>
@@ -3783,11 +4791,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 </div>
                 <div class="teso-inputs-row">
                     <label>Pago Efectivo ($):</label>
-                    <input type="number" class="input-monto-teso in-p-ef" data-key="${t.clave}" data-equipo="${t.nombre}" data-fase="${faseLabel}" value="${t.data.ef || 0}">
+                    <input type="number" class="input-monto-teso in-p-ef" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}" value="${t.data.ef || 0}">
                 </div>
                 <div class="teso-inputs-row">
                     <label>Pago Transf. ($):</label>
-                    <input type="number" class="input-monto-teso in-p-tr" data-key="${t.clave}" data-equipo="${t.nombre}" data-fase="${faseLabel}" value="${t.data.tr || 0}">
+                    <input type="number" class="input-monto-teso in-p-tr" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}" value="${t.data.tr || 0}">
                 </div>
                 ${notasHtml}
                 ${chip}
@@ -3868,13 +4876,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (!p || !p.local || !p.visitante) return '';
             const ev = evaluaciones[p.id];
             const faseLabel = nombreFaseTeso(p.fecha);
-            const avisosHtml = ev.avisos.map(a => `<div class="teso-aviso teso-aviso-${a.tipo}">${a.texto}</div>`).join('');
+            const avisosHtml = ev.avisos.map(a => `<div class="teso-aviso teso-aviso-${a.tipo}">${attrSeguro(a.texto)}</div>`).join('');
 
             return `
                 <div class="teso-match-card">
                     <div class="teso-match-header">
-                        <span><strong>${faseLabel}</strong> — ${p.cancha || 'Cancha a confirmar'} (${p.horario ? p.horario + ' hs' : 'A confirmar'})</span>
-                        <span>Árbitro: <strong>${p.arbitro || 'Por Asignar'}</strong></span>
+                        <span><strong>${faseLabel}</strong> — ${attrSeguro(p.cancha || 'Cancha a confirmar')} (${p.horario ? attrSeguro(p.horario) + ' hs' : 'A confirmar'})</span>
+                        <span>Árbitro: <strong>${attrSeguro(p.arbitro || 'Por Asignar')}</strong></span>
                         <button type="button" class="teso-btn-imprimir" data-pid="${p.id}">Imprimir planilla</button>
                     </div>
 
@@ -4046,8 +5054,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(244,63,94,0.05); padding:8px 12px; margin-bottom:6px; border-radius:3px; border-left: 4px solid #f43f5e;">
                     <div style="text-align:left;">
-                        <span style="font-size:11px; color:white; font-weight:bold;">${eg.detalle} (${eg.concepto.toUpperCase()})</span>
-                        <span style="font-size:9px; color:#fca5a5; display:block;">Medio: ${eg.medio.toUpperCase()} · ${textoFechaEgreso(eg)}</span>
+                        <span style="font-size:11px; color:white; font-weight:bold;">${attrSeguro(eg.detalle)} (${attrSeguro(eg.concepto.toUpperCase())})</span>
+                        <span style="font-size:9px; color:#fca5a5; display:block;">Medio: ${attrSeguro(eg.medio.toUpperCase())} · ${textoFechaEgreso(eg)}</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <span style="font-size:13px; color:#f43f5e; font-weight:bold;">-$${eg.monto.toLocaleString()}</span>
@@ -4395,8 +5403,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(255,255,255,0.03); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid ${esUrgente ? '#f43f5e' : '#2edae3'};">
                     <div style="text-align:left; max-width: 80%;">
-                        <span style="font-size:12px; color:white; font-weight:bold; display:block;">${a.titulo}</span>
-                        <span style="font-size:10px; color:#cbd5e1; display:block; margin-top:2px;">${a.texto}</span>
+                        <span style="font-size:12px; color:white; font-weight:bold; display:block;">${attrSeguro(a.titulo)}</span>
+                        <span style="font-size:10px; color:#cbd5e1; display:block; margin-top:2px;">${attrSeguro(a.texto)}</span>
                         <span style="font-size:8px; color:#869bd8; display:block; margin-top:3px;">${tiempoDinamico}</span>
                     </div>
                     <button class="btn-borrar-alerta" data-id="${a.id}" style="background-color:#991b1b; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Eliminar</button>
@@ -4442,7 +5450,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(255,255,255,0.03); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid #f2c00e;">
                     <div style="text-align:left; max-width: 80%;">
-                        <span style="font-size:11px; color:white; display:block;">${a.detalle}</span>
+                        <span style="font-size:11px; color:white; display:block;">${attrSeguro(a.detalle)}</span>
                         <span style="font-size:8px; color:#869bd8; display:block; margin-top:3px;">${tiempoDinamico}</span>
                     </div>
                     <button class="btn-borrar-aviso-staff" data-id="${a.id}" style="background-color:#991b1b; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Eliminar</button>
@@ -4526,6 +5534,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // ============================================================
     mostrarFechasGrupos();
     actualizarOpcionesGrupo();
+    renderizarCalendarioFechas();
+    autocompletarDiaPartido();
     actualizarListaAdmin();
     actualizarSelectFechasCronograma();
     actualizarSelectsPlayoffs();
@@ -4606,8 +5616,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
             contProximo.innerHTML = pendientes.length === 0
                 ? '<p style="color:#869bd8; font-size:11px;">No hay partidos pendientes cargados.</p>'
-                : `<p style="font-size:13px; color:#fff; font-weight:bold; margin:0 0 6px 0;">${pendientes[0].p.local} vs ${pendientes[0].p.visitante}</p>
-                   <p style="font-size:11px; color:#869bd8; margin:0;">${pendientes[0].p.dia || 'Sin fecha'} — ${pendientes[0].p.horario || 'Sin horario'} — ${pendientes[0].p.cancha || 'Cancha a confirmar'}</p>`;
+                : `<p style="font-size:13px; color:#fff; font-weight:bold; margin:0 0 6px 0;">${attrSeguro(pendientes[0].p.local)} vs ${attrSeguro(pendientes[0].p.visitante)}</p>
+                   <p style="font-size:11px; color:#869bd8; margin:0;">${attrSeguro(pendientes[0].p.dia || 'Sin fecha')} — ${attrSeguro(pendientes[0].p.horario || 'Sin horario')} — ${attrSeguro(pendientes[0].p.cancha || 'Cancha a confirmar')}</p>`;
         }
 
         // Últimas sanciones
@@ -4618,8 +5628,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 ? '<p style="color:#869bd8; font-size:11px;">Sin sanciones registradas.</p>'
                 : ultimas.map(s => `
                     <div style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
-                        <span style="font-size:11px; color:#fff; font-weight:bold; display:block;">${s.equipo}</span>
-                        <span style="font-size:10px; color:#869bd8;">${s.tipo}${s.motivo ? ' — ' + s.motivo : ''}</span>
+                        <span style="font-size:11px; color:#fff; font-weight:bold; display:block;">${attrSeguro(s.equipo)}</span>
+                        <span style="font-size:10px; color:#869bd8;">${attrSeguro(s.tipo)}${s.motivo ? ' — ' + attrSeguro(s.motivo) : ''}</span>
                     </div>
                 `).join('');
         }
@@ -4632,8 +5642,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 ? '<p style="color:#869bd8; font-size:11px;">Sin avisos publicados.</p>'
                 : ultimos.map(a => `
                     <div style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
-                        <span style="font-size:11px; color:${a.tipo === 'urgente' ? '#f43f5e' : '#fff'}; font-weight:bold; display:block;">${a.titulo}</span>
-                        <span style="font-size:10px; color:#869bd8;">${a.texto || ''}</span>
+                        <span style="font-size:11px; color:${a.tipo === 'urgente' ? '#f43f5e' : '#fff'}; font-weight:bold; display:block;">${attrSeguro(a.titulo)}</span>
+                        <span style="font-size:10px; color:#869bd8;">${attrSeguro(a.texto || '')}</span>
                     </div>
                 `).join('');
         }
@@ -4717,8 +5727,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         resultadosBuscadorGlobal.innerHTML = coincidencias.slice(0, 8).map((r, idx) => `
             <div class="resultado-buscador-item" data-idx="${idx}">
-                <span class="resultado-buscador-nombre">${r.jugador.nombre}</span>
-                <span class="resultado-buscador-meta">${dorsalBF(r.jugador)} — ${r.equipo}</span>
+                <span class="resultado-buscador-nombre">${attrSeguro(r.jugador.nombre)}</span>
+                <span class="resultado-buscador-meta">${dorsalBF(r.jugador)} — ${attrSeguro(r.equipo)}</span>
             </div>
         `).join('');
         resultadosBuscadorGlobal.classList.remove('seccion-oculta');
