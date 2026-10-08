@@ -1,3 +1,12 @@
 # Planillas de inscripción reales que mandan los equipos: tienen DNIs y celulares de menores.
 # Todo lo que se commitea lo publica Netlify, así que nunca van al repo.
 Recursos/Planilla Inscripcion*
+Recursos/4to 4ta.pdf
+
+# Lo que no necesita la web. Netlify publica todo lo commiteado, así que quedan afuera:
+# todos los PDF salvo el reglamento (que descarga el sitio), la lista de tareas, el material
+# de trabajo de los agentes (Claude outputs/: banco de pruebas, reportes) y los zips de fuentes.
+*.pdf
+!Recursos/Reglamento MITRE LEAGUE 2026.pdf
+Claude outputs/
+Recursos/Fuente/*.zip

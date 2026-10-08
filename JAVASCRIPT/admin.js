@@ -1872,6 +1872,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             renderizarListaGruposAdmin();
             actualizarOpcionesMoverEquipo();
             actualizarSelectsFormatoTorneo();
+            renderizarEquiposCargados();
         });
     }
 
@@ -1952,6 +1953,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             actualizarSelectorGruposFormulario();
             actualizarComboEquiposPlantel(nombre);
             actualizarOpcionesMoverEquipo();
+            renderizarEquiposCargados();
             alert(`Equipo ${nombre} registrado en el Grupo ${grupo}.`);
         });
     }
@@ -2083,8 +2085,43 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 if (grupoAnterior !== nuevoGrupoVal) registrarHistorial('jugador', `pasó a ${equipoObj.nombre} de ${textoGrupoHistorial(grupoAnterior)} a ${textoGrupoHistorial(nuevoGrupoVal)} (${nombreCicloHistorial(ciclo)})`);
                 actualizarOpcionesMoverEquipo();
                 actualizarOpcionesGrupo();
+                renderizarEquiposCargados();
                 alert(`¡${equipoNombre} fue movido al Grupo ${nuevoGrupoVal} exitosamente!`);
             }
+        });
+    }
+
+    // Equipos Cargados: listado de Superior y Básico por separado, con baja directa (sin tener que
+    // ir hasta Planteles y Jugadores a buscar el equipo en el formulario). Comparte la baja con el
+    // botón viejo de ahí (eliminarEquipoCompleto).
+    function renderizarEquiposCargados() {
+        const contSuperior = document.getElementById('lista-equipos-cargados-superior');
+        const contBasico = document.getElementById('lista-equipos-cargados-basico');
+        if (!contSuperior || !contBasico) return;
+        recargarPools();
+
+        const htmlLista = (pool, ciclo) => {
+            if (!pool || pool.length === 0) return '<p style="color:#869bd8; font-size:11px; margin:0;">Sin equipos cargados.</p>';
+            return pool.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(eq => {
+                const grpLabel = eq.grupo === 'Unico' ? 'Tabla Única' : `Grupo ${eq.grupo || 'A'}`;
+                const cantJug = eq.jugadores ? eq.jugadores.length : 0;
+                return `
+                    <div class="equipo-cargado-item">
+                        <div class="equipo-cargado-info">
+                            <span class="equipo-cargado-nombre">${attrSeguro(eq.nombre)}</span>
+                            <span class="equipo-cargado-meta">${attrSeguro(grpLabel)} · ${cantJug} ${cantJug === 1 ? 'jugador' : 'jugadores'}</span>
+                        </div>
+                        <button type="button" class="btn-eliminar-equipo-item" data-ciclo="${ciclo}" data-equipo="${attrSeguro(eq.nombre)}">Eliminar</button>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        contSuperior.innerHTML = htmlLista(poolSuperior, 'superior');
+        contBasico.innerHTML = htmlLista(poolBasico, 'basico');
+
+        document.querySelectorAll('.btn-eliminar-equipo-item').forEach(btn => {
+            btn.addEventListener('click', () => eliminarEquipoCompleto(btn.dataset.ciclo, btn.dataset.equipo));
         });
     }
 
@@ -2446,34 +2483,37 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
-    // Borrar Equipo Completo
+    // Borrar Equipo Completo. Dos entradas: el botón de siempre (Planteles y Jugadores, arriba del
+    // formulario de alta) y la lista de "Equipos Cargados" (Crear / Mover Equipos), ambas llaman a esto.
+    function eliminarEquipoCompleto(ciclo, equipoNombre) {
+        if (!equipoNombre) {
+            alert('No hay ningún equipo seleccionado para eliminar.');
+            return;
+        }
+
+        if (!confirm(`¿Estás seguro de eliminar completamente al equipo "${equipoNombre}" y a todos sus jugadores del torneo?`)) return;
+
+        const equipoBorrado = (ciclo === 'superior' ? poolSuperior : poolBasico).find(e => e.nombre.trim().toLowerCase() === equipoNombre.trim().toLowerCase());
+        const cantidadBorrada = equipoBorrado && equipoBorrado.jugadores ? equipoBorrado.jugadores.length : 0;
+        if (ciclo === 'superior') {
+            poolSuperior = poolSuperior.filter(e => e.nombre.trim().toLowerCase() !== equipoNombre.trim().toLowerCase());
+        } else {
+            poolBasico = poolBasico.filter(e => e.nombre.trim().toLowerCase() !== equipoNombre.trim().toLowerCase());
+        }
+
+        guardarEquiposEnStorage();
+        registrarHistorial('jugador', `eliminó el equipo ${equipoNombre} (${nombreCicloHistorial(ciclo)}) con sus ${cantidadBorrada} ${cantidadBorrada === 1 ? 'jugador' : 'jugadores'}`);
+        actualizarComboEquiposPlantel();
+        actualizarOpcionesMoverEquipo();
+        actualizarOpcionesGrupo();
+        renderizarEquiposCargados();
+        alert(`Equipo "${equipoNombre}" eliminado.`);
+    }
+
     const btnEliminarEquipoCompleto = document.getElementById('btn-eliminar-equipo-completo');
     if (btnEliminarEquipoCompleto) {
         btnEliminarEquipoCompleto.addEventListener('click', () => {
-            const ciclo = plantelCiclo.value;
-            const equipoNombre = plantelEquipoSelect.value;
-
-            if (!equipoNombre) {
-                alert('No hay ningún equipo seleccionado para eliminar.');
-                return;
-            }
-
-            if (confirm(`¿Estás seguro de eliminar completamente al equipo "${equipoNombre}" y a todos sus jugadores del torneo?`)) {
-                const equipoBorrado = (ciclo === 'superior' ? poolSuperior : poolBasico).find(e => e.nombre.trim().toLowerCase() === equipoNombre.trim().toLowerCase());
-                const cantidadBorrada = equipoBorrado && equipoBorrado.jugadores ? equipoBorrado.jugadores.length : 0;
-                if (ciclo === 'superior') {
-                    poolSuperior = poolSuperior.filter(e => e.nombre.trim().toLowerCase() !== equipoNombre.trim().toLowerCase());
-                } else {
-                    poolBasico = poolBasico.filter(e => e.nombre.trim().toLowerCase() !== equipoNombre.trim().toLowerCase());
-                }
-
-                guardarEquiposEnStorage();
-                registrarHistorial('jugador', `eliminó el equipo ${equipoNombre} (${nombreCicloHistorial(ciclo)}) con sus ${cantidadBorrada} ${cantidadBorrada === 1 ? 'jugador' : 'jugadores'}`);
-                actualizarComboEquiposPlantel();
-                actualizarOpcionesMoverEquipo();
-                actualizarOpcionesGrupo();
-                alert(`Equipo "${equipoNombre}" eliminado.`);
-            }
+            eliminarEquipoCompleto(plantelCiclo.value, plantelEquipoSelect.value);
         });
     }
 
@@ -2627,8 +2667,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 celular: textoOpcional(celda('celular')),
                 instagram: textoOpcional(celda('instagram')).replace(/^@+/, '')
             };
-            // Una fila sin nombre ni DNI es un renglón vacío de la planilla (o el número de página de un PDF).
-            if (!jugador.nombre && soloDigitosDni(jugador.dni).length < 5) return;
+            // Sin un nombre con letras ni DNI es un renglón vacío de la planilla, o el número de página de un PDF.
+            const llenas = fila.map(textoCelda).filter(Boolean);
+            if (llenas.length && llenas.every(t => /^(p[aá]g(ina)?\.?\s*)?\d{1,3}(\s*(de|\/)\s*\d{1,3})?$/i.test(t))) return;
+            if (!/\p{L}/u.test(jugador.nombre) && soloDigitosDni(jugador.dni).length < 5) return;
             filas.push(jugador);
         });
         return { filas, curso };
@@ -2695,15 +2737,44 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return { columnas, banda: new Set(banda) };
     }
 
+    const textoDeRenglon = r => r.items.map(i => i.texto).join(' ');
+    const tieneNombreYDni = r => {
+        const t = normalizarTitulo(textoDeRenglon(r));
+        return /\b(DNI|DOCUMENTO)\b/.test(t) && /\b(NOMBRE|APELLIDO|JUGADOR)/.test(t);
+    };
+
+    // Excel parte en dos hojas la planilla que no entra a lo ancho: la segunda trae CELULAR, INSTAGRAM y DORSAL a la misma
+    // altura que la primera, sin NOMBRE ni DNI (y Excel repite ahí el título cortado). Esa hoja se pega a la derecha de la
+    // anterior, alineando los títulos, y se lee como una sola tabla.
+    function unirPaginasPartidas(paginas) {
+        const hojas = [];
+        paginas.forEach(pagina => {
+            const renglones = renglonesDePdf(pagina.items);
+            const anterior = hojas[hojas.length - 1];
+            const titulos = renglones.find(tieneNombreYDni);
+            const continuacion = !titulos && anterior && anterior.titulos && renglones.find(r => {
+                const cuantos = r.items.filter(i => campoDeTitulo(i.texto)).length;
+                const alineado = Math.abs(r.y - anterior.titulos.y) <= Math.max(3, anterior.titulos.alto);
+                return cuantos >= 2 || (cuantos >= 1 && alineado);
+            });
+            if (continuacion) {
+                const dx = anterior.x1 - pagina.x0;
+                const dy = anterior.titulos.y - continuacion.y;
+                anterior.items.push(...pagina.items.map(i => ({ ...i, x: i.x + dx, y: i.y + dy })));
+                anterior.x1 = pagina.x1 + dx;
+                return;
+            }
+            hojas.push({ items: [...pagina.items], x1: pagina.x1, titulos: titulos || null });
+        });
+        return hojas.map(h => h.items);
+    }
+
     function tablaDePdf(paginas) {
         const tabla = [];
         let columnas = null;
         paginas.forEach(items => {
             const renglones = renglonesDePdf(items);
-            const iTitulo = renglones.findIndex(r => {
-                const t = normalizarTitulo(r.items.map(i => i.texto).join(' '));
-                return /\b(DNI|DOCUMENTO)\b/.test(t) && /\b(NOMBRE|APELLIDO|JUGADOR)/.test(t);
-            });
+            const iTitulo = renglones.findIndex(tieneNombreYDni);
             let enTitulos = new Set();
             if (iTitulo !== -1) {
                 const encontrado = columnasDeTitulos(renglones, iTitulo);
@@ -2742,19 +2813,23 @@ document.addEventListener('liga:datos-listos', (evento) => {
         try {
             const pdf = await tarea.promise;
             for (let n = 1; n <= pdf.numPages; n++) {
-                const contenido = await (await pdf.getPage(n)).getTextContent();
-                paginas.push(contenido.items.filter(it => it.str && it.str.trim()).map(it => ({
-                    texto: it.str, x: it.transform[4], y: it.transform[5], ancho: it.width,
-                    alto: Math.abs(it.height) || Math.hypot(it.transform[2], it.transform[3]) || 10
-                })));
+                const pagina = await pdf.getPage(n);
+                const contenido = await pagina.getTextContent();
+                paginas.push({
+                    x0: pagina.view[0], x1: pagina.view[2],
+                    items: contenido.items.filter(it => it.str && it.str.trim()).map(it => ({
+                        texto: it.str, x: it.transform[4], y: it.transform[5], ancho: it.width,
+                        alto: Math.abs(it.height) || Math.hypot(it.transform[2], it.transform[3]) || 10
+                    }))
+                });
             }
         } finally {
             tarea.destroy();
         }
-        if (!paginas.some(p => p.length)) {
+        if (!paginas.some(p => p.items.length)) {
             return { error: 'Este PDF no tiene texto: es una foto o un escaneo de la planilla, y eso no se puede leer. Pedile al equipo el Excel, o cargá los jugadores a mano.' };
         }
-        const resultado = jugadoresDeTabla(tablaDePdf(paginas), false);
+        const resultado = jugadoresDeTabla(tablaDePdf(unirPaginasPartidas(paginas)), false);
         if (!resultado.error) resultado.desdePdf = true;
         return resultado;
     }
@@ -5549,6 +5624,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     actualizarOpcionesMoverEquipo();
     actualizarComboEquiposPlantel();
     actualizarSelectsFormatoTorneo();
+    renderizarEquiposCargados();
 
     actualizarEquiposSancion();
     actualizarListaSancionesAdmin();

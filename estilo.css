@@ -4624,6 +4624,75 @@ body.auth-pendiente .auth-gate {
     }
 }
 
+/* Equipos Cargados (Planteles → Crear / Mover Equipos): Superior y Básico uno al lado del otro */
+.equipos-cargados-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 600px) {
+    .equipos-cargados-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.equipos-cargados-titulo-ciclo {
+    color: #869bd8;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 8px;
+}
+
+.equipos-cargados-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.equipo-cargado-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 10px;
+    border-radius: 3px;
+    border-left: 3px solid #991b1b;
+    min-width: 0;
+}
+
+.equipo-cargado-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.equipo-cargado-nombre {
+    font-size: 12px;
+    color: #fff;
+    font-weight: bold;
+    overflow-wrap: anywhere;
+}
+
+.equipo-cargado-meta {
+    font-size: 10px;
+    color: #869bd8;
+}
+
+.btn-eliminar-equipo-item {
+    flex-shrink: 0;
+    background: #991b1b;
+    color: #fff;
+    border: none;
+    border-radius: 2px;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: 'Oswald', sans-serif;
+}
+
 .admin-card-panel {
     background-color: #0a1d54;
     padding: 22px;
