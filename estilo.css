@@ -4637,6 +4637,25 @@ body.auth-pendiente .auth-gate {
     }
 }
 
+.equipos-cargados-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.equipos-cargados-total {
+    font-family: 'Michroma', sans-serif;
+    font-size: 13px;
+    color: #2edae3;
+}
+
+.equipos-cargados-cant {
+    color: #2edae3;
+}
+
 .equipos-cargados-titulo-ciclo {
     color: #869bd8;
     font-size: 11px;

@@ -2120,6 +2120,16 @@ document.addEventListener('liga:datos-listos', (evento) => {
         contSuperior.innerHTML = htmlLista(poolSuperior, 'superior');
         contBasico.innerHTML = htmlLista(poolBasico, 'basico');
 
+        const cantSup = (poolSuperior || []).length;
+        const cantBas = (poolBasico || []).length;
+        const textoCant = n => `${n} ${n === 1 ? 'equipo' : 'equipos'}`;
+        const elTotal = document.getElementById('equipos-cargados-total');
+        const elCantSup = document.getElementById('equipos-cargados-cant-superior');
+        const elCantBas = document.getElementById('equipos-cargados-cant-basico');
+        if (elTotal) elTotal.textContent = `${textoCant(cantSup + cantBas)} en total`;
+        if (elCantSup) elCantSup.textContent = `(${cantSup})`;
+        if (elCantBas) elCantBas.textContent = `(${cantBas})`;
+
         document.querySelectorAll('.btn-eliminar-equipo-item').forEach(btn => {
             btn.addEventListener('click', () => eliminarEquipoCompleto(btn.dataset.ciclo, btn.dataset.equipo));
         });
@@ -2578,7 +2588,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const COLUMNAS_PLANILLA = [
         ['dni', /\b(DNI|DOCUMENTO)\b/],
         ['dorsal', /\b(DORSAL|CAMISETA|NUMERO|NRO)\b/],
-        ['nacimiento', /\bNAC/],
+        ['nacimiento', /\b(NAC|FECHA)/],
         ['instagram', /\b(INSTAGRAM|INSTA|IG)\b/],
         ['celular', /\b(CELULAR|CEL|TELEFONO|TEL)\b/],
         ['nombre', /\b(NOMBRE|APELLIDO|JUGADOR)/]
@@ -2597,7 +2607,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return String(v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
     }
 
-    const textoOpcional = v => { const t = textoCelda(v); return /^[-–—.\s]*$/.test(t) ? '' : t; };
+    // "-", "no tiene", "N/A": el campo está vacío (si no, el Instagram "no tiene" terminaría como link en la web).
+    const textoOpcional = v => {
+        const t = textoCelda(v);
+        return /^[-–—.\s]*$/.test(t) || /^(no( tiene| tengo| posee| usa)?|n\/?a|sin [a-z]+|ninguno)\.?$/i.test(t) ? '' : t;
+    };
 
     function textoDni(v) {
         if (typeof v === 'number') return String(Math.round(v));
@@ -2719,7 +2733,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
     function columnasDeTitulos(renglones, iTitulo) {
         const titulo = renglones[iTitulo];
-        const banda = renglones.filter(r => Math.abs(r.y - titulo.y) < titulo.alto).flatMap(r => r.items);
+        // Un título partido en dos renglones ("FECHA DE" / "NAC.") puede quedar hasta un renglón y medio más abajo.
+        const banda = renglones.filter(r => Math.abs(r.y - titulo.y) <= 1.5 * titulo.alto).flatMap(r => r.items);
         const columnas = [];
         [...banda].sort((a, b) => a.x - b.x).forEach(item => {
             const ultima = columnas[columnas.length - 1];
@@ -2769,59 +2784,170 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return hojas.map(h => h.items);
     }
 
+    // Cada texto del renglón va a la columna de centro más cercano; lo que cae fuera de la tabla (la numeración "1)" de
+    // la izquierda, el número de página) se descarta.
+    function celdasDeRenglon(r, columnas) {
+        const n = columnas.length;
+        const margen = n > 1 ? 0 : (columnas[0].x1 - columnas[0].x0) / 2;
+        const izquierda = n > 1 ? columnas[0].centro - (columnas[1].centro - columnas[0].centro) / 2 : columnas[0].x0 - margen;
+        const derecha = n > 1 ? columnas[n - 1].centro + (columnas[n - 1].centro - columnas[n - 2].centro) / 2 : columnas[0].x1 + margen;
+        const celdas = columnas.map(() => []);
+        r.items.forEach(item => {
+            const centro = item.x + item.ancho / 2;
+            if (centro < izquierda || centro > derecha) return;
+            let mejor = 0;
+            columnas.forEach((c, i) => { if (Math.abs(c.centro - centro) < Math.abs(columnas[mejor].centro - centro)) mejor = i; });
+            celdas[mejor].push(item);
+        });
+        return celdas.map(unirTextosPdf);
+    }
+
+    // Hay programas que imprimen la última columna (DORSAL CAMISETA) como otra página, que en el PDF queda debajo de la
+    // tabla y sigue en la hoja siguiente, sin NOMBRE ni DNI. Ese bloque arranca con un renglón que solo tiene títulos,
+    // de alguna columna que la tabla no tenía.
+    function esTituloAparte(r, columnas) {
+        const campos = r.items.map(i => campoDeTitulo(i.texto));
+        const enTabla = new Set(columnas.map(c => campoDeTitulo(c.texto)));
+        return campos.every(Boolean) && !campos.includes('nombre') && campos.some(c => !enTabla.has(c));
+    }
+
+    // Cada valor del bloque aparte vuelve a la fila de su jugador: por la numeración que le hayan escrito ("3)7" es el de
+    // la fila 3; "CAP)10", el del capitán) o, si no tiene, por el orden de los renglones. Al pasar de hoja se supone que
+    // sigue en la fila siguiente.
+    function sumarBloqueAparte(bloque, filas, encabezado, columnas, capitan) {
+        const desde = encabezado.length;
+        encabezado.push(...bloque.columnas.map(c => c.texto));
+        filas.forEach(f => f.celdas.push(...bloque.columnas.map(() => '')));
+        const saltos = [];
+        filas.forEach((f, i) => { const a = filas[i - 1]; if (a && a.hoja === f.hoja && a.y > f.y) saltos.push(a.y - f.y); });
+        saltos.sort((a, b) => a - b);
+        const paso = saltos.length ? saltos[Math.floor(saltos.length / 2)] : 20;
+        const filaNumero = orden => filas.find(f => f.numero === orden + 1) || filas[orden];
+        const iNombre = columnas.flatMap((c, i) => (campoDeTitulo(c.texto) === 'nombre' ? [i] : []));
+        const nombreDe = f => normalizarTitulo(iNombre.map(i => f.celdas[i]).join(' ').replace(/^\d{1,3}\s*[).:-]\s*/, ''));
+        const delCapitan = [];
+        let anterior = { orden: -1, y: bloque.y, hoja: bloque.hoja };
+        bloque.valores.forEach(v => {
+            let orden = anterior.orden + (v.hoja === anterior.hoja ? Math.max(1, Math.round((anterior.y - v.y) / paso)) : 1);
+            const i = v.celdas.findIndex(Boolean);
+            const marca = v.celdas[i].match(/^(\d{1,2}|CAP[^)]*)\s*\)\s*(.*)$/i);
+            if (marca) v.celdas[i] = marca[2];
+            if (marca && /^CAP/i.test(marca[1])) {
+                delCapitan.push(v);
+            } else {
+                if (marca) orden = +marca[1] - 1;
+                const destino = filaNumero(orden);
+                if (destino) v.celdas.forEach((t, j) => { if (t) destino.celdas[desde + j] = t; });
+            }
+            anterior = { orden, y: v.y, hoja: v.hoja };
+        });
+        // El del capitán solo completa lo que la numeración no trajo.
+        const filaCapitan = delCapitan.length && capitan && filas.find(f => nombreDe(f).length >= 4 && capitan.includes(nombreDe(f)));
+        if (filaCapitan) delCapitan.forEach(v => v.celdas.forEach((t, j) => { if (t && !filaCapitan.celdas[desde + j]) filaCapitan.celdas[desde + j] = t; }));
+    }
+
     function tablaDePdf(paginas) {
         const tabla = [];
-        let columnas = null;
-        paginas.forEach(items => {
+        const filas = [];
+        const bloques = [];
+        let columnas = null, encabezado = null, bloque = null, capitan = '';
+        paginas.forEach((items, hoja) => {
             const renglones = renglonesDePdf(items);
             const iTitulo = renglones.findIndex(tieneNombreYDni);
             let enTitulos = new Set();
             if (iTitulo !== -1) {
                 const encontrado = columnasDeTitulos(renglones, iTitulo);
                 if (!columnas) {
-                    renglones.slice(0, iTitulo).filter(r => !r.items.some(i => encontrado.banda.has(i)))
-                        .forEach(r => tabla.push([unirTextosPdf(r.items)]));
-                    tabla.push(encontrado.columnas.map(c => c.texto));
+                    renglones.slice(0, iTitulo).filter(r => !r.items.some(i => encontrado.banda.has(i))).forEach(r => {
+                        const texto = unirTextosPdf(r.items);
+                        if (/^CAPITAN/.test(normalizarTitulo(texto))) capitan = normalizarTitulo(texto);
+                        tabla.push([texto]);
+                    });
+                    encabezado = encontrado.columnas.map(c => c.texto);
+                    tabla.push(encabezado);
                 }
                 columnas = encontrado.columnas;
                 enTitulos = encontrado.banda;
+                bloque = null;
             }
             if (!columnas) return;
-            const desde = iTitulo === -1 ? 0 : iTitulo;
-            renglones.slice(desde).filter(r => !r.items.some(i => enTitulos.has(i))).forEach(r => {
-                const celdas = columnas.map(() => []);
-                const n = columnas.length;
-                const izquierda = n > 1 ? columnas[0].centro - (columnas[1].centro - columnas[0].centro) / 2 : -Infinity;
-                const derecha = n > 1 ? columnas[n - 1].centro + (columnas[n - 1].centro - columnas[n - 2].centro) / 2 : Infinity;
-                r.items.forEach(item => {
-                    const centro = item.x + item.ancho / 2;
-                    if (centro < izquierda || centro > derecha) return;
-                    let mejor = 0;
-                    columnas.forEach((c, i) => { if (Math.abs(c.centro - centro) < Math.abs(columnas[mejor].centro - centro)) mejor = i; });
-                    celdas[mejor].push(item);
-                });
-                tabla.push(celdas.map(unirTextosPdf));
+            const resto = renglones.slice(iTitulo === -1 ? 0 : iTitulo);
+            resto.forEach((r, i) => {
+                if (r.items.some(it => enTitulos.has(it))) return;
+                if (!bloque && esTituloAparte(r, columnas)) {
+                    const encontrado = columnasDeTitulos(resto, i);
+                    enTitulos = encontrado.banda;
+                    bloque = { columnas: encontrado.columnas, y: r.y, hoja, valores: [] };
+                    bloques.push(bloque);
+                    return;
+                }
+                if (bloque) {
+                    const celdas = celdasDeRenglon(r, bloque.columnas);
+                    if (celdas.some(Boolean)) bloque.valores.push({ celdas, y: r.y, hoja });
+                    return;
+                }
+                const numero = r.items.map(it => it.texto.trim().match(/^(\d{1,2})\s*\)$/)).find(Boolean);
+                const celdas = celdasDeRenglon(r, columnas);
+                filas.push({ celdas, numero: numero ? +numero[1] : null, y: r.y, hoja });
+                tabla.push(celdas);
             });
         });
-        return tabla;
+        bloques.forEach(b => sumarBloqueAparte(b, filas, encabezado, columnas, capitan));
+        return { tabla, aparte: bloques.flatMap(b => b.columnas.map(c => c.texto)) };
+    }
+
+    // Ancho aproximado de cada letra en Arial, en proporción al tamaño de la letra. Un texto escrito encima del PDF es un
+    // solo renglón ("Juan Pérez      50.123.456      12/2/2010 ..."): con esto cada palabra cae en la columna que le toca.
+    const anchoLetra = c => (/[\s.,:;'!|()\/\-ijlftrI]/.test(c) ? 0.3 : /[mwMW@%]/.test(c) ? 0.85 : /[A-Z]/.test(c) ? 0.68 : 0.55);
+    const anchoTexto = t => [...t].reduce((suma, c) => suma + anchoLetra(c), 0);
+
+    function palabrasDeAnotacion(a) {
+        const [x0, y0, x1, y1] = a.rect;
+        const lineas = String((a.contentsObj && a.contentsObj.str) || '').split(/\r\n?|\n/).map(l => l.trimEnd());
+        const alto = (y1 - y0) / lineas.length;
+        const tamano = (a.defaultAppearanceData && a.defaultAppearanceData.fontSize) || alto;
+        const escala = Math.min((x1 - x0) / Math.max(...lineas.map(anchoTexto), 1), 1.25 * tamano);
+        return lineas.flatMap((linea, n) => {
+            const y = y1 - (n + 1) * alto + 0.2 * alto;
+            let pos = 0;
+            return linea.split(/(\s+)/).flatMap(parte => {
+                const x = x0 + pos * escala;
+                pos += anchoTexto(parte);
+                return parte.trim() ? [{ texto: parte, x, y, ancho: anchoTexto(parte) * escala, alto: 0.75 * alto }] : [];
+            });
+        });
+    }
+
+    // Una planilla corregida con un editor de PDF (el de Chrome, el del celular) conserva el texto viejo, tapado con un
+    // trazo o un recuadro blanco, y lo nuevo queda en anotaciones de texto. Se lee lo que se ve.
+    function correccionesDePagina(anotaciones) {
+        const blanco = c => !!c && c.length >= 3 && [...c].every(v => v >= 240);
+        const tapas = anotaciones.filter(a => a.subtype !== 'FreeText' && a.subtype !== 'Popup' && blanco(a.color)).map(a => a.rect);
+        const tapado = it => {
+            const x = it.x + it.ancho / 2, y = it.y + 0.35 * it.alto;
+            return tapas.some(([x0, y0, x1, y1]) => x >= x0 && x <= x1 && y >= y0 && y <= y1);
+        };
+        return { tapado, escritos: anotaciones.filter(a => a.subtype === 'FreeText').flatMap(palabrasDeAnotacion) };
     }
 
     async function leerPlanillaPdf(archivo) {
         const pdfjs = await cargarPdfJs();
         const tarea = pdfjs.getDocument({ data: new Uint8Array(await archivo.arrayBuffer()), isEvalSupported: false });
         const paginas = [];
+        let corregido = false;
         try {
             const pdf = await tarea.promise;
             for (let n = 1; n <= pdf.numPages; n++) {
                 const pagina = await pdf.getPage(n);
                 const contenido = await pagina.getTextContent();
-                paginas.push({
-                    x0: pagina.view[0], x1: pagina.view[2],
-                    items: contenido.items.filter(it => it.str && it.str.trim()).map(it => ({
-                        texto: it.str, x: it.transform[4], y: it.transform[5], ancho: it.width,
-                        alto: Math.abs(it.height) || Math.hypot(it.transform[2], it.transform[3]) || 10
-                    }))
-                });
+                const { tapado, escritos } = correccionesDePagina(await pagina.getAnnotations());
+                const impresos = contenido.items.filter(it => it.str && it.str.trim()).map(it => ({
+                    texto: it.str, x: it.transform[4], y: it.transform[5], ancho: it.width,
+                    alto: Math.abs(it.height) || Math.hypot(it.transform[2], it.transform[3]) || 10
+                }));
+                const visibles = impresos.filter(it => !tapado(it));
+                if (visibles.length < impresos.length || escritos.length) corregido = true;
+                paginas.push({ x0: pagina.view[0], x1: pagina.view[2], items: [...visibles, ...escritos] });
             }
         } finally {
             tarea.destroy();
@@ -2829,8 +2955,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (!paginas.some(p => p.items.length)) {
             return { error: 'Este PDF no tiene texto: es una foto o un escaneo de la planilla, y eso no se puede leer. Pedile al equipo el Excel, o cargá los jugadores a mano.' };
         }
-        const resultado = jugadoresDeTabla(tablaDePdf(unirPaginasPartidas(paginas)), false);
-        if (!resultado.error) resultado.desdePdf = true;
+        const { tabla, aparte } = tablaDePdf(unirPaginasPartidas(paginas));
+        const resultado = jugadoresDeTabla(tabla, false);
+        if (!resultado.error) Object.assign(resultado, { desdePdf: true, corregido, aparte });
         return resultado;
     }
 
@@ -2959,11 +3086,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (!panelImportacion || !importacion) return;
         const origen = [`Archivo: <strong>${attrSeguro(importacion.archivo)}</strong>`];
         if (importacion.curso) origen.push(`la planilla dice «${attrSeguro(importacion.curso)}»`);
+        const aparte = importacion.aparte.map(t => `«${attrSeguro(t)}»`).join(' y ');
+        const notasPdf = (importacion.corregido ? ' Tenía datos tapados y escritos de nuevo encima: se tomó lo que se ve.' : '')
+            + (aparte ? ` ${importacion.aparte.length > 1 ? `Las columnas ${aparte} venían` : `La columna ${aparte} venía`} aparte, abajo de la tabla: fijate que cada valor haya quedado con su jugador.` : '');
         panelImportacion.innerHTML = `
             <h3 class="importar-titulo">Vista previa de la importación</h3>
             <p class="importar-origen">${origen.join(' · ')}</p>
             <p class="importar-destino"></p>
-            ${importacion.desdePdf ? '<p class="importar-nota importar-nota-pdf">Leído desde un PDF: revisá que cada dato haya quedado en su columna.</p>' : ''}
+            ${importacion.desdePdf ? `<p class="importar-nota importar-nota-pdf">Leído desde un PDF: revisá que cada dato haya quedado en su columna.${notasPdf}</p>` : ''}
             <p class="importar-nota">Todavía no se guardó nada. Podés corregir cualquier dato acá mismo (por ejemplo, agregarle «(C)» al nombre del capitán) y se vuelve a revisar al tipear.</p>
             <div class="importar-encabezado" aria-hidden="true">
                 <span>#</span><span>Nombre y apellido</span><span>DNI</span><span>N°</span><span>Nacimiento</span><span>Celular</span><span>Instagram</span><span></span>
@@ -3114,6 +3244,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             mostrarEstadoLectura(`Planilla leída: ${resultado.filas.length} ${resultado.filas.length === 1 ? 'fila' : 'filas'}. Revisalas en la vista previa de abajo.`);
             importacion = {
                 archivo: archivo.name, curso: resultado.curso, desdePdf: !!resultado.desdePdf, editada: false, destino,
+                corregido: !!resultado.corregido, aparte: resultado.aparte || [],
                 filas: resultado.filas.map((f, i) => ({ n: i + 1, nacimientoLeido: '', ...f, quitada: false, pase: null }))
             };
             renderizarImportacion();
