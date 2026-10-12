@@ -2467,10 +2467,10 @@ body.scrolled .dashboard-container section {
     min-width: 0 !important;
 }
 
-/* Fuerza que la columna de goleadores tome un ancho fijo a la derecha */
+/* Goleadores: 280 px al lado de las tablas; si no entra, baja y ocupa todo el ancho (ver más abajo) */
 .columna-goleadores {
-    flex: 0 0 280px !important;
-    width: 280px !important;
+    flex: 1 1 280px !important;
+    min-width: 0 !important;
     
     
 }
@@ -2499,15 +2499,17 @@ body.scrolled .dashboard-container section {
     align-items: flex-start !important;
 }
 
-/* Ancho proporcional: 68% para la tabla principal, 30% para goleadores */
+/* Las tablas se quedan con todo el espacio que sobra (crecen 999 veces más que Goleadores, que al lado queda en
+   280 px). Cuando Goleadores no entra al lado (celular, tablet, notebook chica) baja y, sola en su renglón,
+   crece al ancho completo como las otras tablas, en vez de quedar en 280 px pegada a la izquierda. */
 .posiciones-grid-layout > div:first-child {
-    flex: 1 1 68% !important;
+    flex: 999 1 68% !important;
     min-width: 0 !important;
 }
 
 .columna-goleadores {
-    flex: 0 0 280px !important;
-    width: 280px !important;
+    flex: 1 1 280px !important;
+    min-width: 0 !important;
 }
 
 /* 🔓 LIBERAR ANCHO TOTAL EN VISTA ANCHA */
