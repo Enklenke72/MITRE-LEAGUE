@@ -216,6 +216,10 @@ font-size: 14px;
 .table-style th, .table-style td {
    padding: 12px 8px !important;
 }
+/* GF y GC de las tablas de grupo: solo en la vista Posiciones. Antes lo resolvía el JS al dibujar una tabla, y la
+   del otro ciclo quedaba con los títulos visibles y sin esas celdas (columnas corridas). */
+.table-style .col-gf-gc { display: none; }
+.dashboard-container.vista-ancha .table-style .col-gf-gc { display: table-cell; }
 .th-pos { text-align: center; }
 .th-team { text-align: left; }
 .th-pts { color: #2edae3 !important; }
@@ -256,31 +260,31 @@ font-size: 14px;
     font-weight: bold;
     color: #2edae3;
 }
-.row-leader {
-    background: rgba(26, 50, 116, 0.15) !important;
-}
-
-.td-pos-lead {
-    text-align: center;
-    font-weight: bold;
-    color: #2c68e7;
-    box-shadow: inset 2px 0 0 0 #4e7ccd !important;
-}
 .td-pos-normal {
     text-align: center;
     font-weight: bold;
     color: #2c68e7;
 }
 
-/* 🥉 "Mejor 4°": clasificado por comparación entre grupos (no directo como 1°/2°/3°) */
-.row-mejor4to {
-    background: rgba(168, 85, 247, 0.12) !important;
+/* Zona de clasificación de cada copa (Clausura 2026): dorado = Copa Oro (o los playoffs de un ciclo con un solo
+   cuadro), plateado = Copa Plata. Los que entran por comparación entre grupos llevan el mismo color y un title. */
+.row-copa-oro {
+    background: rgba(242, 192, 14, 0.08) !important;
 }
-.td-pos-mejor4to {
+.td-pos-oro {
     text-align: center;
     font-weight: bold;
-    color: #a855f7;
-    box-shadow: inset 2px 0 0 0 #a855f7 !important;
+    color: #f2c00e;
+    box-shadow: inset 2px 0 0 0 #f2c00e !important;
+}
+.row-copa-plata {
+    background: rgba(197, 206, 220, 0.07) !important;
+}
+.td-pos-plata {
+    text-align: center;
+    font-weight: bold;
+    color: #c5cedc;
+    box-shadow: inset 2px 0 0 0 #c5cedc !important;
 }
 
 
@@ -1400,8 +1404,11 @@ body.scrolled .sidebar-bottom {
 
 /* ─── CONTENIDO DE LAS TARJETAS ─── */
 .sponsor-logo {
-    width: 200px;
-    height: 200px;
+    /* Hasta 300 px, pero nunca más del 40% de la tarjeta: entre 601 y ~1100 px de ancho la
+       tarjeta es angosta y un logo fijo aplastaba el texto. */
+    width: min(300px, 40%);
+    height: auto;
+    aspect-ratio: 1 / 1;
     object-fit: contain;
     filter: drop-shadow(0 0 8px rgba(255,255,255,0.1));
     flex-shrink: 0;
@@ -2809,6 +2816,10 @@ body.scrolled .dashboard-container section {
     margin: 10px 0 15px 0 !important;
 }
 
+/* Pestañas Copa Oro / Copa Plata del cuadro (Hecho #33): el activo toma el color de su copa, como en la tabla */
+.btn-playoff-copa[data-copa-playoff="oro"].active { color: #f2c00e; border-color: rgba(242, 192, 14, 0.6); }
+.btn-playoff-copa[data-copa-playoff="plata"].active { color: #c5cedc; border-color: rgba(197, 206, 220, 0.6); }
+
 
 
 
@@ -3474,7 +3485,7 @@ body::-webkit-scrollbar-thumb {
    las infla para acompañar el resto de las columnas y queda un hueco vacío. */
 #tab-modal-jugadores td:first-child,
 #tab-modal-jugadores th:first-child {
-    width: 34px !important;
+    width: 58px !important;
     padding-left: 6px !important;
     padding-right: 2px !important;
 }
@@ -3485,15 +3496,32 @@ body::-webkit-scrollbar-thumb {
     padding-right: 4px !important;
 }
 
-/* Avatar del jugador en la tabla */
+/* Avatar del jugador en la tabla: lo bastante grande para que se reconozca al jugador.
+   Sin aro de color (el celeste se veía mal); un borde neutro solo lo separa del fondo. */
 .player-avatar-img {
-    width: 26px !important;
-    height: 26px !important;
-    border-radius: 50% !important;
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 8px !important;
     object-fit: cover !important;
-    border: 1px solid rgba(46, 218, 227, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
     display: inline-block !important;
     vertical-align: middle !important;
+}
+
+/* Jugador sin foto: silueta neutra en vez de la lupa */
+.player-avatar-img.player-avatar-vacio {
+    display: inline-flex !important;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+    background: rgba(26, 50, 116, 0.35);
+    color: #869bd8;
+}
+.player-avatar-vacio svg {
+    width: 80%;
+    height: 80%;
+    fill: currentColor;
+    opacity: 0.55;
 }
 
 /* Link Instagram */
@@ -5468,6 +5496,123 @@ body.auth-pendiente .auth-gate {
     .fixture-auto-botones { flex-direction: column-reverse; }
     .fixture-auto-botones .btn-submit-admin,
     .fixture-auto-botones .importar-btn-cancelar { width: 100%; }
+}
+
+/* ============================================================
+   🎱 ASISTENTE DE SORTEO (Carga de Partidos → Playoffs). Se usa en el vivo de Instagram, muchas veces desde el
+   celular: botones de 44 px y nada que desborde a 390 px.
+   ============================================================ */
+.sorteo-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+    border-color: #f2c00e;
+    text-align: left;
+}
+.sorteo-titulo { margin-top: 0; color: #f2c00e; }
+.sorteo-texto { margin: -6px 0 10px; font-size: 11px; color: #869bd8; line-height: 1.45; }
+.sorteo-btn-preparar { background: #854d0e; border-color: #f2c00e; color: #ffffff; }
+.sorteo-encabezado { margin: 14px 0 8px; font-family: 'Michroma', sans-serif; font-size: 13px; color: #ffffff; }
+.sorteo-aviso {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    border-left: 3px solid #f2c00e;
+    border-radius: 3px;
+    background: rgba(242, 192, 14, 0.08);
+    font-size: 12px;
+    color: #f8e7a8;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+.sorteo-aviso-error { border-left-color: #f43f5e; background: rgba(244, 63, 94, 0.08); color: #fecdd3; }
+
+.sorteo-bombos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 10px 0;
+}
+.sorteo-bombo {
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 3px;
+    background: rgba(4, 12, 38, 0.55);
+    border-left: 3px solid #f2c00e;
+}
+.sorteo-bombo-titulo { margin: 0 0 6px; font-family: 'Oswald', sans-serif; font-size: 13px; color: #f2c00e; text-transform: uppercase; }
+.sorteo-lista { margin: 0; padding: 0; list-style: none; }
+.sorteo-lista li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    color: #ffffff;
+    overflow-wrap: anywhere;
+}
+.sorteo-lista li:last-child { border-bottom: none; }
+.sorteo-rank { min-width: 22px; color: #869bd8; }
+.sorteo-grupo { margin-left: auto; color: #869bd8; white-space: nowrap; }
+.sorteo-lista li.sorteo-salio { opacity: 0.4; text-decoration: line-through; }
+
+.sorteo-paso {
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px dashed rgba(242, 192, 14, 0.45);
+    border-radius: 3px;
+}
+.sorteo-paso-titulo { margin: 0 0 8px; font-size: 13px; color: #ffffff; }
+.sorteo-opciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.sorteo-opcion {
+    min-height: 44px;
+    padding: 6px 12px;
+    border: 1px solid #2c68e7;
+    border-radius: 3px;
+    background: #0a1d54;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+.sorteo-opcion small { display: block; font-size: 10px; color: #869bd8; }
+.sorteo-opcion:disabled { cursor: not-allowed; opacity: 0.75; }
+.sorteo-opcion-prohibido { border-color: #f43f5e; background: rgba(244, 63, 94, 0.12); }
+.sorteo-opcion-prohibido small { color: #fda4af; }
+.sorteo-opcion-sinsalida { border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+.sorteo-opcion-sinsalida small { color: #fcd34d; }
+.sorteo-opcion-sugerida { border-color: #f2c00e; box-shadow: 0 0 0 1px #f2c00e; }
+.sorteo-opcion-sugerida small { color: #f2c00e; }
+
+.sorteo-llaves {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+}
+.sorteo-llave {
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid #475569;
+    font-size: 12px;
+    color: #cbd5e1;
+    overflow-wrap: anywhere;
+}
+.sorteo-llave strong { display: block; color: #f2c00e; font-size: 11px; text-transform: uppercase; }
+.sorteo-llave-ocupada { border-left-color: #f2c00e; color: #ffffff; }
+
+.sorteo-acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.sorteo-acciones .btn-submit-admin { width: auto; min-height: 44px; }
+
+@media (max-width: 800px) {
+    .sorteo-bombos { grid-template-columns: 1fr; }
+    .sorteo-opcion { width: 100%; }
+    .sorteo-acciones { flex-direction: column-reverse; }
+    .sorteo-acciones .btn-submit-admin,
+    .sorteo-acciones .importar-btn-cancelar { width: 100%; }
 }
 
 /* ============================================================

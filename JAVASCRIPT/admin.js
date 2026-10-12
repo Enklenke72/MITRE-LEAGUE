@@ -77,7 +77,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     function textoHistorialPartido(previo, nuevo) {
-        const donde = `${nombreFaseTeso(nuevo.fecha)} (${nombreCicloHistorial(nuevo.ciclo)})`;
+        const donde = `${nombreFasePartido(nuevo)} (${nombreCicloHistorial(nuevo.ciclo)})`;
         const cruce = `${nuevo.local} vs ${nuevo.visitante}`;
         if (!nuevo.jugado) {
             if (previo && previo.jugado) return `borró el resultado de ${donde}: ${cruce} (era ${marcadorHistorial(previo)})`;
@@ -102,7 +102,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     function textoGrupoHistorial(grupo) {
-        return grupo === 'Unico' ? 'Tabla Única' : `Grupo ${grupo}`;
+        if (grupo === 'Unico') return 'Tabla Única';
+        return grupo === 'Interzonal' ? 'Interzonal' : `Grupo ${grupo}`;
     }
 
     // De lo visible (nombre, número, Instagram, ficha) se anota antes → después; del DNI, la foto y los datos
@@ -193,11 +194,21 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // varios MB y el plan gratis de Cloudinary cuenta el espacio y el tráfico.
     const MAX_LADO_FOTO_JUGADOR = 250;
     const MAX_LADO_FOTO_NOTICIA = 1000;
-    const MAX_LADO_LOGO_SPONSOR = 500;
+    const MAX_LADO_LOGO_SPONSOR = 600;
     const MAX_LADO_PORTADA_ALBUM = 800;
     const CALIDAD_JPEG = 0.75;
 
-    function comprimirImagen(file, maxLado, calidad) {
+    function tieneTransparencia(ctx, ancho, alto) {
+        const datos = ctx.getImageData(0, 0, ancho, alto).data;
+        for (let i = 3; i < datos.length; i += 4) {
+            if (datos[i] < 255) return true;
+        }
+        return false;
+    }
+
+    // Con conservarTransparencia (logos de sponsor) una imagen con partes transparentes sale en
+    // PNG, para que no quede un rectángulo de color sobre el fondo de la tarjeta.
+    function comprimirImagen(file, maxLado, calidad, conservarTransparencia) {
         return new Promise((resolve, reject) => {
             if (!file || !file.type || file.type.indexOf('image/') !== 0) {
                 reject(new Error('El archivo no es una imagen.'));
@@ -219,11 +230,18 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     canvas.height = alto;
 
                     const ctx = canvas.getContext('2d');
-                    // El JPEG no soporta transparencia: pintamos el fondo del sitio para que un
-                    // PNG transparente no termine sobre negro puro.
+                    ctx.drawImage(img, 0, 0, ancho, alto);
+
+                    if (conservarTransparencia && tieneTransparencia(ctx, ancho, alto)) {
+                        resolve(canvas.toDataURL('image/png'));
+                        return;
+                    }
+
+                    // El JPEG no soporta transparencia: pintamos el fondo del sitio detrás para que
+                    // un PNG transparente no termine sobre negro puro.
+                    ctx.globalCompositeOperation = 'destination-over';
                     ctx.fillStyle = '#040c26';
                     ctx.fillRect(0, 0, ancho, alto);
-                    ctx.drawImage(img, 0, 0, ancho, alto);
 
                     resolve(canvas.toDataURL('image/jpeg', calidad));
                 };
@@ -358,7 +376,15 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const checkHorarioConfirmar = document.getElementById('partido-horario-confirmar');
     const selectCrucePlayoff = document.getElementById('partido-cruce-playoff-select');
     const groupCrucePlayoff = document.getElementById('group-cruce-playoff-directo');
+    const selectCopaPartido = document.getElementById('partido-copa');
+    const groupCopaPartido = document.getElementById('group-copa-partido');
     const groupInstanciaRegular = document.getElementById('group-instancia-regular');
+
+    // Copa del partido de playoff que se está cargando: solo se elige si el ciclo tiene Copa Plata; si no, es la única (Oro).
+    function copaFormularioPartido() {
+        const ciclo = cicloSelect ? cicloSelect.value : 'superior';
+        return tieneCopaPlata(ciclo) && selectCopaPartido ? selectCopaPartido.value : 'oro';
+    }
     const rowPenales = document.getElementById('row-penales-partido');
     const selectFiltroCronograma = document.getElementById('filtro-fecha-cronograma-admin');
 
@@ -487,6 +513,19 @@ document.addEventListener('liga:datos-listos', (evento) => {
             .map(p => Number(p.fecha)))];
     }
 
+    // Rondas de playoff que existen en el cuadro (Copa Oro y Plata) de un ciclo, o de los dos con null, más las que ya
+    // tienen partidos (para poder editarlos aunque la config haya cambiado). Si el cuadro arranca en Cuartos, no hay 8vos.
+    function fechasPlayoffOfrecidas(ciclo) {
+        const codigoDeRonda = { octavos: 108, cuartos: 104, semis: 102, final: 100 };
+        const codigos = new Set();
+        (ciclo === null ? ['superior', 'basico'] : [ciclo]).forEach(c =>
+            copasDelCiclo(c).forEach(copa => rondasHabilitadas(c, null, copa).forEach(r => codigos.add(codigoDeRonda[r]))));
+        partidos.forEach(p => {
+            if (p && Number(p.fecha) >= 100 && (ciclo === null || (p.ciclo || 'superior') === ciclo)) codigos.add(Number(p.fecha));
+        });
+        return FECHAS_PLAYOFF.filter(([f]) => codigos.has(f));
+    }
+
     // 1..n más las fechas que ya tienen partidos aunque queden fuera de rango (para poder editarlos).
     function listaFechasGrupos(n, extras) {
         const fechas = new Set(extras.filter(f => Number.isFinite(f) && f >= 1));
@@ -503,7 +542,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (valorDeseado !== undefined && Number(valorDeseado) < 100) extras.push(Number(valorDeseado));
         const grupos = listaFechasGrupos(obtenerFechasGrupos()[ciclo] || FECHAS_GRUPOS_DEFECTO, extras);
         inputFechaPartido.innerHTML = grupos.map(f => `<option value="${f}">Fecha ${f}</option>`).join('')
-            + FECHAS_PLAYOFF.map(([f, texto]) => `<option value="${f}">${texto}</option>`).join('');
+            + fechasPlayoffOfrecidas(ciclo).map(([f, texto]) => `<option value="${f}">${texto}</option>`).join('');
         if ([...inputFechaPartido.options].some(o => o.value === valor)) {
             inputFechaPartido.value = valor;
         } else {
@@ -520,7 +559,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const config = obtenerFechasGrupos();
         const grupos = listaFechasGrupos(Math.max(config.superior, config.basico), fechasGruposConPartidos(null));
         select.innerHTML = '<option value="">General del torneo (ej. premios)</option>'
-            + [...grupos, ...FECHAS_PLAYOFF.map(([f]) => f)].map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
+            + [...grupos, ...fechasPlayoffOfrecidas(null).map(([f]) => f)].map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
         select.value = [...select.options].some(o => o.value === valor) ? valor : '';
     }
 
@@ -750,34 +789,47 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         const nuevos = [];
         const fechas = [];
+        // La misma forma que un partido nuevo cargado a mano, sin jugar.
+        const partidoNuevo = (fecha, dia, grupo, local, visitante) => ({
+            fecha, ciclo, grupo,
+            local: local.nombre, visitante: visitante.nombre,
+            localId: local.id !== undefined ? local.id : null,
+            visitanteId: visitante.id !== undefined ? visitante.id : null,
+            golesLocal: null, golesVisitante: null, penalesLocal: null, penalesVisitante: null,
+            esPlayoff: false, ronda: null, dia, arancelExigido: arancel,
+            horario: '', cancha: '', arbitro: 'Por asignar',
+            goleadoresLocal: [], goleadoresVisitante: [],
+            amarillasLocal: [], rojasLocal: [], amarillasVisitante: [], rojasVisitante: [],
+            jugado: false, resultadoAuto: false
+        });
         for (let r = 0; r < fechasNecesarias; r++) {
             const fecha = r + 1;
             const dia = diaDeCalendario(ciclo, fecha);
-            const libres = [];
+            const libresDeGrupo = [];
             grupos.forEach(g => {
                 const ronda = g.rondas[r];
                 if (!ronda) return;
-                // La misma forma que un partido nuevo cargado a mano, sin jugar.
-                ronda.cruces.forEach(([local, visitante]) => nuevos.push({
-                    fecha, ciclo, grupo: g.grupo,
-                    local: local.nombre, visitante: visitante.nombre,
-                    localId: local.id !== undefined ? local.id : null,
-                    visitanteId: visitante.id !== undefined ? visitante.id : null,
-                    golesLocal: null, golesVisitante: null, penalesLocal: null, penalesVisitante: null,
-                    esPlayoff: false, ronda: null, dia, arancelExigido: arancel,
-                    horario: '', cancha: '', arbitro: 'Por asignar',
-                    goleadoresLocal: [], goleadoresVisitante: [],
-                    amarillasLocal: [], rojasLocal: [], amarillasVisitante: [], rojasVisitante: [],
-                    jugado: false, resultadoAuto: false
-                }));
-                if (ronda.libre) libres.push({ grupo: g.grupo, nombre: ronda.libre.nombre });
+                ronda.cruces.forEach(([local, visitante]) => nuevos.push(partidoNuevo(fecha, dia, g.grupo, local, visitante)));
+                if (ronda.libre) libresDeGrupo.push({ grupo: g.grupo, equipo: ronda.libre });
             });
+            // Decisión de Joaquín (11/10/2026): nadie queda libre si se puede evitar. Los libres de cada fecha (uno por
+            // grupo impar) juegan entre sí un interzonal, que suma en la tabla del grupo de cada uno. La localía alterna.
+            const emparejados = libresDeGrupo.length - (libresDeGrupo.length % 2);
+            for (let i = 0; i < emparejados; i += 2) {
+                const [a, b] = r % 2 === 0 ? [libresDeGrupo[i], libresDeGrupo[i + 1]] : [libresDeGrupo[i + 1], libresDeGrupo[i]];
+                nuevos.push(partidoNuevo(fecha, dia, 'Interzonal', a.equipo, b.equipo));
+            }
+            const libres = libresDeGrupo.slice(emparejados).map(l => ({ grupo: l.grupo, nombre: l.equipo.nombre }));
             fechas.push({ fecha, dia, libres });
         }
 
         return {
             ciclo, arancel, nuevos, fechas, configuradas,
-            grupos: grupos.map(g => ({ grupo: g.grupo, equipos: g.equipos.length, fechas: g.rondas.length, partidos: g.rondas.reduce((n, r) => n + r.cruces.length, 0) })),
+            grupos: grupos.map(g => ({
+                grupo: g.grupo, equipos: g.equipos.length, fechas: g.rondas.length, partidos: g.rondas.reduce((n, r) => n + r.cruces.length, 0),
+                quedaLibre: fechas.some(fe => fe.libres.some(l => l.grupo === g.grupo))
+            })),
+            interzonales: nuevos.filter(p => p.grupo === 'Interzonal').length,
             fueraDeGrupo: pool.filter(e => !gruposCiclo.includes(e.grupo)),
             // Si cambian los equipos, los grupos o el calendario entre la vista previa y la confirmación, se vuelve a revisar.
             firma: JSON.stringify(nuevos.map(p => [p.fecha, p.grupo, p.localId, p.local, p.visitanteId, p.visitante, p.dia]))
@@ -793,13 +845,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (g.equipos === 0) return `${nombre}: sin equipos.`;
             if (g.equipos === 1) return `${nombre}: 1 equipo, sin partidos.`;
             return `${nombre}: ${plural(g.equipos, 'equipo', 'equipos')} → ${plural(g.partidos, 'partido', 'partidos')} en ${plural(g.fechas, 'fecha', 'fechas')}`
-                + (g.equipos % 2 === 1 ? ' (cada fecha queda uno libre).' : '.');
+                + (g.equipos % 2 === 0 ? '.' : (g.quedaLibre ? ' (cada fecha queda uno libre).' : ' (el que queda libre en cada fecha juega el interzonal).'));
         };
+        const etiquetaGrupo = grupo => (grupo === 'Interzonal' ? 'Interzonal' : `Grupo ${attrSeguro(grupo)}`);
         const dondeEsta = e => (e.grupo === 'Unico' ? 'Tabla Única' : (e.grupo ? `Grupo ${e.grupo}, que no está en los grupos del ciclo` : 'sin grupo'));
         const arancel = f.arancel ? `$${f.arancel.toLocaleString()}` : `el de siempre ($${ARANCEL_PARTIDO_DEFECTO.toLocaleString()})`;
         const porFecha = f.fechas.map(fe => {
             const cruces = f.nuevos.filter(p => p.fecha === fe.fecha).map(p =>
-                `<li class="fixture-auto-cruce"><span class="fixture-auto-grupo">Grupo ${attrSeguro(p.grupo)} — </span>${attrSeguro(p.local)} <span class="fixture-auto-vs">vs</span> ${attrSeguro(p.visitante)}</li>`);
+                `<li class="fixture-auto-cruce"><span class="fixture-auto-grupo">${etiquetaGrupo(p.grupo)} — </span>${attrSeguro(p.local)} <span class="fixture-auto-vs">vs</span> ${attrSeguro(p.visitante)}</li>`);
             const libres = fe.libres.map(l =>
                 `<li class="fixture-auto-cruce fixture-auto-libre"><span class="fixture-auto-grupo">Grupo ${attrSeguro(l.grupo)} — </span>Libre: ${attrSeguro(l.nombre)}</li>`);
             return `<div class="fixture-auto-fecha" data-fecha="${fe.fecha}">
@@ -812,7 +865,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             <h3 class="fixture-auto-titulo">Vista previa del fixture — Ciclo ${nombreCicloHistorial(f.ciclo)}</h3>
             <p class="fixture-auto-texto"><strong>${plural(f.nuevos.length, 'partido', 'partidos')} en ${plural(f.fechas.length, 'fecha', 'fechas')}</strong> (el ciclo tiene ${f.configuradas} configuradas). Cada par de equipos se enfrenta una sola vez. Horario y cancha: a confirmar. Arancel: ${arancel} por equipo.</p>
             <p class="fixture-auto-nota">Todavía no se guardó nada. Al confirmar se crean todos juntos; después cada uno se edita desde el Cronograma (horario, cancha, resultado).</p>
-            <ul class="fixture-auto-grupos">${f.grupos.map(g => `<li>${attrSeguro(lineaGrupo(g))}</li>`).join('')}</ul>
+            <ul class="fixture-auto-grupos">${f.grupos.map(g => `<li>${attrSeguro(lineaGrupo(g))}</li>`).join('')}${f.interzonales
+                ? `<li>Interzonales: ${plural(f.interzonales, 'partido', 'partidos')} (suman en la tabla del grupo de cada equipo).</li>` : ''}</ul>
             ${f.fueraDeGrupo.length
                 ? `<p class="fixture-auto-texto fixture-auto-aviso">No entran (no están en un grupo del ciclo): ${f.fueraDeGrupo.map(e => `${attrSeguro(e.nombre)} (${attrSeguro(dondeEsta(e))})`).join(', ')}.</p>`
                 : ''}
@@ -968,7 +1022,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const ciclo = cicloSelect ? cicloSelect.value : 'superior';
         const grupo = grupoSelect ? grupoSelect.value : 'A';
         const pool = ciclo === 'superior' ? poolSuperior : poolBasico;
-        const filtrados = pool.filter(e => e.grupo === grupo);
+        // Un interzonal es entre equipos de grupos distintos del ciclo: se ofrecen todos los que están en algún grupo.
+        const gruposCiclo = gruposTorneo[ciclo] || [];
+        const filtrados = grupo === 'Interzonal'
+            ? pool.filter(e => gruposCiclo.includes(e.grupo))
+            : pool.filter(e => e.grupo === grupo);
 
         if (!localSelect || !visitanteSelect) return;
         const previoLocal = localSelect.value, previoVisitante = visitanteSelect.value;
@@ -1015,8 +1073,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         const fechaVal = parseInt(inputFechaPartido ? inputFechaPartido.value : 0);
         const ronda = (typeof rondaPorCodigoFecha === 'function' ? rondaPorCodigoFecha(fechaVal) : null);
+        const copa = copaFormularioPartido();
         const crucesRonda = (JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [])
-            .filter(c => c.ciclo === ciclo && c.ronda === ronda);
+            .filter(c => c.ciclo === ciclo && c.ronda === ronda && copaDe(c) === copa);
 
         // Sin cruces armados (ronda inicial antes del sorteo) se ofrece el plantel completo,
         // que es el comportamiento de siempre: ahí todavía no hay bracket del que deducir nada.
@@ -1071,14 +1130,16 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (groupCrucePlayoff) groupCrucePlayoff.style.display = 'block';
             if (groupInstanciaRegular) groupInstanciaRegular.style.display = 'none';
             if (rowPenales) rowPenales.style.display = 'grid';
+            if (groupCopaPartido) groupCopaPartido.classList.toggle('seccion-oculta-staff', !tieneCopaPlata(ciclo));
 
             const ronda = (typeof rondaPorCodigoFecha === 'function' ? rondaPorCodigoFecha(fechaVal) : null) || 'octavos';
+            const copa = copaFormularioPartido();
 
             const crucesGuardados = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
             // Sólo cruces con ambos equipos definidos — un cruce generado automáticamente
             // por el avance de playoffs puede tener un lado todavía "A definir".
             const crucesRonda = crucesGuardados
-                .filter(c => c.ciclo === ciclo && c.ronda === ronda && c.local && c.visitante)
+                .filter(c => c.ciclo === ciclo && c.ronda === ronda && copaDe(c) === copa && c.local && c.visitante)
                 .sort((a, b) => (a.slot || 0) - (b.slot || 0));
 
             if (selectCrucePlayoff) {
@@ -1105,7 +1166,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 grupos.forEach(g => {
                     grupoSelect.innerHTML += `<option value="${attrSeguro(g)}">Grupo ${attrSeguro(g)}</option>`;
                 });
-                if (grupos.includes(grpAnterior)) grupoSelect.value = grpAnterior;
+                if (grupos.length >= 2) grupoSelect.innerHTML += '<option value="Interzonal">Interzonal</option>';
+                if ([...grupoSelect.options].some(o => o.value === grpAnterior)) grupoSelect.value = grpAnterior;
             }
             filtrarEquiposPorGrupo();
         }
@@ -1123,6 +1185,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
     if (inputFechaPartido) inputFechaPartido.addEventListener('change', actualizarOpcionesGrupo);
     if (cicloSelect) cicloSelect.addEventListener('change', actualizarOpcionesGrupo);
+    if (selectCopaPartido) selectCopaPartido.addEventListener('change', actualizarOpcionesGrupo);
     if (grupoSelect) grupoSelect.addEventListener('change', filtrarEquiposPorGrupo);
     // Después de los de arriba: cuando se completa el Día, la Fecha ya quedó ajustada al ciclo.
     if (inputFechaPartido) inputFechaPartido.addEventListener('change', autocompletarDiaPartido);
@@ -1163,6 +1226,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             else if (p.fecha === 104) faseLabel = "4tos";
             else if (p.fecha === 102) faseLabel = "Semis";
             else if (p.fecha === 100) faseLabel = "Final";
+            const copaDelPartido = p.fecha >= 100 ? nombreCopa(p.ciclo || 'superior', copaDe(p)) : '';
+            if (copaDelPartido) faseLabel += ` · ${copaDelPartido}`;
 
             if (horarioActual !== ultimoHorario) {
                 ultimoHorario = horarioActual;
@@ -1202,7 +1267,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 });
                 partidos = partidos.filter(p => p.id !== idBorrar);
                 almacen.setItem('liga_partidos', JSON.stringify(partidos));
-                if (partidoBorrado) registrarHistorial('partido', `eliminó el partido de ${nombreFaseTeso(partidoBorrado.fecha)} (${nombreCicloHistorial(partidoBorrado.ciclo)}): `
+                if (partidoBorrado) registrarHistorial('partido', `eliminó el partido de ${nombreFasePartido(partidoBorrado)} (${nombreCicloHistorial(partidoBorrado.ciclo)}): `
                     + (partidoBorrado.jugado ? marcadorHistorial(partidoBorrado) : `${partidoBorrado.local} vs ${partidoBorrado.visitante}`));
                 if (planTeso) aplicarPlanTesoreria(planTeso);
                 if (idPartidoEnEdicion === idBorrar) cancelarEdicionPartido();
@@ -1223,6 +1288,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     idPartidoEnEdicion = p.id;
                     equiposDeLosCampos = null;
                     if (cicloSelect) cicloSelect.value = p.ciclo;
+                    if (selectCopaPartido) selectCopaPartido.value = copaDe(p);
                     armarOpcionesFechaPartido(p.fecha);
                     actualizarOpcionesGrupo();
 
@@ -1324,6 +1390,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const contexto = {
             fecha: inputFechaPartido ? inputFechaPartido.value : "1",
             ciclo: cicloSelect ? cicloSelect.value : "superior",
+            copa: selectCopaPartido ? selectCopaPartido.value : "oro",
             grupo: grupoSelect ? grupoSelect.value : "",
             dia: inputDiaPartido ? inputDiaPartido.value : "",
             horario: inputHorarioPartido ? inputHorarioPartido.value : "14:20",
@@ -1338,9 +1405,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         if (inputFechaPartido) inputFechaPartido.value = contexto.fecha;
         if (cicloSelect) cicloSelect.value = contexto.ciclo;
+        if (selectCopaPartido) selectCopaPartido.value = contexto.copa;
         actualizarOpcionesGrupo();
 
-        if (grupoSelect && contexto.grupo && grupoSelect.querySelector(`option[value="${contexto.grupo}"]`)) {
+        // Se compara el valor y no se arma un selector: un nombre de grupo con comillas lo rompería.
+        if (grupoSelect && contexto.grupo && [...grupoSelect.options].some(o => o.value === contexto.grupo)) {
             grupoSelect.value = contexto.grupo;
             filtrarEquiposPorGrupo();
         }
@@ -1383,6 +1452,16 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (localInput === visitanteInput) {
                 alert('¡Un equipo no puede jugar contra sí mismo!');
                 return;
+            }
+
+            if (fechaVal < 100 && grupoSelect && grupoSelect.value === 'Interzonal') {
+                recargarPools();
+                const pool = ciclo === 'superior' ? poolSuperior : poolBasico;
+                const grupoDe = nombre => (pool.find(e => e.nombre === nombre) || {}).grupo;
+                if (grupoDe(localInput) === grupoDe(visitanteInput)) {
+                    alert(`Un interzonal es entre equipos de grupos distintos, y los dos son del ${textoGrupoHistorial(grupoDe(localInput))}. Elegí el grupo en "Grupo" o cambiá un equipo.`);
+                    return;
+                }
             }
 
             const esJugado = golesLocalInput !== "" && golesVisitanteInput !== "";
@@ -1497,6 +1576,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 penalesVisitante: (fechaVal >= 100 && esJugado) ? penVisitaVal : null,
                 esPlayoff: fechaVal >= 100,
                 ronda: rondaPlayoff,
+                copa: fechaVal >= 100 ? copaFormularioPartido() : null, // Copa Oro o Plata del cuadro (Hecho #33)
                 dia: inputDiaPartido ? diaInputAStorage(inputDiaPartido.value) : '',
                 arancelExigido: (inputArancelPartido && parseFloat(inputArancelPartido.value) > 0)
                     ? parseFloat(inputArancelPartido.value)
@@ -1564,29 +1644,60 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const configBracketCiclo = document.getElementById('config-bracket-ciclo');
     const configBracketRondaInicial = document.getElementById('config-bracket-ronda-inicial');
     const configBracketSlots = document.getElementById('config-bracket-slots');
+    const configBracketCopa = document.getElementById('config-bracket-copa');
+    const btnQuitarCopaPlata = document.getElementById('btn-quitar-copa-plata');
     const resumenConfigBracket = document.getElementById('resumen-config-bracket');
+    const ETIQUETA_RONDA_CORTA = { octavos: 'Octavos', cuartos: 'Cuartos', semis: 'Semifinal', final: 'Final' };
 
     function renderizarResumenConfigBracket() {
         if (!resumenConfigBracket) return;
-        const config = typeof obtenerConfigPlayoffs === 'function' ? obtenerConfigPlayoffs() : {};
-        const etiquetaCiclo = { superior: 'Superior', basico: 'Básico' };
-        const etiquetaRonda = { octavos: 'Octavos', cuartos: 'Cuartos', semis: 'Semifinal', final: 'Final' };
+        const config = obtenerConfigPlayoffs();
         let html = '';
         ['superior', 'basico'].forEach(ciclo => {
+            const nombre = nombreCicloHistorial(ciclo);
             const cfg = config[ciclo];
-            if (cfg) {
-                html += `<div><strong>${etiquetaCiclo[ciclo]}</strong>: arranca en ${etiquetaRonda[cfg.rondaInicial] || cfg.rondaInicial} con ${cfg.slots} llave(s).</div>`;
-            } else {
-                html += `<div><strong>${etiquetaCiclo[ciclo]}</strong>: sin configurar (default: Octavos, 8 llaves).</div>`;
-            }
+            const cuadro = tieneCopaPlata(ciclo, config) ? ' (Copa Oro)' : '';
+            html += cfg
+                ? `<div><strong>${nombre}${cuadro}</strong>: arranca en ${ETIQUETA_RONDA_CORTA[cfg.rondaInicial] || attrSeguro(cfg.rondaInicial)} con ${cfg.slots} llave(s).</div>`
+                : `<div><strong>${nombre}</strong>: sin configurar (default: Octavos, 8 llaves).</div>`;
+            const plata = config[claveCuadro(ciclo, 'plata')];
+            if (plata) html += `<div><strong>${nombre} (Copa Plata)</strong>: arranca en ${ETIQUETA_RONDA_CORTA[plata.rondaInicial] || attrSeguro(plata.rondaInicial)} con ${plata.slots} llave(s).</div>`;
         });
         resumenConfigBracket.innerHTML = html;
     }
+
+    // El formulario muestra lo guardado del ciclo y la copa elegidos. Una Copa Plata todavía sin configurar arranca
+    // con los valores de la Oro, como sugerencia (no se guarda hasta tocar "Guardar Configuración").
+    function mostrarConfigBracketGuardada() {
+        if (!configBracketCiclo || !configBracketRondaInicial || !configBracketSlots) return;
+        const config = obtenerConfigPlayoffs();
+        const ciclo = configBracketCiclo.value;
+        const copa = configBracketCopa ? configBracketCopa.value : 'oro';
+        const cfg = config[claveCuadro(ciclo, copa)] || config[ciclo] || { rondaInicial: CONFIG_PLAYOFFS_DEFAULT_RONDA, slots: CONFIG_PLAYOFFS_DEFAULT_SLOTS };
+        configBracketRondaInicial.value = cfg.rondaInicial;
+        configBracketSlots.value = cfg.slots;
+        if (btnQuitarCopaPlata) btnQuitarCopaPlata.classList.toggle('seccion-oculta-staff', !(copa === 'plata' && tieneCopaPlata(ciclo, config)));
+    }
+
+    // Las rondas de playoff que ofrecen "Fecha / Fase" y los egresos dependen del cuadro.
+    function configBracketCambiada() {
+        renderizarResumenConfigBracket();
+        mostrarConfigBracketGuardada();
+        actualizarRondaYSlotPlayoffs();
+        actualizarCopaSorteo();
+        actualizarOpcionesGrupo();
+        armarOpcionesFechaPartido();
+        armarOpcionesFechaEgreso();
+    }
+
+    if (configBracketCiclo) configBracketCiclo.addEventListener('change', mostrarConfigBracketGuardada);
+    if (configBracketCopa) configBracketCopa.addEventListener('change', mostrarConfigBracketGuardada);
 
     if (formConfigBracket) {
         formConfigBracket.addEventListener('submit', (e) => {
             e.preventDefault();
             const ciclo = configBracketCiclo.value;
+            const copa = configBracketCopa ? configBracketCopa.value : 'oro';
             const rondaInicial = configBracketRondaInicial.value;
             const slots = parseInt(configBracketSlots.value);
 
@@ -1595,13 +1706,32 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 return;
             }
 
-            const config = typeof obtenerConfigPlayoffs === 'function' ? obtenerConfigPlayoffs() : {};
-            config[ciclo] = { rondaInicial, slots };
-            if (typeof guardarConfigPlayoffs === 'function') guardarConfigPlayoffs(config);
+            const config = obtenerConfigPlayoffs();
+            config[claveCuadro(ciclo, copa)] = { rondaInicial, slots };
+            guardarConfigPlayoffs(config);
 
-            renderizarResumenConfigBracket();
-            actualizarRondaYSlotPlayoffs();
-            alert(`Configuración guardada — Ciclo ${ciclo === 'superior' ? 'Superior' : 'Básico'} arranca en ${rondaInicial.toUpperCase()} con ${slots} llave(s).`);
+            configBracketCambiada();
+            const cuadro = nombreCopa(ciclo, copa, config);
+            alert(`Configuración guardada — Ciclo ${nombreCicloHistorial(ciclo)}${cuadro ? ', ' + cuadro : ''} arranca en ${rondaInicial.toUpperCase()} con ${slots} llave(s).`);
+        });
+    }
+
+    if (btnQuitarCopaPlata) {
+        btnQuitarCopaPlata.addEventListener('click', () => {
+            const ciclo = configBracketCiclo.value;
+            const nombre = nombreCicloHistorial(ciclo);
+            const enUso = (JSON.parse(almacen.getItem('liga_cruces_playoffs')) || []).some(c => c.ciclo === ciclo && copaDe(c) === 'plata')
+                || partidos.some(p => p && p.ciclo === ciclo && p.esPlayoff && copaDe(p) === 'plata');
+            if (enUso) {
+                alert(`El ciclo ${nombre} ya tiene cruces o partidos de la Copa Plata. Borralos primero (Armador de Cruces y Cronograma) y después quitá la copa.`);
+                return;
+            }
+            if (!confirm(`¿Quitar la Copa Plata del ciclo ${nombre}? La tabla deja de marcar quién va a la Plata.`)) return;
+            const config = obtenerConfigPlayoffs();
+            delete config[claveCuadro(ciclo, 'plata')];
+            guardarConfigPlayoffs(config);
+            configBracketCambiada();
+            alert(`Copa Plata quitada del ciclo ${nombre}.`);
         });
     }
 
@@ -1656,12 +1786,20 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
     // Llena el select de Ronda Target sólo con las rondas vigentes para el ciclo
     // elegido, según la configuración del bracket (ver form-config-bracket).
+    const playoffCopaSel = document.getElementById('playoff-copa-select');
+    const groupPlayoffCopa = document.getElementById('group-playoff-copa');
+
+    // Copa del Armador: solo se elige si el ciclo tiene Copa Plata.
+    function copaArmador() {
+        const ciclo = playoffCicloSel ? playoffCicloSel.value : 'superior';
+        return tieneCopaPlata(ciclo) && playoffCopaSel ? playoffCopaSel.value : 'oro';
+    }
+
     function actualizarRondaYSlotPlayoffs() {
         if (!playoffRondaSel || !playoffCicloSel) return;
         const ciclo = playoffCicloSel.value;
-        const rondas = typeof rondasHabilitadas === 'function'
-            ? rondasHabilitadas(ciclo)
-            : ['octavos', 'cuartos', 'semis', 'final'];
+        if (groupPlayoffCopa) groupPlayoffCopa.classList.toggle('seccion-oculta-staff', !tieneCopaPlata(ciclo));
+        const rondas = rondasHabilitadas(ciclo, null, copaArmador());
 
         const rondaPrevia = playoffRondaSel.value;
         playoffRondaSel.innerHTML = rondas.map(r => `<option value="${r}">${ETIQUETAS_RONDA[r] || r}</option>`).join('');
@@ -1675,7 +1813,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (!playoffSlotSel || !playoffCicloSel || !playoffRondaSel) return;
         const ciclo = playoffCicloSel.value;
         const ronda = playoffRondaSel.value;
-        const slots = typeof slotsPorRonda === 'function' ? slotsPorRonda(ciclo) : null;
+        const slots = slotsPorRonda(ciclo, null, copaArmador());
         const cantidad = (slots && slots[ronda]) || 1;
 
         const slotPrevio = playoffSlotSel.value;
@@ -1694,6 +1832,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
     if (playoffRondaSel) playoffRondaSel.addEventListener('change', actualizarSlotsPlayoffs);
+    if (playoffCopaSel) playoffCopaSel.addEventListener('change', actualizarRondaYSlotPlayoffs);
 
     function renderizarCrucesPlayoffsAdmin() {
         const contenedor = document.getElementById('lista-cruces-playoffs-admin');
@@ -1707,6 +1846,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         const crucesOrdenados = [...crucesPlayoffs].sort((a, b) => {
             if (a.ciclo !== b.ciclo) return a.ciclo.localeCompare(b.ciclo);
+            if (copaDe(a) !== copaDe(b)) return copaDe(a) === 'oro' ? -1 : 1;
             const idxA = typeof ORDEN_RONDAS !== 'undefined' ? ORDEN_RONDAS.indexOf(a.ronda) : 0;
             const idxB = typeof ORDEN_RONDAS !== 'undefined' ? ORDEN_RONDAS.indexOf(b.ronda) : 0;
             if (idxA !== idxB) return idxA - idxB;
@@ -1717,7 +1857,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(242, 192, 14,0.05); padding:10px; margin-bottom:8px; border-radius:4px; border-left: 4px solid #f2c00e;">
                     <div style="text-align:left;">
-                        <span style="font-size:10px; color:#f2c00e; display:block; text-transform:uppercase;">${c.ronda.toUpperCase()} — LLAVE ${c.slot || '?'} (${c.ciclo.toUpperCase()})</span>
+                        <span style="font-size:10px; color:#f2c00e; display:block; text-transform:uppercase;">${c.ronda.toUpperCase()} — LLAVE ${c.slot || '?'} (${c.ciclo.toUpperCase()}${nombreCopa(c.ciclo, copaDe(c)) ? ' · ' + nombreCopa(c.ciclo, copaDe(c)).toUpperCase() : ''})</span>
                         <span style="font-size:12px; color:white; font-weight:bold;">${attrSeguro(c.local || '(A definir)')} VS ${attrSeguro(c.visitante || '(A definir)')}</span>
                     </div>
                     <button class="btn-borrar-cruce" data-id="${c.id}" style="background-color:#991b1b; color:white; border:none; padding:4px 8px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Eliminar</button>
@@ -1744,7 +1884,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // a un cruce dado (mismo ciclo+ronda, mismos equipos en cualquier orden).
     function buscarPartidoDeCruce(cruce) {
         return partidos.find(p =>
-            p.esPlayoff && p.jugado && p.ronda === cruce.ronda && p.ciclo === cruce.ciclo &&
+            p.esPlayoff && p.jugado && p.ronda === cruce.ronda && p.ciclo === cruce.ciclo && copaDe(p) === copaDe(cruce) &&
             ((p.local === cruce.local && p.visitante === cruce.visitante) ||
              (p.local === cruce.visitante && p.visitante === cruce.local))
         );
@@ -1758,7 +1898,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (typeof determinarGanador !== 'function' || typeof rondaSiguiente !== 'function') return;
 
         const cruceOrigen = crucesPlayoffs.find(c =>
-            c.ciclo === partidoJugado.ciclo && c.ronda === partidoJugado.ronda &&
+            c.ciclo === partidoJugado.ciclo && c.ronda === partidoJugado.ronda && copaDe(c) === copaDe(partidoJugado) &&
             ((c.local === partidoJugado.local && c.visitante === partidoJugado.visitante) ||
              (c.local === partidoJugado.visitante && c.visitante === partidoJugado.local))
         );
@@ -1775,12 +1915,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const slotDest = slotDestino(cruceOrigen.slot);
         const ladoDest = ladoDestino(cruceOrigen.slot);
 
+        // Cada copa tiene su cuadro: el ganador de Cuartos de la Plata va a Semis de la Plata, nunca a las de la Oro.
+        const copa = copaDe(cruceOrigen);
         let cruceDestino = crucesPlayoffs.find(c =>
-            c.ciclo === cruceOrigen.ciclo && c.ronda === rondaDestino && c.slot === slotDest
+            c.ciclo === cruceOrigen.ciclo && c.ronda === rondaDestino && c.slot === slotDest && copaDe(c) === copa
         );
 
         if (!cruceDestino) {
-            cruceDestino = { id: Date.now(), ciclo: cruceOrigen.ciclo, ronda: rondaDestino, slot: slotDest, local: null, visitante: null };
+            cruceDestino = { id: Date.now(), ciclo: cruceOrigen.ciclo, copa, ronda: rondaDestino, slot: slotDest, local: null, visitante: null };
             crucesPlayoffs.push(cruceDestino);
         } else {
             const partidoDestinoYaJugado = buscarPartidoDeCruce(cruceDestino);
@@ -1816,13 +1958,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 return;
             }
 
-            const yaExiste = crucesPlayoffs.find(c => c.ciclo === playoffCicloSel.value && c.ronda === ronda && c.slot === slot);
+            const ciclo = playoffCicloSel.value;
+            const copa = copaArmador();
+            const cuadro = nombreCopa(ciclo, copa);
+            const enCuadro = cuadro ? ` de la ${cuadro}` : '';
+            const yaExiste = crucesPlayoffs.find(c => c.ciclo === ciclo && c.ronda === ronda && c.slot === slot && copaDe(c) === copa);
             if (yaExiste) {
                 // La llave 1 viene preseleccionada, así que es fácil pisar un cruce ya armado
                 // sin darse cuenta: pedimos confirmación explícita antes de reemplazarlo.
                 const ocupadaPor = `${yaExiste.local || 'A definir'} vs ${yaExiste.visitante || 'A definir'}`;
                 const confirmado = confirm(
-                    `La Llave ${slot} de ${ronda.toUpperCase()} ya está ocupada por:\n\n${ocupadaPor}\n\n` +
+                    `La Llave ${slot} de ${ronda.toUpperCase()}${enCuadro} ya está ocupada por:\n\n${ocupadaPor}\n\n` +
                     `Si continuás se reemplaza por:\n\n${eq1} vs ${eq2}\n\n¿Sobrescribir la llave?`
                 );
                 if (!confirmado) return;
@@ -1832,7 +1978,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             } else {
                 crucesPlayoffs.push({
                     id: Date.now(),
-                    ciclo: playoffCicloSel.value,
+                    ciclo,
+                    copa,
                     ronda: ronda,
                     slot: slot,
                     local: eq1,
@@ -1843,7 +1990,244 @@ document.addEventListener('liga:datos-listos', (evento) => {
             almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
             renderizarCrucesPlayoffsAdmin();
             actualizarOpcionesGrupo();
-            alert(`Cruce de ${ronda.toUpperCase()} (Llave ${slot}) guardado: ${eq1} vs ${eq2}`);
+            // Dos del mismo grupo no deberían cruzarse en la ronda inicial (regla del sorteo): se avisa, no se bloquea.
+            const pool = ciclo === 'superior' ? poolSuperior : poolBasico;
+            const grupoDe = nombre => (pool.find(e => e.nombre === nombre) || {}).grupo;
+            const mismoGrupoAviso = grupoDe(eq1) && grupoDe(eq1) === grupoDe(eq2)
+                ? `\n\nOjo: los dos son del ${textoGrupoHistorial(grupoDe(eq1))}. Según el reglamento, dos equipos del mismo grupo no se cruzan en la primera ronda de playoffs.`
+                : '';
+            alert(`Cruce de ${ronda.toUpperCase()}${enCuadro} (Llave ${slot}) guardado: ${eq1} vs ${eq2}${mismoGrupoAviso}`);
+        });
+    }
+
+    // ============================================================
+    // ASISTENTE DE SORTEO (vivo de Instagram) — decisiones de Joaquín del 11/10/2026
+    // ============================================================
+    // Arma los dos bombos de la copa con la tabla, marca qué rivales no puede sacar cada equipo del Bombo 1 (mismo
+    // grupo, o uno que deja el sorteo sin salida) y sugiere la llave para que dos del mismo grupo no queden del mismo
+    // lado del cuadro. La lógica está en playoffs.js; acá solo el paso a paso. Nada se guarda hasta "Guardar cruces"
+    // (salvo un desempate por sorteo, que es un dato del torneo y se guarda al marcarlo).
+    const selectCicloSorteo = document.getElementById('sorteo-ciclo');
+    const selectCopaSorteo = document.getElementById('sorteo-copa');
+    const groupCopaSorteo = document.getElementById('group-sorteo-copa');
+    const btnPrepararSorteo = document.getElementById('btn-preparar-sorteo');
+    const panelSorteo = document.getElementById('sorteo-contenido');
+    let sorteo = null;
+
+    function cicloSorteo() {
+        return selectCicloSorteo ? selectCicloSorteo.value : 'superior';
+    }
+
+    function copaSorteo() {
+        return tieneCopaPlata(cicloSorteo()) && selectCopaSorteo ? selectCopaSorteo.value : 'oro';
+    }
+
+    function actualizarCopaSorteo() {
+        if (groupCopaSorteo) groupCopaSorteo.classList.toggle('seccion-oculta-staff', !tieneCopaPlata(cicloSorteo()));
+    }
+
+    // Tabla del ciclo calculada como la web (mismas funciones de playoffs.js), sobre copias de los equipos.
+    function tablaParaSorteo(ciclo) {
+        recargarPools();
+        const equipos = (ciclo === 'basico' ? poolBasico : poolSuperior).map(e => ({ ...e }));
+        calcularEstadisticas(equipos, partidos, JSON.parse(almacen.getItem('liga_sanciones')) || [], ciclo);
+        const grupos = gruposTorneo[ciclo] || [];
+        const desempates = obtenerDesempatesSorteo()[ciclo] || {};
+        return { equipos, grupos, desempates, filas: clasificacionDelCiclo(equipos, grupos, ciclo, desempates) };
+    }
+
+    function prepararSorteo() {
+        const ciclo = cicloSorteo(), copa = copaSorteo();
+        const tabla = tablaParaSorteo(ciclo);
+        const bombos = bombosDeCopa(tabla.filas, ciclo, copa);
+        sorteo = {
+            ciclo, copa, tabla, bombos,
+            empates: empatesQueImportan(tabla.equipos, tabla.grupos, ciclo, tabla.desempates),
+            sinJugar: partidos.filter(p => p && (p.ciclo || 'superior') === ciclo && Number(p.fecha) < 100 && !p.jugado).length,
+            cruces: [], elegido: null, rival: null
+        };
+        renderizarSorteo();
+    }
+
+    function cerrarSorteo() {
+        sorteo = null;
+        if (panelSorteo) { panelSorteo.innerHTML = ''; panelSorteo.classList.add('seccion-oculta-staff'); }
+    }
+
+    const nombreFila = f => attrSeguro(f.equipo.nombre);
+    const grupoFila = f => attrSeguro(textoGrupoHistorial(f.grupo));
+
+    function restantesSorteo() {
+        const salieron = new Set(sorteo.cruces.flatMap(c => [c.local, c.visitante]));
+        if (sorteo.elegido) salieron.add(sorteo.elegido);
+        if (sorteo.rival) salieron.add(sorteo.rival);
+        return {
+            uno: sorteo.bombos.bombo1.filter(f => !salieron.has(f)),
+            dos: sorteo.bombos.bombo2.filter(f => !salieron.has(f)),
+            salieron
+        };
+    }
+
+    function textoPares(pares) {
+        return pares.map(([a, b]) => `${a.equipo.nombre} y ${b.equipo.nombre} (${textoGrupoHistorial(a.grupo)})`).join('; ');
+    }
+
+    function renderizarSorteo() {
+        if (!panelSorteo || !sorteo) return;
+        const s = sorteo;
+        const cuadro = nombreCopa(s.ciclo, s.copa);
+        const encabezado = `<h4 class="sorteo-encabezado">${cuadro || 'Playoffs'} — Ciclo ${nombreCicloHistorial(s.ciclo)}${s.bombos ? ` · ${ETIQUETAS_RONDA[s.bombos.rondaInicial] || s.bombos.rondaInicial} · ${s.bombos.llaves} llaves` : ''}</h4>`;
+        panelSorteo.classList.remove('seccion-oculta-staff');
+
+        if (!s.bombos) {
+            panelSorteo.innerHTML = encabezado + '<p class="sorteo-aviso sorteo-aviso-error">Esta copa no tiene cuadro configurado: definí la ronda inicial y las llaves en "Configurar Bracket por Ciclo".</p>';
+            return;
+        }
+        const necesarios = s.bombos.llaves * 2;
+        if (s.bombos.bombo2.length < s.bombos.llaves) {
+            panelSorteo.innerHTML = encabezado + `<p class="sorteo-aviso sorteo-aviso-error">La copa necesita ${necesarios} equipos clasificados y la tabla tiene ${s.bombos.filas.length}. Revisá los grupos y la configuración del cuadro.</p>`;
+            return;
+        }
+
+        let html = encabezado;
+        if (s.sinJugar > 0) {
+            html += `<p class="sorteo-aviso">Todavía hay ${s.sinJugar} ${s.sinJugar === 1 ? 'partido' : 'partidos'} de fase de grupos sin resultado en este ciclo: los bombos pueden cambiar.</p>`;
+        }
+        if (s.empates.length > 0) {
+            html += '<div class="sorteo-paso"><p class="sorteo-paso-titulo">Antes de sortear, definí por sorteo estos empates (mismos PTS, DIF, GF y partidos ganados): cambian la copa o el bombo de alguno.</p>'
+                + s.empates.map(([a, b]) => `<p class="sorteo-texto">${attrSeguro(a.nombre)} y ${attrSeguro(b.nombre)}: ¿quién queda arriba?</p>
+                    <div class="sorteo-opciones">
+                        <button type="button" class="sorteo-opcion" data-accion="desempate" data-ganador="${attrSeguro(a.id)}" data-perdedor="${attrSeguro(b.id)}">${attrSeguro(a.nombre)}</button>
+                        <button type="button" class="sorteo-opcion" data-accion="desempate" data-ganador="${attrSeguro(b.id)}" data-perdedor="${attrSeguro(a.id)}">${attrSeguro(b.nombre)}</button>
+                    </div>`).join('')
+                + '</div>';
+            panelSorteo.innerHTML = html;
+            return;
+        }
+
+        const { uno, dos, salieron } = restantesSorteo();
+        const listaBombo = (titulo, filas) => `<div class="sorteo-bombo"><h5 class="sorteo-bombo-titulo">${titulo}</h5><ul class="sorteo-lista">${filas.map(f =>
+            `<li class="${salieron.has(f) ? 'sorteo-salio' : ''}"><span class="sorteo-rank">${f.rank}°</span><span>${nombreFila(f)}</span><span class="sorteo-grupo">${grupoFila(f)}</span></li>`).join('')}</ul></div>`;
+        html += `<div class="sorteo-bombos">${listaBombo('Bombo 1', s.bombos.bombo1)}${listaBombo('Bombo 2', s.bombos.bombo2)}</div>`;
+
+        const completo = s.cruces.length === s.bombos.llaves;
+        if (completo) {
+            const pares = paresMismaMitad(s.cruces, s.bombos.llaves);
+            html += `<div class="sorteo-paso"><p class="sorteo-paso-titulo">Sorteo completo.</p>${pares.length
+                ? `<p class="sorteo-aviso">Pueden cruzarse en ${s.bombos.llaves > 2 ? 'semis' : 'la ronda siguiente'} si ganan los dos: ${attrSeguro(textoPares(pares))}.</p>` : ''}</div>`;
+        } else if (!s.elegido) {
+            html += `<div class="sorteo-paso"><p class="sorteo-paso-titulo">¿Quién salió del Bombo 1?</p><div class="sorteo-opciones">${uno.map(f =>
+                `<button type="button" class="sorteo-opcion" data-accion="elegir" data-rank="${f.rank}">${nombreFila(f)}<small>${grupoFila(f)}</small></button>`).join('')}</div></div>`;
+        } else if (!s.rival) {
+            const estados = estadoRivales(s.elegido, [s.elegido, ...uno], dos);
+            const detalle = { prohibido: 'no puede: mismo grupo', sinSalida: 'no puede: deja el sorteo sin salida', posible: '' };
+            html += `<div class="sorteo-paso"><p class="sorteo-paso-titulo">Rival de ${nombreFila(s.elegido)} (${grupoFila(s.elegido)}): ¿quién salió del Bombo 2?</p><div class="sorteo-opciones">${estados.map(e =>
+                `<button type="button" class="sorteo-opcion${e.estado === 'prohibido' ? ' sorteo-opcion-prohibido' : ''}${e.estado === 'sinSalida' ? ' sorteo-opcion-sinsalida' : ''}" data-accion="rival" data-rank="${e.rival.rank}" data-estado="${e.estado}" ${e.estado === 'posible' ? '' : 'disabled'}>${nombreFila(e.rival)}<small>${grupoFila(e.rival)}${detalle[e.estado] ? ' — ' + detalle[e.estado] : ''}</small></button>`).join('')}</div>
+                <p class="sorteo-texto">Si sale uno que no puede, se vuelve a sacar.</p></div>`;
+        } else {
+            const evaluadas = evaluarLlaves(s.cruces, { local: s.elegido, visitante: s.rival }, uno, dos, s.bombos.llaves);
+            const usadas = new Set(s.cruces.map(c => c.llave));
+            const opciones = evaluadas || Array.from({ length: s.bombos.llaves }, (_, i) => ({ llave: i + 1 })).filter(o => !usadas.has(o.llave));
+            const minimo = evaluadas ? Math.min(...evaluadas.map(e => e.costo)) : 0;
+            const nota = o => {
+                if (!evaluadas) return '';
+                if (o.sugerida) return minimo > 0 ? `sugerida — inevitable: ${minimo} ${minimo === 1 ? 'cruce' : 'cruces'} del mismo grupo antes de la final` : 'sugerida';
+                return o.costo > minimo ? 'deja más cruces del mismo grupo antes de la final' : 'igual de buena';
+            };
+            html += `<div class="sorteo-paso"><p class="sorteo-paso-titulo">${nombreFila(s.elegido)} vs ${nombreFila(s.rival)}: ¿en qué llave va?</p><div class="sorteo-opciones">${opciones.map(o =>
+                `<button type="button" class="sorteo-opcion${o.sugerida ? ' sorteo-opcion-sugerida' : ''}" data-accion="llave" data-llave="${o.llave}">Llave ${o.llave}<small>${nota(o)}</small></button>`).join('')}</div></div>`;
+        }
+
+        html += `<div class="sorteo-llaves">${Array.from({ length: s.bombos.llaves }, (_, i) => {
+            const c = s.cruces.find(x => x.llave === i + 1);
+            return `<div class="sorteo-llave${c ? ' sorteo-llave-ocupada' : ''}"><strong>Llave ${i + 1}</strong>${c ? `${nombreFila(c.local)} vs ${nombreFila(c.visitante)}` : '—'}</div>`;
+        }).join('')}</div>`;
+        html += `<div class="sorteo-acciones">
+            <button type="button" class="importar-btn-cancelar" data-accion="reiniciar">Reiniciar</button>
+            <button type="button" class="importar-btn-cancelar" data-accion="deshacer" ${s.cruces.length || s.elegido ? '' : 'disabled'}>Deshacer último</button>
+            <button type="button" class="btn-submit-admin" data-accion="guardar" ${completo ? '' : 'disabled'}>Guardar cruces</button>
+        </div>`;
+        panelSorteo.innerHTML = html;
+    }
+
+    function guardarCrucesSorteo() {
+        const s = sorteo;
+        const cuadro = nombreCopa(s.ciclo, s.copa);
+        const enCuadro = cuadro ? ` de la ${cuadro}` : '';
+        const conPartidos = partidos.some(p => p && p.esPlayoff && (p.ciclo || 'superior') === s.ciclo && copaDe(p) === s.copa);
+        if (conPartidos) {
+            alert(`Ya hay partidos de playoffs${enCuadro} (Ciclo ${nombreCicloHistorial(s.ciclo)}) cargados en el Cronograma. Para volver a sortear, borralos primero. No se guardó nada.`);
+            return;
+        }
+        crucesPlayoffs = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || crucesPlayoffs;
+        const anteriores = crucesPlayoffs.filter(c => c.ciclo === s.ciclo && copaDe(c) === s.copa);
+        if (anteriores.length && !confirm(`Ya hay ${anteriores.length} ${anteriores.length === 1 ? 'cruce armado' : 'cruces armados'}${enCuadro} (Ciclo ${nombreCicloHistorial(s.ciclo)}). Se reemplazan por los del sorteo. ¿Seguir?`)) return;
+
+        const base = Date.now();
+        crucesPlayoffs = crucesPlayoffs.filter(c => !anteriores.includes(c)).concat([...s.cruces]
+            .sort((a, b) => a.llave - b.llave)
+            .map((c, i) => ({ id: base + i, ciclo: s.ciclo, copa: s.copa, ronda: s.bombos.rondaInicial, slot: c.llave, local: c.local.equipo.nombre, visitante: c.visitante.equipo.nombre })));
+        almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
+        renderizarCrucesPlayoffsAdmin();
+        actualizarOpcionesGrupo();
+        cerrarSorteo();
+        alert(`Cruces${enCuadro} guardados en el cuadro (${ETIQUETAS_RONDA[s.bombos.rondaInicial] || s.bombos.rondaInicial}). Se ven en la web cuando los playoffs están publicados.`);
+    }
+
+    if (panelSorteo) {
+        panelSorteo.addEventListener('click', e => {
+            const boton = e.target.closest('button[data-accion]');
+            if (!boton || boton.disabled || !sorteo) return;
+            const filaPorRank = rank => sorteo.bombos.filas.find(f => f.rank === Number(rank));
+            const accion = boton.dataset.accion;
+            if (accion === 'desempate') {
+                const ganador = sorteo.tabla.equipos.find(eq => String(eq.id) === boton.dataset.ganador);
+                const perdedor = sorteo.tabla.equipos.find(eq => String(eq.id) === boton.dataset.perdedor);
+                const todos = obtenerDesempatesSorteo();
+                todos[sorteo.ciclo] = desempatarPorSorteo(todos[sorteo.ciclo], ganador, perdedor);
+                almacen.setItem('liga_desempates_sorteo', JSON.stringify(todos));
+                prepararSorteo();
+                return;
+            }
+            if (accion === 'elegir') sorteo.elegido = filaPorRank(boton.dataset.rank);
+            else if (accion === 'rival') sorteo.rival = filaPorRank(boton.dataset.rank);
+            else if (accion === 'llave') {
+                sorteo.cruces.push({ local: sorteo.elegido, visitante: sorteo.rival, llave: Number(boton.dataset.llave) });
+                sorteo.elegido = null;
+                sorteo.rival = null;
+            } else if (accion === 'deshacer') {
+                if (sorteo.rival) sorteo.rival = null;
+                else if (sorteo.elegido) sorteo.elegido = null;
+                else sorteo.cruces.pop();
+            } else if (accion === 'reiniciar') {
+                if ((sorteo.cruces.length || sorteo.elegido) && !confirm('¿Empezar el sorteo de nuevo? Se pierden las llaves que ya salieron.')) return;
+                prepararSorteo();
+                return;
+            } else if (accion === 'guardar') {
+                guardarCrucesSorteo();
+                return;
+            }
+            renderizarSorteo();
+        });
+    }
+
+    // Cambiar de ciclo o copa con un sorteo empezado lo descarta (se pregunta antes).
+    function cambioDeCopaSorteo() {
+        if (sorteo && (sorteo.cruces.length || sorteo.elegido) && !confirm('Hay un sorteo empezado. ¿Descartarlo?')) {
+            if (selectCicloSorteo) selectCicloSorteo.value = sorteo.ciclo;
+            if (selectCopaSorteo) selectCopaSorteo.value = sorteo.copa;
+            actualizarCopaSorteo();
+            return;
+        }
+        actualizarCopaSorteo();
+        cerrarSorteo();
+    }
+    if (selectCicloSorteo) selectCicloSorteo.addEventListener('change', cambioDeCopaSorteo);
+    if (selectCopaSorteo) selectCopaSorteo.addEventListener('change', cambioDeCopaSorteo);
+    if (btnPrepararSorteo) {
+        btnPrepararSorteo.addEventListener('click', () => {
+            if (sorteo && (sorteo.cruces.length || sorteo.elegido) && !confirm('Hay un sorteo empezado. ¿Empezarlo de nuevo?')) return;
+            prepararSorteo();
         });
     }
 
@@ -3681,8 +4065,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const tituloFormSponsor = document.getElementById('titulo-form-sponsor');
     const listaSponsorsAdminCont = document.getElementById('lista-sponsors-admin');
 
+    const inputSponsorColor = document.getElementById('sponsor-color-fondo');
+
     let logoSponsorBase64Temp = null;
     let idSponsorEnEdicion = null;
+
+    // La vista previa va sobre el color de la tarjeta, así se ve si el logo se funde con el fondo.
+    function pintarFondoPreviewSponsor() {
+        if (previewSponsorImg && inputSponsorColor) previewSponsorImg.style.background = inputSponsorColor.value;
+    }
+    if (inputSponsorColor) inputSponsorColor.addEventListener('input', pintarFondoPreviewSponsor);
+    pintarFondoPreviewSponsor();
 
     if (inputSponsorLogoFile) {
         inputSponsorLogoFile.addEventListener('change', (e) => {
@@ -3690,9 +4083,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (!file) return;
             // Igual que las fotos de jugador/noticia: se redimensiona y recomprime en el
             // navegador antes de guardarse, así el logo no se guarda "en crudo" (CLAUDE.md).
-            comprimirImagen(file, MAX_LADO_LOGO_SPONSOR, CALIDAD_JPEG)
+            comprimirImagen(file, MAX_LADO_LOGO_SPONSOR, CALIDAD_JPEG, true)
                 .then(dataURL => {
                     logoSponsorBase64Temp = dataURL;
+                    pintarFondoPreviewSponsor();
                     if (previewSponsorImg) previewSponsorImg.src = logoSponsorBase64Temp;
                     if (previewSponsorWrap) previewSponsorWrap.classList.remove('seccion-oculta-staff');
                 })
@@ -3708,7 +4102,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (formSponsor) formSponsor.reset();
         logoSponsorBase64Temp = null;
         if (previewSponsorWrap) previewSponsorWrap.classList.add('seccion-oculta-staff');
-        if (document.getElementById('sponsor-color-fondo')) document.getElementById('sponsor-color-fondo').value = '#3e3f9b';
+        if (inputSponsorColor) inputSponsorColor.value = '#3e3f9b';
+        pintarFondoPreviewSponsor();
     }
 
     function cancelarEdicionSponsor() {
@@ -3773,6 +4168,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 document.getElementById('sponsor-descripcion').value = s.descripcion || '';
                 document.getElementById('sponsor-beneficio').value = s.beneficio || '';
                 document.getElementById('sponsor-color-fondo').value = s.colorFondo || '#3e3f9b';
+                pintarFondoPreviewSponsor();
                 document.getElementById('sponsor-instagram').value = s.instagram || '';
                 document.getElementById('sponsor-telefono').value = s.telefono || '';
                 document.getElementById('sponsor-link').value = s.link || '';
@@ -4229,6 +4625,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return `FECHA ${fecha}`;
     }
 
+    // Como nombreFaseTeso, pero un partido de playoff de un ciclo con dos copas dice cuál: "CUARTOS DE FINAL · COPA PLATA".
+    function nombreFasePartido(p) {
+        const fase = nombreFaseTeso(p.fecha);
+        if (Number(p.fecha) < 100) return fase;
+        const copa = nombreCopa(p.ciclo || 'superior', copaDe(p));
+        return copa ? `${fase} · ${copa.toUpperCase()}` : fase;
+    }
+
     // Tesorería identifica a cada equipo por su id, que sobrevive a un cambio de nombre (antes era por nombre y
     // renombrar un equipo le "borraba" los pagos). Solo los partidos viejos sin id caen al nombre.
     function equipoTeso(p, lado) {
@@ -4297,7 +4701,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const clave = claveTesoreria(nuevo, ladoNuevo);
                 if (clave !== vieja) plan.mudanzas.push({ vieja, nueva: clave, fecha: nuevo.fecha });
             } else if (montoTeso(datos) > 0) {
-                plan.bloqueos.push(`${lado === 'local' ? previo.local : previo.visitante}: $${montoTeso(datos).toLocaleString()} (${nombreFaseTeso(previo.fecha)})`);
+                plan.bloqueos.push(`${lado === 'local' ? previo.local : previo.visitante}: $${montoTeso(datos).toLocaleString()} (${nombreFasePartido(previo)})`);
             } else {
                 plan.descartes.push(vieja);
             }
@@ -5042,7 +5446,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return `
             <section class="plan-hoja">
                 <h2 class="plan-titulo">MITRE LEAGUE — Planilla de buena fe</h2>
-                <p class="plan-partido">${attrSeguro(p.local)} VS ${attrSeguro(p.visitante)} — ${attrSeguro(nombreFaseTeso(p.fecha))} — ${attrSeguro(p.cancha || 'Cancha a confirmar')} — ${hora}</p>
+                <p class="plan-partido">${attrSeguro(p.local)} VS ${attrSeguro(p.visitante)} — ${attrSeguro(nombreFasePartido(p))} — ${attrSeguro(p.cancha || 'Cancha a confirmar')} — ${hora}</p>
                 <div class="plan-equipos">${htmlPlanillaEquipo(p.local, ciclo, p.fecha)}${htmlPlanillaEquipo(p.visitante, ciclo, p.fecha)}</div>
             </section>`;
     }
@@ -5081,7 +5485,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         contenedor.innerHTML = partidosFiltrados.map(p => {
             if (!p || !p.local || !p.visitante) return '';
             const ev = evaluaciones[p.id];
-            const faseLabel = nombreFaseTeso(p.fecha);
+            const faseLabel = nombreFasePartido(p);
             const avisosHtml = ev.avisos.map(a => `<div class="teso-aviso teso-aviso-${a.tipo}">${attrSeguro(a.texto)}</div>`).join('');
 
             return `
@@ -5749,6 +6153,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     renderizarCrucesPlayoffsAdmin();
     actualizarBotonEstadoPlayoffs();
     renderizarResumenConfigBracket();
+    mostrarConfigBracketGuardada();
+    actualizarCopaSorteo();
 
     actualizarSelectorGruposFormulario();
     renderizarListaGruposAdmin();

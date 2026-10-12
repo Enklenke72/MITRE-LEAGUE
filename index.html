@@ -303,8 +303,7 @@
 
                                     <div class="group-title-container">
                                         <h3 class="group-name-sup">Grupo A</h3>
-                                        <p class="group-category">Clasifican los 3 primeros de cada grupo + el mejor 4°
-                                            puesto</p>
+                                        <p class="group-category">Clasificación a Playoffs</p>
                                     </div>
 
                                     <div class="table-wrapper">
@@ -342,7 +341,7 @@
 
                                 <div class="group-title-container">
                                     <h3 class="group-name-bas">Grupo A</h3>
-                                    <p class="group-category">Clasifican los 2 primeros y los 3 mejores 3ros</p>
+                                    <p class="group-category">Clasificación a Playoffs</p>
                                 </div>
 
                                 <div class="table-wrapper">
@@ -461,8 +460,8 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                                 PLAY-OFFS EN ESPERA</h3>
                             <p
                                 style="font-family: 'Oswald', sans-serif; color: #cbd5e1; font-size: 11px; line-height: 1.6; margin: 0;">
-                                Los cruces de eliminación directa se publicarán automáticamente una vez finalizada la
-                                Fase Regular y realizado el sorteo oficial en Instagram.
+                                Los cruces de Cuartos se publican al terminar la Fase de Grupos, después del sorteo en
+                                vivo por Instagram.
                             </p>
                         </div>
 
@@ -473,6 +472,11 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                                         Superior</button>
                                     <button class="tab-btn btn-playoff-ciclo" data-ciclo-playoff="basico">Ciclo
                                         Básico</button>
+                                </div>
+                                <!-- Solo para un ciclo con Copa Plata (el JS saca el hidden) -->
+                                <div class="tabs-copa-playoff" hidden>
+                                    <button class="tab-btn active btn-playoff-copa" data-copa-playoff="oro">Copa Oro</button>
+                                    <button class="tab-btn btn-playoff-copa" data-copa-playoff="plata">Copa Plata</button>
                                 </div>
                             </div>
 
@@ -609,6 +613,40 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 
                 <!-- ACORDEÓN DE REGLAS RÁPIDAS -->
                 <div class="reglamento-acordeon-container">
+
+                    <!-- BLOQUE 0: FORMATO DEL TORNEO (Clausura 2026) -->
+                    <div class="acordeon-item">
+                        <button class="acordeon-header">
+                            <span>Formato del Torneo</span>
+                            <span class="acordeon-icon">+</span>
+                        </button>
+                        <div class="acordeon-content">
+                            <ul>
+                                <li><strong>Ciclo Superior:</strong> 18 equipos en 3 grupos de 6. Fase de grupos de 5
+                                    fechas: todos contra todos dentro del grupo, a partido único.</li>
+                                <li><strong>Ciclo Básico:</strong> 10 equipos en 2 grupos de 5. Fase de grupos de 5
+                                    fechas. En cada fecha, el equipo que queda libre en un grupo juega un partido
+                                    interzonal contra el libre del otro grupo, así nadie queda sin jugar. El interzonal
+                                    suma en la tabla del grupo de cada equipo.</li>
+                                <li><strong>Desempate:</strong> 1) puntos, 2) diferencia de gol, 3) goles a favor,
+                                    4) partidos ganados, 5) sorteo.</li>
+                                <li><strong>Clasificación:</strong> en cada ciclo se arma un ranking ordenando primero
+                                    por puesto en el grupo (todos los primeros, después todos los segundos, y así) y,
+                                    entre equipos del mismo puesto, con el mismo criterio de desempate.</li>
+                                <li><strong>Copa Oro y Copa Plata (Superior):</strong> los puestos 1 a 8 del ranking
+                                    juegan la Copa Oro (1° y 2° de cada grupo y los 2 mejores 3°) y los puestos 9 a 16
+                                    la Copa Plata (el 3° restante, los 4°, los 5° y el mejor 6°). Los dos últimos quedan
+                                    eliminados.</li>
+                                <li><strong>Play-Offs (Básico):</strong> clasifican los 4 primeros de cada grupo.</li>
+                                <li><strong>Cuartos de Final:</strong> todas las copas arrancan en Cuartos. Los cruces
+                                    se sortean en vivo por Instagram: en cada copa, el Bombo 1 tiene a los 4 mejores del
+                                    ranking de esa copa y el Bombo 2 a los otros 4, y cada equipo del Bombo 1 recibe un
+                                    rival del Bombo 2. Dos equipos del mismo grupo no pueden cruzarse en Cuartos, y la
+                                    Organización ubica las llaves para que, en lo posible, tampoco puedan cruzarse en
+                                    Semifinales.</li>
+                            </ul>
+                        </div>
+                    </div>
 
                     <!-- BLOQUE 1: INSCRIPCIÓN Y JUGADORES -->
                     <div class="acordeon-item">

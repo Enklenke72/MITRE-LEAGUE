@@ -147,6 +147,14 @@
                         <!-- SELECTOR DE CRUCE SORTEADO (Aparece solo en Playoffs) -->
                         <div class="form-group" id="group-cruce-playoff-directo"
                             style="display: none; background: rgba(242, 192, 14,0.08); padding: 8px; border-radius: 3px; border: 1px dashed rgba(242, 192, 14,0.3);">
+                            <!-- Solo se ve si el ciclo tiene Copa Plata (Configurar Bracket) -->
+                            <div id="group-copa-partido" class="seccion-oculta-staff">
+                                <label style="color:#f2c00e;">Copa</label>
+                                <select id="partido-copa">
+                                    <option value="oro">Copa Oro</option>
+                                    <option value="plata">Copa Plata</option>
+                                </select>
+                            </div>
                             <label style="color:#f2c00e;">Cargar Cruce Sorteado Directo</label>
                             <select id="partido-cruce-playoff-select">
                                 <option value="">Seleccionar cruce armado...</option>
@@ -369,7 +377,8 @@
                         La cantidad de equipos que clasifican a playoffs cambia en cada torneo. Definí acá en qué ronda
                         arranca cada ciclo y cuántas llaves tiene esa ronda inicial — el resto del árbol (rondas
                         siguientes hasta la Final) se calcula solo. Si un ciclo no se corre este torneo, simplemente no
-                        lo configures.
+                        lo configures. Un ciclo puede tener además una Copa Plata con su propio cuadro: la tabla
+                        reparte los cupos en orden (primero los de la Copa Oro y después los de la Plata).
                     </p>
                     <form id="form-config-bracket">
                         <div class="form-row">
@@ -378,6 +387,13 @@
                                 <select id="config-bracket-ciclo">
                                     <option value="superior">Superior</option>
                                     <option value="basico">Básico</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Copa</label>
+                                <select id="config-bracket-copa">
+                                    <option value="oro">Copa Oro (o el único cuadro)</option>
+                                    <option value="plata">Copa Plata</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -398,10 +414,39 @@
                             <div class="form-group" style="justify-content:flex-end;">
                                 <button type="submit" class="btn-submit-admin" style="background:#1a3274;">Guardar
                                     Configuración</button>
+                                <button type="button" id="btn-quitar-copa-plata" class="importar-btn-cancelar seccion-oculta-staff">Quitar
+                                    Copa Plata</button>
                             </div>
                         </div>
                     </form>
                     <div id="resumen-config-bracket" style="font-size:10px; color:#869bd8; margin-top:8px;"></div>
+                </section>
+
+                <section class="admin-card-panel sorteo-panel" id="asistente-sorteo">
+                    <h3 class="sorteo-titulo">Asistente de Sorteo (vivo de Instagram)</h3>
+                    <p class="sorteo-texto">
+                        Arma los dos bombos de la copa con la tabla. Cuando sale una bolilla del Bombo 1, muestra contra
+                        quién no puede jugar (mismo grupo) y, al salir el rival, sugiere la llave para que dos equipos del
+                        mismo grupo no se crucen en semis. Al final, "Guardar cruces" los publica en el cuadro.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ciclo</label>
+                            <select id="sorteo-ciclo">
+                                <option value="superior">Superior</option>
+                                <option value="basico">Básico</option>
+                            </select>
+                        </div>
+                        <div class="form-group seccion-oculta-staff" id="group-sorteo-copa">
+                            <label>Copa</label>
+                            <select id="sorteo-copa">
+                                <option value="oro">Copa Oro</option>
+                                <option value="plata">Copa Plata</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="button" id="btn-preparar-sorteo" class="btn-submit-admin sorteo-btn-preparar">Preparar sorteo</button>
+                    <div id="sorteo-contenido" class="seccion-oculta-staff"></div>
                 </section>
 
                 <section class="admin-card-panel" style="border-color: #f2c00e;">
@@ -425,6 +470,14 @@
                             <div class="form-group">
                                 <label>Llave (Slot)</label>
                                 <select id="playoff-slot-select"></select>
+                            </div>
+                            <!-- Solo se ve si el ciclo tiene Copa Plata -->
+                            <div class="form-group seccion-oculta-staff" id="group-playoff-copa">
+                                <label>Copa</label>
+                                <select id="playoff-copa-select">
+                                    <option value="oro">Copa Oro</option>
+                                    <option value="plata">Copa Plata</option>
+                                </select>
                             </div>
                         </div>
 

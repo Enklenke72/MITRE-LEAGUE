@@ -18,35 +18,19 @@ document.addEventListener('liga:datos-listos', () => {
         return urlSegura(String(url ?? '').replace(/['"()\\]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()), '');
     }
 
-    // 1. ALGORITMO DE ORDENAMIENTO
-    function ordenarTabla(equipos) {
-        return [...equipos].sort((a, b) => {
-            if (b.pts !== a.pts) return b.pts - a.pts;
-            if (b.dif !== a.dif) return b.dif - a.dif;
-            return b.gf - a.gf;
-        });
+    // 1. ORDENAMIENTO Y CLASIFICACIÓN: ordenarTabla, calcularEstadisticas y clasificacionDelCiclo viven en
+    // playoffs.js, compartidas con el panel, para que la tabla pública y el sorteo usen el mismo ranking.
+    function desempatesDe(ciclo) {
+        return obtenerDesempatesSorteo()[ciclo] || {};
     }
 
-    // Clasificación a Playoffs (formato por grupos): 1°, 2° y 3° de CADA grupo
-    // clasifican directo. Además clasifica un único "mejor 4°" comparando el 4to
-    // puesto de todos los grupos entre sí (mismo criterio de desempate: PTS → DIF → GF).
-    // Recorre TODO el ciclo (no sólo el grupo que se está por pintar), por eso vive
-    // separado de renderizarTabla — la tabla en pantalla muestra un grupo a la vez,
-    // pero el "mejor 4°" depende de comparar contra los demás grupos.
-    function obtenerMejorCuartoId(dataArray) {
-        const porGrupo = {};
-        dataArray.forEach(equipo => {
-            if (!equipo.grupo || equipo.grupo === 'Unico') return; // Tabla Única no tiene este formato de clasificación
-            if (!porGrupo[equipo.grupo]) porGrupo[equipo.grupo] = [];
-            porGrupo[equipo.grupo].push(equipo);
-        });
+    function gruposDelCiclo(ciclo) {
+        const grupos = JSON.parse(almacen.getItem('liga_grupos')) || { superior: ['A', 'B', 'C', 'D', 'E'], basico: ['A', 'B'] };
+        return grupos[ciclo] || [];
+    }
 
-        const cuartosPuestos = Object.values(porGrupo)
-            .map(equiposDelGrupo => ordenarTabla(equiposDelGrupo)[3]) // índice 3 = 4to puesto
-            .filter(Boolean); // grupos con menos de 4 equipos no aportan candidato a "mejor 4°"
-
-        if (cuartosPuestos.length === 0) return null;
-        return ordenarTabla(cuartosPuestos)[0].id;
+    function etiquetaGrupoPartido(partido) {
+        return partido.grupo === 'Interzonal' ? 'Interzonal' : `Grupo ${escaparHtml(partido.grupo || 'A')}`;
     }
 
     // 2. PROCESAMIENTO MATEMÁTICO DE LA LIGA
@@ -73,46 +57,8 @@ document.addEventListener('liga:datos-listos', () => {
             ligaData.sanciones = JSON.parse(sancionesDinamicas);
         }
 
-        const resetearContadores = (ciclo) => {
-            ciclo.forEach(e => {
-                e.pj = 0; e.g = 0; e.e = 0; e.p = 0; e.gf = 0; e.gc = 0; e.dif = 0; e.pts = 0;
-            });
-        };
-        resetearContadores(ligaData.cicloSuperior);
-        resetearContadores(ligaData.cicloBasico);
-
-        ligaData.partidos.forEach(partido => {
-            if (!partido.jugado || partido.esPlayoff) return; // Los partidos de playoff no suman a la fase de grupos
-
-            let poolEquipos = partido.ciclo === 'superior' ? ligaData.cicloSuperior : ligaData.cicloBasico;
-            let local = poolEquipos.find(e => e.nombre.trim() === partido.local.trim());
-            let visitante = poolEquipos.find(e => e.nombre.trim() === partido.visitante.trim());
-
-            if (local && visitante) {
-                local.pj++; visitante.pj++;
-                local.gf += partido.golesLocal; local.gc += partido.golesVisitante;
-                visitante.gf += partido.golesVisitante; visitante.gc += partido.golesLocal;
-                local.dif = local.gf - local.gc;
-                visitante.dif = visitante.gf - visitante.gc;
-
-                if (partido.golesLocal > partido.golesVisitante) {
-                    local.pts += 3; local.g++; visitante.p++;
-                } else if (partido.golesLocal < partido.golesVisitante) {
-                    visitante.pts += 3; visitante.g++; local.p++;
-                } else {
-                    local.pts += 1; visitante.pts += 1; local.e++; visitante.e++;
-                }
-            }
-        });
-
-        ligaData.sanciones.forEach(sancion => {
-            let pool = sancion.ciclo === 'superior' ? ligaData.cicloSuperior : ligaData.cicloBasico;
-            let equipoSancionado = pool.find(e => e.nombre.trim() === sancion.equipo.trim());
-            if (equipoSancionado) {
-                // Solo la "Quita de Puntos" resta en la tabla; en las suspensiones, "puntosRestados" guarda la cantidad de fechas.
-                if (sancion.tipo === 'Quita de Puntos') equipoSancionado.pts -= sancion.puntosRestados;
-            }
-        });
+        calcularEstadisticas(ligaData.cicloSuperior, ligaData.partidos, ligaData.sanciones, 'superior');
+        calcularEstadisticas(ligaData.cicloBasico, ligaData.partidos, ligaData.sanciones, 'basico');
     }
 
     // 3. RENDERIZADO DE TABLAS
@@ -128,60 +74,52 @@ document.addEventListener('liga:datos-listos', () => {
         const esTablaUnica = (grupoId === 'Unico' || grupoId === 'Tabla Única');
         titulo.textContent = esTablaUnica ? 'TABLA ÚNICA' : `Grupo ${nombreGrupo}`;
 
+        // Quién va a cada copa depende de TODO el ciclo (los mejores 3°, el mejor 6°…), no solo del grupo que se pinta.
+        const ciclo = tbodySelector === '.tbody-bas' ? 'basico' : 'superior';
+        const desempates = desempatesDe(ciclo);
+        const grupos = gruposDelCiclo(ciclo);
+        const clasificacion = esTablaUnica ? [] : clasificacionDelCiclo(dataArray, grupos, ciclo, desempates);
+        const filaDe = new Map(clasificacion.map(f => [f.equipo, f]));
+
         // Subtítulo dinámico: Cambia según el formato (Mundial vs Tabla Única)
         const subtitulo = titulo.nextElementSibling;
         if (subtitulo && subtitulo.classList.contains('group-category')) {
             subtitulo.textContent = esTablaUnica
                 ? 'Clasificación a Playoffs: Bombo 1 (1° al 4°) | Bombo 2 (5° al 8°) | Bombo 3 (9° al 12°)'
-                : 'Clasifican los 3 primeros de cada grupo + el mejor 4° puesto';
+                : textoClasificacion(clasificacion, ciclo, grupos.length);
         }
 
         const equiposFiltrados = ordenarTabla(
-            esTablaUnica ? dataArray.filter(e => e.grupo === 'Unico' || !e.grupo) : dataArray.filter(e => e.grupo === grupoId)
+            esTablaUnica ? dataArray.filter(e => e.grupo === 'Unico' || !e.grupo) : dataArray.filter(e => e.grupo === grupoId),
+            desempates
         );
 
-        const dashboard = document.querySelector('.dashboard-container');
-        const esVistaPosiciones = dashboard ? dashboard.classList.contains('vista-ancha') : false;
-
-        document.querySelectorAll('.col-gf-gc').forEach(th => {
-            th.style.display = esVistaPosiciones ? 'table-cell' : 'none';
-        });
-
-        // El "mejor 4°" se calcula sobre TODO el ciclo (todos los grupos), no sólo
-        // sobre el grupo que se está por pintar — por eso se resuelve una vez acá.
-        const mejorCuartoId = esTablaUnica ? null : obtenerMejorCuartoId(dataArray);
-
         equiposFiltrados.forEach((equipo, index) => {
-            // Lógica de Clases y Colores por Bombos / Posición
+            // Lógica de Clases y Colores por Bombos / Copa
             let clasePosicion = 'td-pos-normal';
-            let esMejorCuarto = false;
-            let clasifica = false;
+            const fila = filaDe.get(equipo);
+            const copa = fila ? fila.copa : null;
+            const cartel = fila && fila.porComparacion ? textoEntradaPorComparacion(clasificacion, fila, ciclo) : '';
 
             if (esTablaUnica) {
                 if (index < 4) clasePosicion = 'td-pos-bombo1';       // Bombo 1 (1° al 4°)
                 else if (index < 8) clasePosicion = 'td-pos-bombo2';  // Bombo 2 (5° al 8°)
                 else if (index < 12) clasePosicion = 'td-pos-bombo3'; // Bombo 3 (9° al 12°)
-            } else {
-                esMejorCuarto = (index === 3 && equipo.id === mejorCuartoId);
-                clasifica = index < 3 || esMejorCuarto;
-                clasePosicion = esMejorCuarto ? 'td-pos-mejor4to' : (clasifica ? 'td-pos-lead' : 'td-pos-normal');
+            } else if (copa) {
+                clasePosicion = `td-pos-${copa}`;
             }
 
             let colorDiffStyle = equipo.dif > 0 ? 'style="color: #4ade80 !important;"' : (equipo.dif < 0 ? 'style="color: #f43f5e !important;"' : '');
             const diffTexto = equipo.dif > 0 ? '+' + equipo.dif : equipo.dif;
 
-            const columnasGFGC = esVistaPosiciones
-                ? `<td style="color: #869bd8;">${equipo.gf}</td><td style="color: #869bd8;">${equipo.gc}</td>`
-                : '';
+            // GF y GC van siempre: el CSS los muestra solo en la vista Posiciones (.vista-ancha), igual que sus títulos.
+            const columnasGFGC = `<td class="col-gf-gc" style="color: #869bd8;">${equipo.gf}</td><td class="col-gf-gc" style="color: #869bd8;">${equipo.gc}</td>`;
 
-            let claseFila = 'row-normal';
-            if (!esTablaUnica) {
-                claseFila = esMejorCuarto ? 'row-mejor4to' : (clasifica ? 'row-leader' : 'row-normal');
-            }
+            const claseFila = !esTablaUnica && copa ? `row-copa-${copa}` : 'row-normal';
 
             tbody.innerHTML += `
                 <tr class="${claseFila}">
-                    <td class="${clasePosicion}" ${esMejorCuarto ? 'title="Clasifica como mejor 4° puesto"' : ''}>${index + 1}</td>
+                    <td class="${clasePosicion}" ${cartel ? `title="${escaparHtml(cartel)}"` : ''}>${index + 1}</td>
                     <td class="td-team-name">${escaparHtml(equipo.nombre)}</td>
                     <td>${equipo.pj}</td>
                     <td>${equipo.g}</td>
@@ -268,7 +206,7 @@ document.addEventListener('liga:datos-listos', () => {
 
         // Ordenamos según el criterio elegido
         if (criterioAnualActivo === 'puntos') {
-            pool.sort((a, b) => b.pts !== a.pts ? b.pts - a.pts : b.dif - a.dif);
+            pool.sort((a, b) => b.pts - a.pts || b.dif - a.dif || (b.g || 0) - (a.g || 0)); // PTS → DIF → partidos ganados (Joaquín, 12/10/2026)
             thead.innerHTML = `<th>Pos</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>+/-</th><th style="color:#f2c00e;">PTS</th>`;
         } else if (criterioAnualActivo === 'gf') {
             pool.sort((a, b) => b.gf !== a.gf ? b.gf - a.gf : a.gc - b.gc);
@@ -361,17 +299,16 @@ document.addEventListener('liga:datos-listos', () => {
 
         partidosFiltrados.sort((a, b) => {
             if (a.ciclo !== b.ciclo) return b.ciclo.localeCompare(a.ciclo);
-            return (a.grupo || 'A').localeCompare(b.grupo || 'A');
+            return ordenCopa(a, b) || (a.grupo || 'A').localeCompare(b.grupo || 'A');
         });
 
         let ultimoSeparador = "";
 
         partidosFiltrados.forEach(partido => {
-            const grupoActual = partido.grupo || 'A';
             const esDePlayoff = partido.esPlayoff || Number(partido.fecha) >= 100;
             const infoSeparador = esDePlayoff
-                ? `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} — ${nombreFechaPublico(partido.fecha)}`
-                : `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} - Grupo ${escaparHtml(grupoActual)}`;
+                ? `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} — ${nombreFasePublico(partido)}`
+                : `${partido.ciclo === 'superior' ? 'Superior' : 'Básico'} - ${etiquetaGrupoPartido(partido)}`;
 
             if (infoSeparador !== ultimoSeparador) {
                 contenedor.innerHTML += `
@@ -1162,6 +1099,7 @@ document.addEventListener('liga:datos-listos', () => {
     // RENDERIZADO DEL ÁRBOL DE PLAYOFFS EN LA WEB PÚBLICA
     // ============================================================
     let cicloPlayoffPublicoActivo = 'superior';
+    let copaPlayoffPublicoActiva = 'oro'; // Copa Oro o Plata del ciclo elegido (Hecho #33)
 
     function renderizarPlayoffsPublico() {
         const bannerEspera = document.getElementById('playoffs-banner-espera');
@@ -1179,6 +1117,16 @@ document.addEventListener('liga:datos-listos', () => {
         if (bannerEspera) bannerEspera.classList.add('seccion-oculta');
         if (contenidoActivo) contenidoActivo.classList.remove('seccion-oculta');
 
+        // Las pestañas Copa Oro / Copa Plata solo aparecen si el ciclo tiene las dos.
+        const conPlata = tieneCopaPlata(cicloPlayoffPublicoActivo);
+        if (!conPlata) copaPlayoffPublicoActiva = 'oro';
+        const copa = copaPlayoffPublicoActiva;
+        const tabsCopa = document.querySelector('.tabs-copa-playoff');
+        if (tabsCopa) {
+            tabsCopa.hidden = !conPlata;
+            tabsCopa.querySelectorAll('.btn-playoff-copa').forEach(b => b.classList.toggle('active', b.getAttribute('data-copa-playoff') === copa));
+        }
+
         if (!bracketContenedor) return;
 
         const partidosGuardados = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
@@ -1190,13 +1138,13 @@ document.addEventListener('liga:datos-listos', () => {
         const crucesGuardados = typeof migrarCrucesConSlot === 'function'
             ? migrarCrucesConSlot(crucesGuardadosRaw).cruces
             : crucesGuardadosRaw;
-        const crucesCiclo = crucesGuardados.filter(c => c.ciclo === cicloPlayoffPublicoActivo);
+        const crucesCiclo = crucesGuardados.filter(c => c.ciclo === cicloPlayoffPublicoActivo && copaDe(c) === copa);
 
         bracketContenedor.innerHTML = '';
         const rondas = typeof rondasHabilitadas === 'function'
-            ? rondasHabilitadas(cicloPlayoffPublicoActivo)
+            ? rondasHabilitadas(cicloPlayoffPublicoActivo, null, copa)
             : ['octavos', 'cuartos', 'semis', 'final'];
-        const slotsRonda = typeof slotsPorRonda === 'function' ? slotsPorRonda(cicloPlayoffPublicoActivo) : null;
+        const slotsRonda = typeof slotsPorRonda === 'function' ? slotsPorRonda(cicloPlayoffPublicoActivo, null, copa) : null;
         let campeonTorneo = null;
 
         const esUltimaRondaHabilitada = (ronda) => ronda === rondas[rondas.length - 1];
@@ -1222,7 +1170,7 @@ document.addEventListener('liga:datos-listos', () => {
                 }
 
                 const partidoJugado = partidosGuardados.find(p =>
-                    p.esPlayoff && p.ronda === ronda && p.ciclo === cicloPlayoffPublicoActivo &&
+                    p.esPlayoff && p.ronda === ronda && p.ciclo === cicloPlayoffPublicoActivo && copaDe(p) === copa &&
                     ((p.local === c.local && p.visitante === c.visitante) || (p.local === c.visitante && p.visitante === c.local))
                 );
 
@@ -1292,7 +1240,7 @@ document.addEventListener('liga:datos-listos', () => {
         const cajaCampeonHTML = `
             <div class="bracket-round" style="justify-content: center !important;">
                 <div class="champion-box">
-                    <span style="font-size: 9px; color: #869bd8; display: block; text-transform: uppercase; letter-spacing: 1px;">CAMPEÓN CLAUSURA 2026</span>
+                    <span style="font-size: 9px; color: #869bd8; display: block; text-transform: uppercase; letter-spacing: 1px;">CAMPEÓN ${conPlata ? escaparHtml(nombreCopa(cicloPlayoffPublicoActivo, copa).toUpperCase()) : 'CLAUSURA 2026'}</span>
                     <h3 style="font-size: 15px; color: #fff; margin: 8px 0 0 0; text-shadow: 0 0 10px #f2c00e;">
                         ${campeonTorneo ? escaparHtml(campeonTorneo) : 'POR DEFINIR'}
                     </h3>
@@ -1318,12 +1266,22 @@ document.addEventListener('liga:datos-listos', () => {
         }
     }
 
+    // Pestañas Copa Oro / Copa Plata (solo visibles en un ciclo con las dos)
+    document.querySelectorAll('.btn-playoff-copa').forEach(btn => {
+        btn.addEventListener('click', () => {
+            copaPlayoffPublicoActiva = btn.getAttribute('data-copa-playoff');
+            document.querySelectorAll('.btn-ronda-nav').forEach(b => b.classList.remove('active'));
+            renderizarPlayoffsPublico();
+        });
+    });
+
     // Escuchador para cambiar de ciclo en Playoffs
     document.querySelectorAll('.btn-playoff-ciclo').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.btn-playoff-ciclo').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             cicloPlayoffPublicoActivo = btn.getAttribute('data-ciclo-playoff');
+            copaPlayoffPublicoActiva = 'oro';
             // Al cambiar de ciclo la pestaña de ronda vuelve a la primera ronda que ese ciclo tiene
             document.querySelectorAll('.btn-ronda-nav').forEach(b => b.classList.remove('active'));
             renderizarPlayoffsPublico();
@@ -1433,7 +1391,7 @@ document.addEventListener('liga:datos-listos', () => {
 
         partidosFiltrados.sort((a, b) => {
             if (a.ciclo !== b.ciclo) return b.ciclo.localeCompare(a.ciclo);
-            return (a.grupo || 'A').localeCompare(b.grupo || 'A');
+            return ordenCopa(a, b) || (a.grupo || 'A').localeCompare(b.grupo || 'A');
         });
 
         let ultimoSeparador = "";
@@ -1441,8 +1399,8 @@ document.addEventListener('liga:datos-listos', () => {
         partidosFiltrados.forEach((partido, index) => {
             const cicloTxt = partido.ciclo === 'superior' ? 'Superior' : 'Básico';
             const infoSeparador = partido.esPlayoff
-                ? `${cicloTxt} — ${nombreFechaPublico(partido.fecha)}`
-                : `${cicloTxt} — Grupo ${escaparHtml(partido.grupo || 'A')}`;
+                ? `${cicloTxt} — ${nombreFasePublico(partido)}`
+                : `${cicloTxt} — ${etiquetaGrupoPartido(partido)}`;
 
             if (infoSeparador !== ultimoSeparador) {
                 contenedor.innerHTML += `
@@ -2099,6 +2057,18 @@ document.addEventListener('liga:datos-listos', () => {
         return `FECHA ${fecha}`;
     }
 
+    // Un partido de playoff de un ciclo con dos copas dice de cuál: "Copa Plata · CUARTOS".
+    function nombreFasePublico(partido) {
+        const fase = nombreFechaPublico(partido.fecha);
+        const copa = Number(partido.fecha) >= 100 ? nombreCopa(partido.ciclo || 'superior', copaDe(partido)) : '';
+        return copa ? `${copa} · ${fase}` : fase;
+    }
+
+    // Dentro de un mismo ciclo, los partidos de la Copa Oro van antes que los de la Plata.
+    function ordenCopa(a, b) {
+        return (copaDe(a) === 'plata') - (copaDe(b) === 'plata');
+    }
+
     // Tarjetas de un lado del partido con el mismo formato que los goleadores ("Nombre (#N)", y "x2" si tiene más de una).
     // En el partido se guarda el DNI de cada jugador: acá se busca el nombre y el dorsal en el plantel.
     function htmlTarjetasPartido(partido, lado) {
@@ -2136,7 +2106,7 @@ document.addEventListener('liga:datos-listos', () => {
         document.getElementById('modal-equipo-categoria').textContent = `Ciclo ${equipo.ciclo} — Grupo ${equipo.grupo || 'A'}`;
 
         const poolCiclo = equipo.ciclo === 'Superior' ? ligaData.cicloSuperior : ligaData.cicloBasico;
-        const tablaOrdenada = ordenarTabla(poolCiclo.filter(e => e.grupo === equipo.grupo));
+        const tablaOrdenada = ordenarTabla(poolCiclo.filter(e => e.grupo === equipo.grupo), desempatesDe(equipo.ciclo === 'Superior' ? 'superior' : 'basico'));
         const posReal = tablaOrdenada.findIndex(e => e.nombre === equipo.nombre) + 1;
 
         document.getElementById('modal-equipo-pos').textContent = posReal > 0 ? `${posReal}°` : '-';
@@ -2154,7 +2124,9 @@ document.addEventListener('liga:datos-listos', () => {
             equipo.jugadores.sort((a, b) => golesDe.get(b) - golesDe.get(a));
 
             equipo.jugadores.forEach((j, idx) => {
-                const fotoUrl = escaparHtml(j.foto || 'Recursos/search.svg');
+                const fotoHtml = j.foto
+                    ? `<img src="${escaparHtml(j.foto)}" alt="${escaparHtml(j.nombre)}" class="player-avatar-img">`
+                    : '<span class="player-avatar-img player-avatar-vacio" role="img" aria-label="Sin foto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4.2"/><path d="M3.5 22c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg></span>';
                 const dorsal = (j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '') ? `#${escaparHtml(j.dorsal)}` : `-`;
                 const ig = j.instagram ? escaparHtml(j.instagram.replace('@','')) : '';
                 const igUser = ig
@@ -2163,7 +2135,7 @@ document.addEventListener('liga:datos-listos', () => {
 
                 tbodyJugadores.innerHTML += `
                     <tr class="row-normal">
-                        <td><img src="${fotoUrl}" alt="${escaparHtml(j.nombre)}" class="player-avatar-img"></td>
+                        <td>${fotoHtml}</td>
                         <td style="color: #869bd8; font-size: 11px; text-align: center;">${dorsal}</td>
                         <td style="text-align: left !important; color: #fff; font-weight: bold;">${escaparHtml(j.nombre)}</td>
                         <td style="text-align: center; color:#fff;">${partidosJugadosDeJugador(j, equipo, partidosParaPJ)}</td>
@@ -2242,7 +2214,7 @@ document.addEventListener('liga:datos-listos', () => {
                             </div>
 
                             <div class="col-center">
-                                <span style="font-size: 9px; color: #869bd8; font-family: 'Oswald'; display: block;">${escaparHtml(nombreFechaPublico(partido.fecha))}</span>
+                                <span style="font-size: 9px; color: #869bd8; font-family: 'Oswald'; display: block;">${escaparHtml(nombreFasePublico(partido))}</span>
                                 ${esJugado
                                     ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>`
                                     : `<span class="vs-badge">VS</span>`
