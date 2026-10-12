@@ -31,6 +31,11 @@ body {
     display: none !important;
 }
 
+/* Lo de un ciclo que no se juega esta edición (main.js, aplicarCiclosQueSeJuegan) */
+.ciclo-no-se-juega {
+    display: none !important;
+}
+
 
 
 .top-bar, .inicio, .search, .search-box{

@@ -666,6 +666,28 @@
             <!-- ==================================================== -->
             <div id="sub-vista-plantel-admin" class="seccion-oculta-staff staff-dos-columnas">
 
+                <!-- BLOQUE CICLOS QUE SE JUEGAN (la web pública oculta el que no se juega) -->
+                <section class="admin-card-panel" style="border-color: #4ade80; grid-column: 1 / -1;">
+                    <h3 style="color:#4ade80; margin-top:0;">Ciclos que se Juegan</h3>
+                    <p style="color:#869bd8; font-size:10px; margin-top:-6px;">
+                        Si un ciclo no se juega esta edición, destildalo: la web pública oculta su tabla en Posiciones,
+                        su pestaña en Goleadores y en la Tabla General, y su llave de Play-Offs. No se borra ningún
+                        dato y el panel sigue mostrando los dos ciclos.
+                    </p>
+                    <div class="form-row">
+                        <label class="check-inline-admin">
+                            <input type="checkbox" id="ciclo-activo-superior" checked> Se juega Ciclo Superior
+                        </label>
+                        <label class="check-inline-admin">
+                            <input type="checkbox" id="ciclo-activo-basico" checked> Se juega Ciclo Básico
+                        </label>
+                    </div>
+                    <button type="button" id="btn-guardar-ciclos-activos" class="btn-submit-admin"
+                        style="background:#166534; border-color:#4ade80;">
+                        Guardar Ciclos
+                    </button>
+                </section>
+
                 <!-- BLOQUE FORMATO DEL TORNEO (GRUPOS vs TABLA ÚNICA) -->
                 <section class="admin-card-panel" style="border-color: #f2c00e; grid-column: 1 / -1;">
                     <h3 style="color:#f2c00e; margin-top:0;">Formato del Torneo por Ciclo</h3>

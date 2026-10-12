@@ -48,6 +48,7 @@ const ESQUEMA = [
     { clave: 'liga_playoffs_publicados', tipo: 'config', col: 'config', id: 'playoffsPublicados', nivel: 'publico' },
     { clave: 'liga_fechas_grupos', tipo: 'config', col: 'config', id: 'fechasGrupos', nivel: 'publico' },
     { clave: 'liga_calendario_fechas', tipo: 'config', col: 'config', id: 'calendarioFechas', nivel: 'publico' },
+    { clave: 'liga_ciclos_activos', tipo: 'config', col: 'config', id: 'ciclosActivos', nivel: 'publico' },
     { clave: 'liga_avisos_staff', tipo: 'lista', col: 'avisosStaff', nivel: 'staff' },
     { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
     { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },

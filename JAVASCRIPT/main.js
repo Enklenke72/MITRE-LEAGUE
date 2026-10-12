@@ -2553,6 +2553,7 @@ document.addEventListener('liga:datos-listos', () => {
         renderizarBotonesFechaFixture();
         renderizarFixtureFecha(fechaActivaFixture);
         renderizarNotificaciones();
+        aplicarCiclosQueSeJuegan();
 
         if (panelTribunal && contFechasTribunal && !panelTribunal.classList.contains('seccion-oculta')) {
             const actaAbierta = (contFechasTribunal.querySelector('.tab-btn.active') || {}).textContent;
@@ -2571,6 +2572,58 @@ document.addEventListener('liga:datos-listos', () => {
             }
         }
     }
+
+    // ============================================================
+    // CICLOS QUE SE JUEGAN (se eligen en el panel: liga_ciclos_activos)
+    // ============================================================
+    // Un ciclo que no se juega esta edición se oculta: su bloque en Posiciones y sus pestañas en Goleadores,
+    // Tabla General y Play-Offs. Si queda uno solo, esos selectores de ciclo también se ocultan. Va acá abajo
+    // porque usa el ciclo elegido de cada sección (cicloPlayoffPublicoActivo se declara más arriba).
+    function ciclosQueSeJuegan() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_ciclos_activos')); } catch (e) { guardado = null; }
+        const activos = { superior: !guardado || guardado.superior !== false, basico: !guardado || guardado.basico !== false };
+        return (activos.superior || activos.basico) ? activos : { superior: true, basico: true };
+    }
+
+    function ajustarPestanasDeCiclo(selector, atributo, cicloElegido, activos) {
+        const botones = [...document.querySelectorAll(selector)];
+        if (botones.length === 0) return;
+        botones.forEach(b => b.classList.toggle('ciclo-no-se-juega', !activos[b.getAttribute(atributo)]));
+        botones[0].parentElement.classList.toggle('ciclo-no-se-juega', botones.filter(b => activos[b.getAttribute(atributo)]).length < 2);
+        // Si estaba elegido el ciclo que no se juega, pasa al otro (el clic no burbujea: no cierra nada abierto)
+        if (!activos[cicloElegido]) {
+            const otro = botones.find(b => activos[b.getAttribute(atributo)]);
+            if (otro) otro.dispatchEvent(new Event('click'));
+        }
+    }
+
+    function aplicarCiclosQueSeJuegan() {
+        const activos = ciclosQueSeJuegan();
+        const cerca = (selector, contenedor) => {
+            const e = document.querySelector(selector);
+            return e ? e.closest(contenedor) : null;
+        };
+        const inicioBasico = document.querySelector('.basic-section-margin');
+        const bloques = {
+            superior: [document.querySelector('.group-selector > .cycle-label'), document.querySelector('.tabs-sup'),
+                cerca('.group-name-sup', '.group-title-container'), cerca('.tbody-sup', '.table-wrapper')],
+            basico: [inicioBasico, cerca('.group-name-bas', '.group-title-container'), cerca('.tbody-bas', '.table-wrapper')]
+        };
+        Object.entries(bloques).forEach(([ciclo, elementos]) =>
+            elementos.forEach(e => { if (e) e.classList.toggle('ciclo-no-se-juega', !activos[ciclo]); }));
+        // La línea que separa los dos ciclos (el <hr> y el <br> de arriba) solo tiene sentido con los dos
+        const separadores = [];
+        let previo = inicioBasico ? inicioBasico.previousElementSibling : null;
+        while (previo && (previo.tagName === 'HR' || previo.tagName === 'BR')) { separadores.push(previo); previo = previo.previousElementSibling; }
+        separadores.forEach(e => e.classList.toggle('ciclo-no-se-juega', !(activos.superior && activos.basico)));
+
+        ajustarPestanasDeCiclo('.btn-gol-ciclo', 'data-ciclo-gol', cicloGoleadoresActivo, activos);
+        ajustarPestanasDeCiclo('.btn-anual-ciclo', 'data-anual-ciclo', cicloAnualActivo, activos);
+        ajustarPestanasDeCiclo('.btn-playoff-ciclo', 'data-ciclo-playoff', cicloPlayoffPublicoActivo, activos);
+    }
+
+    aplicarCiclosQueSeJuegan();
 
     document.addEventListener('liga:datos-actualizados', refrescarConDatosNuevos);
 

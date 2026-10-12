@@ -1913,7 +1913,43 @@ document.addEventListener('liga:datos-listos', (evento) => {
             renderizarListaGruposAdmin();
             actualizarOpcionesMoverEquipo();
             actualizarSelectsFormatoTorneo();
+            actualizarChecksCiclosActivos();
             renderizarEquiposCargados();
+        });
+    }
+
+    // ── Ciclos que se juegan esta edición (liga_ciclos_activos) ──
+    // Decisión de Joaquín (12/10/2026): un ciclo que no se juega se oculta solo en la web pública (Posiciones,
+    // Goleadores, Tabla General y Play-Offs); el panel sigue igual y no se borra nada. Sin guardar, se juegan los dos.
+    const checkCicloSuperior = document.getElementById('ciclo-activo-superior');
+    const checkCicloBasico = document.getElementById('ciclo-activo-basico');
+    const btnGuardarCiclosActivos = document.getElementById('btn-guardar-ciclos-activos');
+
+    function obtenerCiclosActivos() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_ciclos_activos')); } catch (e) { guardado = null; }
+        return { superior: !guardado || guardado.superior !== false, basico: !guardado || guardado.basico !== false };
+    }
+
+    function actualizarChecksCiclosActivos() {
+        const activos = obtenerCiclosActivos();
+        if (checkCicloSuperior) checkCicloSuperior.checked = activos.superior;
+        if (checkCicloBasico) checkCicloBasico.checked = activos.basico;
+    }
+
+    if (btnGuardarCiclosActivos) {
+        btnGuardarCiclosActivos.addEventListener('click', () => {
+            const activos = {
+                superior: checkCicloSuperior ? checkCicloSuperior.checked : true,
+                basico: checkCicloBasico ? checkCicloBasico.checked : true
+            };
+            if (!activos.superior && !activos.basico) {
+                alert('Tiene que jugarse al menos un ciclo.');
+                actualizarChecksCiclosActivos();
+                return;
+            }
+            almacen.setItem('liga_ciclos_activos', JSON.stringify(activos));
+            alert('Ciclos guardados. La web pública se actualiza en unos segundos.');
         });
     }
 
@@ -5800,6 +5836,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     actualizarOpcionesMoverEquipo();
     actualizarComboEquiposPlantel();
     actualizarSelectsFormatoTorneo();
+    actualizarChecksCiclosActivos();
     renderizarEquiposCargados();
 
     actualizarEquiposSancion();
