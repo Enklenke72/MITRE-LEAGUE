@@ -197,12 +197,11 @@ document.addEventListener('liga:datos-listos', () => {
     // LÓGICA DE GOLEADORES POR CICLO
     let cicloGoleadoresActivo = 'superior';
 
-    function renderizarGoleadores() {
-        const tbody = document.getElementById('tbody-goleadores');
-        if (!tbody) return;
-
-        const pool = cicloGoleadoresActivo === 'superior' 
-            ? (JSON.parse(almacen.getItem('liga_cicloSuperior')) || ligaData.cicloSuperior) 
+    // Ranking de goleadores de un ciclo. Lo usan la tabla de Goleadores (los 10 primeros) y el perfil del jugador
+    // ("#8 en Goleadores"), así nunca dicen cosas distintas. Entre empatados queda el orden del plantel.
+    function rankingGoleadores(ciclo) {
+        const pool = ciclo === 'superior'
+            ? (JSON.parse(almacen.getItem('liga_cicloSuperior')) || ligaData.cicloSuperior)
             : (JSON.parse(almacen.getItem('liga_cicloBasico')) || ligaData.cicloBasico);
 
         const partidos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
@@ -215,6 +214,7 @@ document.addEventListener('liga:datos-listos', () => {
                         listaJugadores.push({
                             nombre: j.nombre,
                             equipo: eq.nombre,
+                            dni: j.dni,
                             goles
                         });
                     }
@@ -222,8 +222,14 @@ document.addEventListener('liga:datos-listos', () => {
             }
         });
 
-        listaJugadores.sort((a, b) => b.goles - a.goles);
-        const topGoleadores = listaJugadores.slice(0, 10);
+        return listaJugadores.sort((a, b) => b.goles - a.goles);
+    }
+
+    function renderizarGoleadores() {
+        const tbody = document.getElementById('tbody-goleadores');
+        if (!tbody) return;
+
+        const topGoleadores = rankingGoleadores(cicloGoleadoresActivo).slice(0, 10);
 
         tbody.innerHTML = '';
         if (topGoleadores.length === 0) {
@@ -232,8 +238,9 @@ document.addEventListener('liga:datos-listos', () => {
         }
 
         topGoleadores.forEach((j, i) => {
+            const datosPerfil = j.dni ? ` data-equipo="${escaparHtml(j.equipo)}" data-jugador="${escaparHtml(j.dni)}" tabindex="0"` : '';
             tbody.innerHTML += `
-                <tr class="row-normal">
+                <tr class="row-normal"${datosPerfil}>
                     <td style="color:#fff; text-align:center;">${i + 1}</td>
                     <td class="td-team-name">${escaparHtml(j.nombre)}</td>
                     <td style="font-size: 12px; color: #a9bce8;">${escaparHtml(j.equipo)}</td>
@@ -1474,7 +1481,7 @@ document.addEventListener('liga:datos-listos', () => {
             htmlVisita += htmlTarjetasPartido(partido, 'visitante');
             if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin incidencias</div>';
 
-            const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${escaparHtml(partido.mvp)}` : '';
+            const mvpTxt = htmlMvpPartido(partido);
 
             contenedor.innerHTML += `
                 <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}" data-pid="${escaparHtml(partido.id)}">
@@ -2120,8 +2127,32 @@ document.addEventListener('liga:datos-listos', () => {
         }).join('');
     }
 
+    // Equipo de un lado del partido en el plantel público (por id estable, o por nombre en los partidos viejos).
+    function equipoDelLadoPublico(partido, esLocal) {
+        const pool = partido.ciclo === 'basico' ? ligaData.cicloBasico : ligaData.cicloSuperior;
+        const id = esLocal ? partido.localId : partido.visitanteId;
+        const nombre = ((esLocal ? partido.local : partido.visitante) || '').trim().toLowerCase();
+        return pool.find(e => id != null && e.id === id) || pool.find(e => e.nombre.trim().toLowerCase() === nombre) || null;
+    }
+
+    // MVP del partido: el panel guarda al jugador (mvpId, que en la web pública es el código de su DNI) y acá se arma
+    // "Nombre (#N)". Un partido viejo puede traer el MVP como texto suelto en "mvp".
+    function htmlMvpPartido(partido) {
+        if (partido.mvpId) {
+            for (const esLocal of [true, false]) {
+                const equipo = equipoDelLadoPublico(partido, esLocal);
+                const jugador = equipo && (equipo.jugadores || []).find(j => j.dni === partido.mvpId);
+                if (jugador) return `<strong>MVP:</strong> ${escaparHtml(jugador.nombre)} (#${escaparHtml(jugador.dorsal)})`;
+            }
+            return '';
+        }
+        return partido.mvp ? `<strong>MVP:</strong> ${escaparHtml(partido.mvp)}` : '';
+    }
+
+    const SILUETA_JUGADOR = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4.2"/><path d="M3.5 22c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg>';
+
     function abrirPerfilEquipo(nombreEquipo) {
-        if (!modalEquipo) return;
+        if (!modalEquipo) return false;
 
         const todosLosEquipos = [
             ...ligaData.cicloSuperior.map(e => ({ ...e, ciclo: 'Superior' })),
@@ -2129,7 +2160,7 @@ document.addEventListener('liga:datos-listos', () => {
         ];
 
         const equipo = todosLosEquipos.find(e => e.nombre.trim().toLowerCase() === nombreEquipo.trim().toLowerCase());
-        if (!equipo) return;
+        if (!equipo) return false;
 
         // 1. Cabecera y datos del equipo
         document.getElementById('modal-equipo-nombre').textContent = equipo.nombre;
@@ -2156,15 +2187,17 @@ document.addEventListener('liga:datos-listos', () => {
             equipo.jugadores.forEach((j, idx) => {
                 const fotoHtml = j.foto
                     ? `<img src="${escaparHtml(j.foto)}" alt="${escaparHtml(j.nombre)}" class="player-avatar-img">`
-                    : '<span class="player-avatar-img player-avatar-vacio" role="img" aria-label="Sin foto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4.2"/><path d="M3.5 22c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg></span>';
+                    : `<span class="player-avatar-img player-avatar-vacio" role="img" aria-label="Sin foto">${SILUETA_JUGADOR}</span>`;
                 const dorsal = (j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '') ? `#${escaparHtml(j.dorsal)}` : `-`;
                 const ig = j.instagram ? escaparHtml(j.instagram.replace('@','')) : '';
                 const igUser = ig
                     ? `<a href="https://instagram.com/${ig}" target="_blank" class="ig-player-link">@${ig}</a>`
                     : '-';
 
+                const datosPerfil = j.dni ? ` data-jugador="${escaparHtml(j.dni)}" tabindex="0"` : '';
+
                 tbodyJugadores.innerHTML += `
-                    <tr class="row-normal">
+                    <tr class="row-normal"${datosPerfil}>
                         <td>${fotoHtml}</td>
                         <td style="color: #869bd8; font-size: 11px; text-align: center;">${dorsal}</td>
                         <td style="text-align: left !important; color: #fff; font-weight: bold;">${escaparHtml(j.nombre)}</td>
@@ -2221,7 +2254,7 @@ document.addEventListener('liga:datos-listos', () => {
                 htmlVisita += htmlTarjetasPartido(partido, 'visitante');
                 if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';
 
-                const mvpTxt = partido.mvp ? `<strong>MVP:</strong> ${escaparHtml(partido.mvp)}` : '';
+                const mvpTxt = htmlMvpPartido(partido);
 
                 // Sanción/Descuento de puntos en esa fecha
                 const sancionPartido = sancionesDinamicas.find(s =>
@@ -2298,13 +2331,172 @@ document.addEventListener('liga:datos-listos', () => {
         }
 
         modalEquipo.classList.remove('seccion-oculta');
+        return true;
     }
+
+    // ============================================================
+    // PERFIL DEL JUGADOR: otra vista dentro del mismo modal (en el celular es más simple que un modal sobre otro)
+    // ============================================================
+    const vistaEquipoModal = document.getElementById('modal-vista-equipo');
+    const vistaJugadorModal = document.getElementById('modal-vista-jugador');
+    const cardModalEquipo = modalEquipo ? modalEquipo.querySelector('.modal-equipo-card') : null;
+    let jugadorAbierto = null;  // {equipo, dni} mientras se ve un perfil
+    let scrollListaEquipo = 0;  // dónde estaba la lista del equipo, para que "Volver" deje al visitante en el mismo lugar
+
+    function mostrarVistaModal(vista) {
+        if (!vistaEquipoModal || !vistaJugadorModal) return;
+        vistaEquipoModal.classList.toggle('seccion-oculta', vista !== 'equipo');
+        vistaJugadorModal.classList.toggle('seccion-oculta', vista !== 'jugador');
+    }
+
+    function volverAlEquipo() {
+        jugadorAbierto = null;
+        mostrarVistaModal('equipo');
+        if (cardModalEquipo) cardModalEquipo.scrollTop = scrollListaEquipo;
+    }
+
+    function cerrarModalEquipo() {
+        modalEquipo.classList.add('seccion-oculta');
+        jugadorAbierto = null;
+        mostrarVistaModal('equipo');
+    }
+
+    // Partidos del jugador: los jugados (sin los 3-0 automáticos) en los que figura tildado en la lista de buena fe,
+    // hizo goles, vio tarjetas o fue el MVP.
+    function htmlPartidosDeJugador(jugador, equipo, partidos) {
+        const filas = partidos.filter(p => p.jugado && !p.resultadoAuto).map(p => {
+            const { esLocal, esVisita } = ladosDelEquipoEnPartido(p, equipo);
+            if (!esLocal && !esVisita) return null;
+            const tildado = (p[esLocal ? 'asistentesLocal' : 'asistentesVisitante'] || []).includes(jugador.dni);
+            const goles = golesDeJugador(jugador, equipo, [p]);
+            const tarjetas = tarjetasDeJugador(jugador, equipo, [p]);
+            const mvp = !!p.mvpId && p.mvpId === jugador.dni;
+            if (!tildado && !goles && !tarjetas.amarillas && !tarjetas.rojas && !mvp) return null;
+            return { p, esLocal, goles, tarjetas, mvp };
+        }).filter(Boolean);
+
+        if (filas.length === 0) return '<p class="perfil-jugador-vacio">Todavía no jugó partidos.</p>';
+
+        filas.sort((a, b) => ordenCronologicoFechaPublico(a.p.fecha) - ordenCronologicoFechaPublico(b.p.fecha));
+        return filas.map(({ p, esLocal, goles, tarjetas, mvp }) => {
+            const propios = esLocal ? p.golesLocal : p.golesVisitante;
+            const ajenos = esLocal ? p.golesVisitante : p.golesLocal;
+            let res = propios > ajenos ? 'G' : (propios < ajenos ? 'P' : 'E');
+            let penales = '';
+            // Un empate de playoffs se define por penales
+            if (res === 'E' && p.esPlayoff && p.penalesLocal != null && p.penalesVisitante != null && p.penalesLocal !== p.penalesVisitante) {
+                const penPropios = esLocal ? p.penalesLocal : p.penalesVisitante;
+                const penAjenos = esLocal ? p.penalesVisitante : p.penalesLocal;
+                res = penPropios > penAjenos ? 'G' : 'P';
+                penales = ` (${escaparHtml(penPropios)}-${escaparHtml(penAjenos)} pen.)`;
+            }
+            const textoRes = { G: 'Ganó', E: 'Empató', P: 'Perdió' }[res];
+            const icono = (clase, etiqueta, n) => `<span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>`.repeat(n);
+            const incidencias = [
+                goles ? `<span class="perfil-partido-goles">${goles} ${goles === 1 ? 'gol' : 'goles'}</span>` : '',
+                icono('amarilla', 'Amarilla', tarjetas.amarillas) + icono('roja', 'Roja', tarjetas.rojas),
+                mvp ? '<span class="perfil-partido-mvp">MVP</span>' : ''
+            ].join('');
+            return `
+                <div class="perfil-partido">
+                    <div class="perfil-partido-info">
+                        <span class="perfil-partido-fecha">${escaparHtml(nombreFechaPublico(p.fecha))}</span>
+                        <span class="perfil-partido-rival">vs ${escaparHtml(esLocal ? p.visitante : p.local)}</span>
+                    </div>
+                    <div class="perfil-partido-detalle">
+                        <span class="perfil-partido-res res-${res}" title="${textoRes}">${res} ${escaparHtml(propios)}-${escaparHtml(ajenos)}${penales}</span>
+                        ${incidencias}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function dibujarPerfilJugador(jugador, equipo, ciclo) {
+        const partidos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
+        const nombreCiclo = ciclo === 'superior' ? 'Superior' : 'Básico';
+        const tieneDorsal = jugador.dorsal !== undefined && jugador.dorsal !== null && String(jugador.dorsal).trim() !== '';
+
+        document.getElementById('perfil-jugador-volver-equipo').textContent = equipo.nombre;
+        document.getElementById('perfil-jugador-foto').innerHTML = jugador.foto
+            ? `<img src="${escaparHtml(jugador.foto)}" alt="${escaparHtml(jugador.nombre)}">`
+            : SILUETA_JUGADOR;
+        document.getElementById('perfil-jugador-dorsal').textContent = tieneDorsal ? `#${jugador.dorsal}` : 'S/N';
+        document.getElementById('perfil-jugador-nombre').textContent = jugador.nombre;
+        document.getElementById('perfil-jugador-categoria').textContent =
+            `${equipo.nombre} · Ciclo ${nombreCiclo} — ${equipo.grupo === 'Unico' ? 'Tabla Única' : `Grupo ${equipo.grupo || 'A'}`}`;
+        const ig = jugador.instagram ? escaparHtml(jugador.instagram.replace('@', '')) : '';
+        document.getElementById('perfil-jugador-instagram').innerHTML = ig
+            ? `<a href="https://instagram.com/${ig}" target="_blank" class="ig-player-link">@${ig}</a>`
+            : '';
+
+        const puesto = rankingGoleadores(ciclo).findIndex(g =>
+            g.equipo.trim().toLowerCase() === equipo.nombre.trim().toLowerCase() && g.dni === jugador.dni) + 1;
+        const ranking = document.getElementById('perfil-jugador-ranking');
+        ranking.textContent = puesto > 0 ? `#${puesto} en Goleadores · Ciclo ${nombreCiclo}` : 'Sin goles todavía';
+        ranking.classList.toggle('sin-goles', puesto === 0);
+
+        const tarjetas = tarjetasDeJugador(jugador, equipo, partidos);
+        document.getElementById('perfil-jugador-pj').textContent = partidosJugadosDeJugador(jugador, equipo, partidos);
+        document.getElementById('perfil-jugador-goles').textContent = golesDeJugador(jugador, equipo, partidos);
+        document.getElementById('perfil-jugador-mvp').textContent = partidos.filter(p => p.jugado && p.mvpId && p.mvpId === jugador.dni).length;
+        document.getElementById('perfil-jugador-amarillas').textContent = tarjetas.amarillas;
+        document.getElementById('perfil-jugador-rojas').textContent = tarjetas.rojas;
+
+        document.getElementById('perfil-jugador-partidos').innerHTML = htmlPartidosDeJugador(jugador, equipo, partidos);
+    }
+
+    // Abre el modal del equipo (así "Volver" ya lo tiene listo) y pasa a la vista del jugador. Si el jugador ya no
+    // está en el plantel, se queda en el equipo. conservarScroll: lo usa el refresco en vivo para no mover la pantalla.
+    function abrirPerfilJugador(nombreEquipo, dni, conservarScroll) {
+        if (!modalEquipo || !cardModalEquipo) return false;
+        const modalYaAbierto = !modalEquipo.classList.contains('seccion-oculta');
+        if (!conservarScroll) scrollListaEquipo = (modalYaAbierto && !jugadorAbierto) ? cardModalEquipo.scrollTop : 0;
+        if (!abrirPerfilEquipo(nombreEquipo)) return false;
+
+        const nombre = nombreEquipo.trim().toLowerCase();
+        const ciclo = ligaData.cicloSuperior.some(e => e.nombre.trim().toLowerCase() === nombre) ? 'superior' : 'basico';
+        const equipo = (ciclo === 'superior' ? ligaData.cicloSuperior : ligaData.cicloBasico).find(e => e.nombre.trim().toLowerCase() === nombre);
+        const jugador = equipo && (equipo.jugadores || []).find(j => j.dni === dni);
+        if (!jugador) {
+            volverAlEquipo();
+            return false;
+        }
+
+        jugadorAbierto = { equipo: equipo.nombre, dni };
+        dibujarPerfilJugador(jugador, equipo, ciclo);
+        mostrarVistaModal('jugador');
+        if (!conservarScroll) cardModalEquipo.scrollTop = 0;
+        return true;
+    }
+
+    // Tocar un jugador (la fila entera, menos el link de Instagram) abre su perfil. Con el teclado: Enter.
+    function abrirPerfilDesdeFila(e, nombreEquipoDe) {
+        const fila = e.target.closest('tr[data-jugador]');
+        if (!fila || e.target.closest('a')) return;
+        if (e.type === 'keydown') {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+        }
+        abrirPerfilJugador(nombreEquipoDe(fila), fila.dataset.jugador);
+    }
+
+    const tbodyJugadoresModal = document.getElementById('modal-equipo-tbody-jugadores');
+    const tbodyGoleadores = document.getElementById('tbody-goleadores');
+    const equipoDelModal = () => document.getElementById('modal-equipo-nombre').textContent;
+    ['click', 'keydown'].forEach(tipo => {
+        if (tbodyJugadoresModal) tbodyJugadoresModal.addEventListener(tipo, e => abrirPerfilDesdeFila(e, equipoDelModal));
+        if (tbodyGoleadores) tbodyGoleadores.addEventListener(tipo, e => abrirPerfilDesdeFila(e, fila => fila.dataset.equipo));
+    });
+
+    const btnVolverEquipo = document.getElementById('btn-volver-equipo');
+    if (btnVolverEquipo) btnVolverEquipo.addEventListener('click', volverAlEquipo);
 
     // Eventos de cierre y pestañas
     if (btnCerrarModalEquipo && modalEquipo) {
-        btnCerrarModalEquipo.addEventListener('click', () => modalEquipo.classList.add('seccion-oculta'));
+        btnCerrarModalEquipo.addEventListener('click', cerrarModalEquipo);
         modalEquipo.addEventListener('click', (e) => {
-            if (e.target === modalEquipo) modalEquipo.classList.add('seccion-oculta');
+            if (e.target === modalEquipo) cerrarModalEquipo();
         });
     }
 
@@ -2319,10 +2511,12 @@ document.addEventListener('liga:datos-listos', () => {
         });
     });
 
-    // Clic en cualquier equipo de las tablas para abrir su perfil
+    // Clic en cualquier equipo de las tablas para abrir su perfil (en la tabla de Goleadores ese nombre es de un jugador)
     document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('td-team-name')) {
+        if (e.target.classList.contains('td-team-name') && !e.target.closest('#tbody-goleadores')) {
             const nombreEquipo = e.target.textContent.trim();
+            jugadorAbierto = null;
+            mostrarVistaModal('equipo');
             abrirPerfilEquipo(nombreEquipo);
         }
     });
@@ -2368,7 +2562,13 @@ document.addEventListener('liga:datos-listos', () => {
         }
 
         if (modalEquipo && !modalEquipo.classList.contains('seccion-oculta')) {
-            abrirPerfilEquipo(document.getElementById('modal-equipo-nombre').textContent);
+            if (jugadorAbierto) {
+                // El perfil se redibuja en el lugar; si al jugador lo dieron de baja, vuelve al equipo
+                const scroll = cardModalEquipo.scrollTop;
+                if (abrirPerfilJugador(jugadorAbierto.equipo, jugadorAbierto.dni, true)) cardModalEquipo.scrollTop = scroll;
+            } else {
+                abrirPerfilEquipo(document.getElementById('modal-equipo-nombre').textContent);
+            }
         }
     }
 

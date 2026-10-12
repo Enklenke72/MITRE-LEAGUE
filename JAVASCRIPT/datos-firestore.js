@@ -24,7 +24,7 @@ const NIVEL = { publico: 0, staff: 1, coordinador: 2 };
 const CAMPOS_PUBLICOS_JUGADOR = ['nombre', 'dorsal', 'instagram', 'foto', 'goles', 'amarillas', 'rojas'];
 // 'lista.campo' = el campo de cada objeto de esa lista (el id de cada goleador).
 const CAMPOS_DNI_PARTIDO = ['asistentesLocal', 'asistentesVisitante', 'amarillasLocal', 'rojasLocal', 'amarillasVisitante', 'rojasVisitante',
-    'goleadoresLocal.id', 'goleadoresVisitante.id'];
+    'goleadoresLocal.id', 'goleadoresVisitante.id', 'mvpId'];
 const PATRON_CODIGO = /^j[A-Za-z0-9_-]{16}$/;
 
 // nivel = quién puede leerla. escribeStaff: el staff solo agrega (la Caja registra cada pago que marca).

@@ -3558,6 +3558,236 @@ body::-webkit-scrollbar-thumb {
 }
 
 /* ============================================================
+   PERFIL DEL JUGADOR (otra vista dentro del modal del equipo)
+   ============================================================ */
+#modal-equipo-tbody-jugadores tr[data-jugador],
+#tbody-goleadores tr[data-jugador] {
+    cursor: pointer;
+}
+#modal-equipo-tbody-jugadores tr[data-jugador]:focus-visible,
+#tbody-goleadores tr[data-jugador]:focus-visible {
+    outline: 1px solid #869bd8;
+    outline-offset: -1px;
+}
+
+.perfil-jugador-hint {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    color: #869bd8;
+    margin: 0 0 8px 0;
+}
+
+/* No llega hasta la X de cerrar, que está arriba a la derecha */
+.perfil-jugador-volver {
+    display: inline-block;
+    max-width: calc(100% - 44px);
+    margin: 0 0 16px 0;
+    padding: 7px 12px;
+    background: transparent;
+    border: 1px solid rgba(26, 50, 116, 0.8);
+    border-radius: 3px;
+    color: #a9bce8;
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.perfil-jugador-volver:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.perfil-jugador-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed rgba(134, 155, 216, 0.25);
+}
+
+/* La foto se sube a 250 px: a 120 se ve nítida. Sin aro de color, como en la tabla. */
+.perfil-jugador-foto {
+    flex: 0 0 120px;
+    width: 120px;
+    height: 120px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(26, 50, 116, 0.35);
+    color: #869bd8;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+.perfil-jugador-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.perfil-jugador-foto svg {
+    width: 80%;
+    height: 80%;
+    fill: currentColor;
+    opacity: 0.55;
+}
+
+.perfil-jugador-datos {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+.perfil-jugador-dorsal {
+    font-family: 'Michroma', sans-serif;
+    font-size: 13px;
+    color: #869bd8;
+}
+#modal-vista-jugador .perfil-jugador-nombre {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.15;
+    color: #fff;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.perfil-jugador-ranking {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 5px 12px;
+    border-radius: 3px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.08);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.perfil-jugador-ranking.sin-goles {
+    color: #869bd8;
+    background: rgba(26, 50, 116, 0.3);
+    border-color: rgba(26, 50, 116, 0.6);
+}
+
+.equipo-stats-grid.perfil-jugador-stats {
+    grid-template-columns: repeat(5, 1fr) !important;
+}
+.perfil-jugador-stats .stat-label .tarjeta-ico {
+    margin-right: 4px;
+}
+
+.perfil-jugador-subtitulo {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 400;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #869bd8;
+    margin: 4px 0 10px 0;
+}
+.perfil-jugador-partidos {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.perfil-partido {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(26, 50, 116, 0.4);
+    border-radius: 4px;
+    font-family: 'Oswald', sans-serif;
+}
+.perfil-partido-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.perfil-partido-fecha {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: #869bd8;
+}
+.perfil-partido-rival {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    overflow-wrap: anywhere;
+}
+.perfil-partido-detalle {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.perfil-partido-res {
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.perfil-partido-res.res-G { color: #4ade80; background: rgba(74, 222, 128, 0.1); }
+.perfil-partido-res.res-E { color: #cbd5e1; background: rgba(203, 213, 225, 0.08); }
+.perfil-partido-res.res-P { color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
+.perfil-partido-goles {
+    font-size: 12px;
+    color: #4ade80;
+}
+.perfil-partido .tarjeta-ico {
+    margin-right: 2px;
+}
+.perfil-partido-mvp {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: #f2c00e;
+    background: rgba(242, 192, 14, 0.08);
+    border: 1px solid rgba(242, 192, 14, 0.35);
+}
+.perfil-jugador-vacio {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    color: #869bd8;
+    text-align: center;
+    padding: 12px;
+    margin: 0;
+}
+
+/* Celular: 3 cajas arriba (PJ, goles, MVP) y 2 abajo (tarjetas), sin huecos; foto un poco más chica */
+@media (max-width: 768px) {
+    .equipo-stats-grid.perfil-jugador-stats {
+        grid-template-columns: repeat(6, 1fr) !important;
+    }
+    .perfil-jugador-stats .stat-box:nth-child(-n+3) {
+        grid-column: span 2;
+    }
+    .perfil-jugador-stats .stat-box:nth-child(n+4) {
+        grid-column: span 3;
+    }
+    .perfil-jugador-foto {
+        flex-basis: 96px;
+        width: 96px;
+        height: 96px;
+    }
+    .perfil-jugador-header {
+        gap: 14px;
+    }
+    #modal-vista-jugador .perfil-jugador-nombre {
+        font-size: 20px;
+    }
+}
+
+/* ============================================================
    🔒 ESCUDO DE SEGURIDAD: OCULTA TESORERÍA SENSIBLE AL STAFF
    ============================================================ */
 body.rol-staff .solo-admin {
