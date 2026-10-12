@@ -1925,8 +1925,10 @@ body .top-bar {
     transition: transform 0.4s ease, opacity 0.35s ease !important;
 }
 
-/* 2. BARRA LATERAL (Ubicación y centrado de pantalla) */
-@media (min-width: 601px) {
+/* 2. BARRA LATERAL (Ubicación y centrado de pantalla)
+   Desde 769 px: hasta 768 la barra va abajo, como en el celular. Antes arrancaba en 601 y entre 601 y 768
+   (iPad parado, celular acostado) se mezclaba con la barra de abajo: columna de 70 px con los íconos en fila. */
+@media (min-width: 769px) {
     body aside.sidebar {
         position: fixed !important;
         top: 0px !important;
@@ -2030,7 +2032,7 @@ body.scrolled .dashboard-container #home div {
 /* ============================================================
    🌅 FIX HOVER + FIJADO DE SIDEBAR (Textos e Íconos Siempre Visibles)
    ============================================================ */
-@media (min-width: 601px) {
+@media (min-width: 769px) {
 
     /* 1. Mantiene el ancho expandido tanto en HOVER como en FIJADA */
     body aside.sidebar:hover,
@@ -5758,8 +5760,9 @@ body.auth-pendiente .auth-gate {
         }
     }
 
-    /* Horizontal: la barra lateral, el encabezado y el contenido no quedan debajo de la isla de la cámara */
-    @media (min-width: 601px) {
+    /* Horizontal: la barra lateral, el encabezado y el contenido no quedan debajo de la isla de la cámara.
+       Desde 769 px, igual que la barra lateral: los iPhone con isla o muesca miden 812 px o más acostados. */
+    @media (min-width: 769px) {
         body aside.sidebar {
             padding-left: env(safe-area-inset-left) !important;
             width: calc(70px + env(safe-area-inset-left)) !important;
