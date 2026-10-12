@@ -953,6 +953,28 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
+    // MVP del partido: uno solo, de cualquiera de los dos equipos (decisión de Joaquín, 12/10/2026). Se guarda el
+    // jugador (mvpId = DNI; en Firestore va codificado, como las tarjetas) y la web pública arma "Nombre (#N)".
+    // Se rearma cada vez que cambian Local o Visitante, y conserva al elegido si sigue en alguno de los dos.
+    function armarOpcionesMvp(valorElegido) {
+        const selectMvp = document.getElementById('partido-mvp');
+        if (!selectMvp) return;
+        const elegido = valorElegido !== undefined ? valorElegido : selectMvp.value;
+        recargarPools();
+        const pool = (cicloSelect && cicloSelect.value === 'basico') ? poolBasico : poolSuperior;
+        const equipos = [localSelect, visitanteSelect].map(select => select ? select.value : '')
+            .filter((nombre, i, lista) => nombre && lista.indexOf(nombre) === i)
+            .map(nombre => pool.find(e => e.nombre.trim().toLowerCase() === nombre.trim().toLowerCase()))
+            .filter(Boolean);
+        const porDorsal = (a, b) => (Number(a.dorsal) || 0) - (Number(b.dorsal) || 0);
+        selectMvp.innerHTML = '<option value="">— Sin MVP —</option>' + equipos.map(eq =>
+            `<optgroup label="${attrSeguro(eq.nombre)}">`
+            + (eq.jugadores || []).filter(j => j.dni).sort(porDorsal)
+                .map(j => `<option value="${attrSeguro(idJugadorBF(j))}">${dorsalBF(j)} ${attrSeguro(j.nombre)}</option>`).join('')
+            + '</optgroup>').join('');
+        selectMvp.value = [...selectMvp.options].some(o => o.value === elegido) ? elegido : '';
+    }
+
     // Al rearmar Local/Visitante (cambio de fecha, grupo o ciclo) se conservan los equipos elegidos si
     // siguen disponibles. Si no: en un partido nuevo, los primeros de la lista como siempre; editando uno,
     // ese lado queda vacío y hay que elegirlo (no se cambia un equipo sin que el staff lo vea).
@@ -965,6 +987,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (visita === null) visita = nombres.find(n => n !== local) || null;
             if (local !== null) localSelect.value = local;
             if (visita !== null) visitanteSelect.value = visita;
+            armarOpcionesMvp();
             return;
         }
         // Editando: si un lado quedó vacío (por ejemplo, se pasó por otro grupo y se volvió), vuelve el equipo del partido.
@@ -977,6 +1000,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             select.value = '';
         });
         alinearCamposConEquipos();
+        armarOpcionesMvp();
     }
 
     // Campos que dependen del lado. equiposDeLosCampos dice a qué equipo corresponde hoy cada lado de
@@ -1012,6 +1036,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 otro.value = previo;
             }
             alinearCamposConEquipos();
+            armarOpcionesMvp();
             select.dataset.previo = select.value;
         });
     });
@@ -1180,6 +1205,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (localSelect) localSelect.value = eqLocal;
             if (visitanteSelect) visitanteSelect.value = eqVisita;
             alinearCamposConEquipos();
+            armarOpcionesMvp();
         });
     }
 
@@ -1326,6 +1352,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     document.getElementById('dorsales-amarillas-visitante').value = dorsalesDeIds(p.amarillasVisitante, equipoEdVisita);
                     document.getElementById('dorsales-rojas-visitante').value = dorsalesDeIds(p.rojasVisitante, equipoEdVisita);
                     equiposDeLosCampos = { local: p.local, visitante: p.visitante };
+                    armarOpcionesMvp(p.mvpId || '');
 
                     if (submitBtnPartido) {
                         submitBtnPartido.textContent = 'Actualizar Partido';
@@ -1425,6 +1452,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (inputArbitro) inputArbitro.value = contexto.arbitro;
         if (inputArancel && contexto.arancel) inputArancel.value = contexto.arancel;
 
+        armarOpcionesMvp('');
+
         if (submitBtnPartido) {
             submitBtnPartido.textContent = 'GUARDAR Y COMPUTAR PARTIDO';
             submitBtnPartido.style.backgroundColor = '#1a3274';
@@ -1500,6 +1529,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     return;
                 }
                 tarjetas[campo] = resuelto.ids;
+            }
+
+            // MVP: como las tarjetas, pide el resultado, y tiene que ser de alguno de los dos equipos del partido.
+            const mvpElegido = leerCampoTexto('partido-mvp');
+            if (mvpElegido && !esJugado) {
+                alert('Para cargar el MVP primero cargá el resultado del partido.');
+                return;
+            }
+            if (mvpElegido && ![eqLocalObj, eqVisitanteObj].some(eq => eq && (eq.jugadores || []).some(j => idJugadorBF(j) === mvpElegido))) {
+                alert('El MVP tiene que ser un jugador de alguno de los dos equipos del partido.');
+                return;
             }
 
             // Los goles de cada jugador se cuentan desde los partidos (main.js, golesDeJugador): acá solo se
@@ -1594,6 +1634,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 rojasLocal: tarjetas.rojasLocal,
                 amarillasVisitante: tarjetas.amarillasVisitante,
                 rojasVisitante: tarjetas.rojasVisitante,
+                mvpId: mvpElegido || null,
                 jugado: esJugado,
                 resultadoAuto: conservaResultadoAuto
             };
@@ -2256,7 +2297,43 @@ document.addEventListener('liga:datos-listos', (evento) => {
             renderizarListaGruposAdmin();
             actualizarOpcionesMoverEquipo();
             actualizarSelectsFormatoTorneo();
+            actualizarChecksCiclosActivos();
             renderizarEquiposCargados();
+        });
+    }
+
+    // ── Ciclos que se juegan esta edición (liga_ciclos_activos) ──
+    // Decisión de Joaquín (12/10/2026): un ciclo que no se juega se oculta solo en la web pública (Posiciones,
+    // Goleadores, Tabla General y Play-Offs); el panel sigue igual y no se borra nada. Sin guardar, se juegan los dos.
+    const checkCicloSuperior = document.getElementById('ciclo-activo-superior');
+    const checkCicloBasico = document.getElementById('ciclo-activo-basico');
+    const btnGuardarCiclosActivos = document.getElementById('btn-guardar-ciclos-activos');
+
+    function obtenerCiclosActivos() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_ciclos_activos')); } catch (e) { guardado = null; }
+        return { superior: !guardado || guardado.superior !== false, basico: !guardado || guardado.basico !== false };
+    }
+
+    function actualizarChecksCiclosActivos() {
+        const activos = obtenerCiclosActivos();
+        if (checkCicloSuperior) checkCicloSuperior.checked = activos.superior;
+        if (checkCicloBasico) checkCicloBasico.checked = activos.basico;
+    }
+
+    if (btnGuardarCiclosActivos) {
+        btnGuardarCiclosActivos.addEventListener('click', () => {
+            const activos = {
+                superior: checkCicloSuperior ? checkCicloSuperior.checked : true,
+                basico: checkCicloBasico ? checkCicloBasico.checked : true
+            };
+            if (!activos.superior && !activos.basico) {
+                alert('Tiene que jugarse al menos un ciclo.');
+                actualizarChecksCiclosActivos();
+                return;
+            }
+            almacen.setItem('liga_ciclos_activos', JSON.stringify(activos));
+            alert('Ciclos guardados. La web pública se actualiza en unos segundos.');
         });
     }
 
@@ -2634,6 +2711,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
                         return despues.dni;
                     });
                 });
+            }
+            if (cambioDni && p.mvpId != null && String(p.mvpId) === String(antes.dni)) {
+                p.mvpId = despues.dni;
+                partidosTocados = true;
             }
             ladosGoles.forEach(([lado, ladoId, campo]) => {
                 if (!Array.isArray(p[campo]) || !esDelEquipo(p[lado], p[ladoId])) return;
@@ -6161,6 +6242,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     actualizarOpcionesMoverEquipo();
     actualizarComboEquiposPlantel();
     actualizarSelectsFormatoTorneo();
+    actualizarChecksCiclosActivos();
     renderizarEquiposCargados();
 
     actualizarEquiposSancion();

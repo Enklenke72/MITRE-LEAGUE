@@ -24,7 +24,7 @@ const NIVEL = { publico: 0, staff: 1, coordinador: 2 };
 const CAMPOS_PUBLICOS_JUGADOR = ['nombre', 'dorsal', 'instagram', 'foto', 'goles', 'amarillas', 'rojas'];
 // 'lista.campo' = el campo de cada objeto de esa lista (el id de cada goleador).
 const CAMPOS_DNI_PARTIDO = ['asistentesLocal', 'asistentesVisitante', 'amarillasLocal', 'rojasLocal', 'amarillasVisitante', 'rojasVisitante',
-    'goleadoresLocal.id', 'goleadoresVisitante.id'];
+    'goleadoresLocal.id', 'goleadoresVisitante.id', 'mvpId'];
 const PATRON_CODIGO = /^j[A-Za-z0-9_-]{16}$/;
 
 // nivel = quién puede leerla. escribeStaff: el staff solo agrega (la Caja registra cada pago que marca).
@@ -49,6 +49,7 @@ const ESQUEMA = [
     { clave: 'liga_fechas_grupos', tipo: 'config', col: 'config', id: 'fechasGrupos', nivel: 'publico' },
     { clave: 'liga_calendario_fechas', tipo: 'config', col: 'config', id: 'calendarioFechas', nivel: 'publico' },
     { clave: 'liga_desempates_sorteo', tipo: 'config', col: 'config', id: 'desempatesSorteo', nivel: 'publico' },
+    { clave: 'liga_ciclos_activos', tipo: 'config', col: 'config', id: 'ciclosActivos', nivel: 'publico' },
     { clave: 'liga_avisos_staff', tipo: 'lista', col: 'avisosStaff', nivel: 'staff' },
     { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
     { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },

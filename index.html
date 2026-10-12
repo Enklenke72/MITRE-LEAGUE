@@ -905,6 +905,9 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
         <div class="modal-equipo-card">
             <span class="close-modal-equipo" id="btn-cerrar-modal-equipo">&times;</span>
 
+            <!-- VISTA DEL EQUIPO (la ficha de siempre) -->
+            <div id="modal-vista-equipo">
+
             <!-- Nombre y Categoría -->
             <div class="equipo-modal-header">
                 <div>
@@ -940,6 +943,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
 
             <!-- VISTA 1: TABLA DE JUGADORES (Misma estética de Posiciones) -->
             <div id="tab-modal-jugadores" class="tab-modal-content">
+                <p class="perfil-jugador-hint">Tocá un jugador para ver sus estadísticas.</p>
                 <div class="table-wrapper">
                     <table class="table-style">
                         <thead>
@@ -966,6 +970,51 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                 <div id="modal-equipo-lista-partidos" class="resultados-lista">
                     <!-- Carga dinámica por JS -->
                 </div>
+            </div>
+
+            </div>
+
+            <!-- VISTA DEL JUGADOR: se abre tocando un jugador del equipo o de la tabla de Goleadores (main.js) -->
+            <div id="modal-vista-jugador" class="seccion-oculta">
+                <button type="button" class="perfil-jugador-volver" id="btn-volver-equipo">&larr; Volver a <span id="perfil-jugador-volver-equipo"></span></button>
+
+                <div class="perfil-jugador-header">
+                    <div id="perfil-jugador-foto" class="perfil-jugador-foto"></div>
+                    <div class="perfil-jugador-datos">
+                        <span id="perfil-jugador-dorsal" class="perfil-jugador-dorsal"></span>
+                        <h2 id="perfil-jugador-nombre" class="perfil-jugador-nombre"></h2>
+                        <span id="perfil-jugador-categoria" class="badge-categoria"></span>
+                        <div id="perfil-jugador-instagram"></div>
+                    </div>
+                </div>
+
+                <div id="perfil-jugador-ranking" class="perfil-jugador-ranking"></div>
+
+                <div class="equipo-stats-grid perfil-jugador-stats">
+                    <div class="stat-box">
+                        <span class="stat-label">PJ</span>
+                        <span id="perfil-jugador-pj" class="stat-val">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">GOLES</span>
+                        <span id="perfil-jugador-goles" class="stat-val green">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">MVP</span>
+                        <span id="perfil-jugador-mvp" class="stat-val gold">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label"><span class="tarjeta-ico tarjeta-amarilla"></span>AMARILLAS</span>
+                        <span id="perfil-jugador-amarillas" class="stat-val">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label"><span class="tarjeta-ico tarjeta-roja"></span>ROJAS</span>
+                        <span id="perfil-jugador-rojas" class="stat-val">0</span>
+                    </div>
+                </div>
+
+                <h3 class="perfil-jugador-subtitulo">PARTIDO A PARTIDO</h3>
+                <div id="perfil-jugador-partidos" class="perfil-jugador-partidos"></div>
             </div>
 
         </div>
