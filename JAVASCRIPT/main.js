@@ -2154,7 +2154,9 @@ document.addEventListener('liga:datos-listos', () => {
             equipo.jugadores.sort((a, b) => golesDe.get(b) - golesDe.get(a));
 
             equipo.jugadores.forEach((j, idx) => {
-                const fotoUrl = escaparHtml(j.foto || 'Recursos/search.svg');
+                const fotoHtml = j.foto
+                    ? `<img src="${escaparHtml(j.foto)}" alt="${escaparHtml(j.nombre)}" class="player-avatar-img">`
+                    : '<span class="player-avatar-img player-avatar-vacio" role="img" aria-label="Sin foto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4.2"/><path d="M3.5 22c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg></span>';
                 const dorsal = (j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '') ? `#${escaparHtml(j.dorsal)}` : `-`;
                 const ig = j.instagram ? escaparHtml(j.instagram.replace('@','')) : '';
                 const igUser = ig
@@ -2163,7 +2165,7 @@ document.addEventListener('liga:datos-listos', () => {
 
                 tbodyJugadores.innerHTML += `
                     <tr class="row-normal">
-                        <td><img src="${fotoUrl}" alt="${escaparHtml(j.nombre)}" class="player-avatar-img"></td>
+                        <td>${fotoHtml}</td>
                         <td style="color: #869bd8; font-size: 11px; text-align: center;">${dorsal}</td>
                         <td style="text-align: left !important; color: #fff; font-weight: bold;">${escaparHtml(j.nombre)}</td>
                         <td style="text-align: center; color:#fff;">${partidosJugadosDeJugador(j, equipo, partidosParaPJ)}</td>
