@@ -582,8 +582,16 @@ document.addEventListener('liga:datos-listos', () => {
         if (!track) return;
         const sponsors = obtenerSponsors().slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
+        // Con los dos colores elegidos en el panel, el degradado reemplaza al del CSS. Un sponsor cargado
+        // antes del 13/10/2026 tiene un solo color y se sigue viendo como antes.
+        const esColorHex = c => /^#[0-9a-f]{6}$/i.test(String(c || ''));
+        const estiloFondo = s => {
+            if (esColorHex(s.colorFondo) && esColorHex(s.colorFondo2)) return ` style="background: linear-gradient(135deg, ${s.colorFondo} 0%, ${s.colorFondo2} 100%);"`;
+            return s.colorFondo ? ` style="background-color: ${String(s.colorFondo).replace(/[^#a-zA-Z0-9(),.%\s-]/g, '')};"` : '';
+        };
+
         track.innerHTML = sponsors.map((s, i) => `
-            <div class="sponsor-card-full${i === 0 ? ' active-slide' : ''}"${s.colorFondo ? ` style="background-color: ${String(s.colorFondo).replace(/[^#a-zA-Z0-9(),.%\s-]/g, '')};"` : ''}>
+            <div class="sponsor-card-full${i === 0 ? ' active-slide' : ''}"${estiloFondo(s)}>
                 ${s.categoria ? `<div class="sponsor-badge">${escaparHtml(s.categoria)}</div>` : ''}
                 <img src="${urlSegura(s.logo, 'Recursos/logo pelota fut.svg')}" alt="Sponsor ${escaparHtml(s.nombre)}" class="sponsor-logo">
                 <div class="sponsor-info">

@@ -1337,14 +1337,17 @@ body.scrolled .sidebar-bottom {
     width: 70%;
     height: 100%; /* MAGIA 2: Obliga a TODAS las tarjetas a medir lo mismo que la más alta */
     
-    display: flex !important;   
+    display: flex !important;
     flex-direction: row;
-    justify-content: space-around;
+    /* Logo y texto juntos en el centro, con la misma separación en todas las tarjetas
+       (con space-around el hueco cambiaba según el largo del texto). */
+    justify-content: center;
+    gap: clamp(24px, 4vw, 56px);
     align-items: center;
     background: linear-gradient(135deg, rgba(26, 50, 116,0.3) 0%, rgba(10, 29, 84,0.8) 100%);
     border: 1px solid rgba(46, 218, 227, 0.2);
     border-radius: 5px;
-    padding: 20px;
+    padding: 28px 40px;
     box-sizing: border-box;
     overflow: hidden;
 
@@ -1409,32 +1412,33 @@ body.scrolled .sidebar-bottom {
 
 /* ─── CONTENIDO DE LAS TARJETAS ─── */
 .sponsor-logo {
-    /* Hasta 300 px, pero nunca más del 40% de la tarjeta: entre 601 y ~1100 px de ancho la
-       tarjeta es angosta y un logo fijo aplastaba el texto. */
-    width: min(300px, 40%);
+    /* Nunca más del 38% de la tarjeta: entre 601 y ~1100 px de ancho la tarjeta es angosta y un
+       logo fijo aplastaba el texto. Sin caja cuadrada: un logo apaisado no deja aire arriba y abajo. */
+    width: min(280px, 38%);
     height: auto;
-    aspect-ratio: 1 / 1;
+    max-height: 220px;
     object-fit: contain;
     filter: drop-shadow(0 0 8px rgba(255,255,255,0.1));
     flex-shrink: 0;
 }
 
 .sponsor-info {
+    flex: 0 1 auto;
     text-align: right;
-    max-width: 63%;
+    max-width: 55%;
 }
 
 .sponsor-info h4 {
     font-family: 'Michroma', sans-serif;
-    font-size: 15px;
+    font-size: 20px;
     color: #fff;
-    margin: 0 0 5px 0;
+    margin: 0 0 6px 0;
 }
 
 .sponsor-support {
     display: block;
     color: #4284f2;
-    font-size: 9px;
+    font-size: 10px;
     font-family: 'Oswald', sans-serif;
     text-transform: uppercase;
     margin-bottom: 8px;
@@ -1443,7 +1447,7 @@ body.scrolled .sidebar-bottom {
 
 .sponsor-info p {
     font-family: 'Oswald', sans-serif;
-    font-size: 10px;
+    font-size: 13px;
     color: #cbd5e1;
     margin: 0 0 10px 0;
     line-height: 1.5;
@@ -1464,10 +1468,11 @@ body.scrolled .sidebar-bottom {
 .sponsor-contacto-link {
     display: block;
     color: #2edae3;
-    font-size: 10px;
+    font-size: 13px;
     font-family: 'Oswald', sans-serif;
     text-decoration: none;
     margin-bottom: 10px;
+    overflow-wrap: anywhere;
 }
 
 /* Ubicación del sponsor (dirección o link de mapa): mismo bloque que Instagram/teléfono, un poco más apagado para no competir con ese dato. */
@@ -1488,6 +1493,10 @@ body.scrolled .sidebar-bottom {
     display: inline-block;
     transition: background 0.3s ease, color 0.3s ease;
 }
+.sponsor-info .sponsor-link-btn {
+    font-size: 12px;
+    padding: 8px 18px;
+}
 .sponsor-link-btn:hover {
     background: #2edae3;
     color: #040c26;
@@ -1501,7 +1510,7 @@ body.scrolled .sidebar-bottom {
     background-color: #2edae3;
     color: #040c26;
     font-family: 'Oswald', sans-serif;
-    font-size: 8px;
+    font-size: 9px;
     padding: 4px 10px;
     border-bottom-right-radius: 8px;
     text-transform: uppercase;
@@ -1579,6 +1588,11 @@ body.scrolled .sidebar-bottom {
         text-align: center;
         max-width: 100%;
     }
+
+    .sponsor-info h4 { font-size: 16px; }
+    .sponsor-info p,
+    .sponsor-contacto-link { font-size: 12px; }
+    .sponsor-info .sponsor-link-btn { font-size: 11px; }
 
     .sponsor-card-full.pos-left {
         transform: translateX(-96%) scale(0.85);

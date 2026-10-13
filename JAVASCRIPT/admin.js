@@ -206,8 +206,39 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return false;
     }
 
-    // Con conservarTransparencia (logos de sponsor) una imagen con partes transparentes sale en
-    // PNG, para que no quede un rectángulo de color sobre el fondo de la tarjeta.
+    // Recuadro de la imagen sin el margen transparente que traiga el archivo, con un 2% de aire.
+    // Se busca sobre una copia de hasta 800 px para no recorrer millones de píxeles.
+    function recorteSinMargen(img) {
+        const todo = { x: 0, y: 0, w: img.width, h: img.height };
+        const escala = Math.min(1, 800 / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * escala));
+        const h = Math.max(1, Math.round(img.height * escala));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0, w, h);
+        const datos = cx.getImageData(0, 0, w, h).data;
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (datos[(y * w + x) * 4 + 3] > 8) {
+                    if (x < x0) x0 = x;
+                    if (x > x1) x1 = x;
+                    if (y < y0) y0 = y;
+                    if (y > y1) y1 = y;
+                }
+            }
+        }
+        if (x1 < 0) return todo;
+        const aire = Math.round(Math.max(x1 - x0 + 1, y1 - y0 + 1) * 0.02);
+        x0 = Math.max(0, x0 - aire); y0 = Math.max(0, y0 - aire);
+        x1 = Math.min(w - 1, x1 + aire); y1 = Math.min(h - 1, y1 + aire);
+        const rx = x0 / escala, ry = y0 / escala;
+        return { x: rx, y: ry, w: Math.min(img.width - rx, (x1 - x0 + 1) / escala), h: Math.min(img.height - ry, (y1 - y0 + 1) / escala) };
+    }
+
+    // Con conservarTransparencia (logos de sponsor) se recorta el margen transparente y una imagen
+    // con partes transparentes sale en PNG, para que no quede un rectángulo de color sobre la tarjeta.
     function comprimirImagen(file, maxLado, calidad, conservarTransparencia) {
         return new Promise((resolve, reject) => {
             if (!file || !file.type || file.type.indexOf('image/') !== 0) {
@@ -221,16 +252,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const img = new Image();
                 img.onerror = () => reject(new Error('No se pudo abrir la imagen.'));
                 img.onload = () => {
-                    const escala = Math.min(1, maxLado / Math.max(img.width, img.height));
-                    const ancho = Math.max(1, Math.round(img.width * escala));
-                    const alto = Math.max(1, Math.round(img.height * escala));
+                    const rec = conservarTransparencia ? recorteSinMargen(img) : { x: 0, y: 0, w: img.width, h: img.height };
+                    const escala = Math.min(1, maxLado / Math.max(rec.w, rec.h));
+                    const ancho = Math.max(1, Math.round(rec.w * escala));
+                    const alto = Math.max(1, Math.round(rec.h * escala));
 
                     const canvas = document.createElement('canvas');
                     canvas.width = ancho;
                     canvas.height = alto;
 
                     const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, ancho, alto);
+                    ctx.drawImage(img, rec.x, rec.y, rec.w, rec.h, 0, 0, ancho, alto);
 
                     if (conservarTransparencia && tieneTransparencia(ctx, ancho, alto)) {
                         resolve(canvas.toDataURL('image/png'));
@@ -4147,15 +4179,33 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const listaSponsorsAdminCont = document.getElementById('lista-sponsors-admin');
 
     const inputSponsorColor = document.getElementById('sponsor-color-fondo');
+    const inputSponsorColor2 = document.getElementById('sponsor-color-fondo-2');
 
     let logoSponsorBase64Temp = null;
     let idSponsorEnEdicion = null;
 
-    // La vista previa va sobre el color de la tarjeta, así se ve si el logo se funde con el fondo.
+    const esColorHex = c => /^#[0-9a-f]{6}$/i.test(String(c || ''));
+
+    // Los dos colores del degradado de la tarjeta. Un sponsor cargado antes del 13/10/2026 tiene un
+    // solo color con el degradado fijo del CSS encima: se devuelven los dos colores que se veían,
+    // así al editarlo queda igual.
+    function coloresSponsor(s) {
+        if (esColorHex(s.colorFondo) && esColorHex(s.colorFondo2)) return [s.colorFondo, s.colorFondo2];
+        const base = esColorHex(s.colorFondo) ? s.colorFondo : '#3e3f9b';
+        const rgb = [1, 3, 5].map(i => parseInt(base.slice(i, i + 2), 16));
+        const mezcla = (encima, alfa) => '#' + rgb.map((v, i) => Math.round(v * (1 - alfa) + encima[i] * alfa).toString(16).padStart(2, '0')).join('');
+        return [mezcla([26, 50, 116], 0.3), mezcla([10, 29, 84], 0.8)];
+    }
+    const degradadoSponsor = colores => `linear-gradient(135deg, ${colores[0]} 0%, ${colores[1]} 100%)`;
+
+    // La vista previa va sobre el degradado de la tarjeta, así se ve si el logo se funde con el fondo.
     function pintarFondoPreviewSponsor() {
-        if (previewSponsorImg && inputSponsorColor) previewSponsorImg.style.background = inputSponsorColor.value;
+        if (previewSponsorImg && inputSponsorColor && inputSponsorColor2) {
+            previewSponsorImg.style.background = degradadoSponsor([inputSponsorColor.value, inputSponsorColor2.value]);
+        }
     }
     if (inputSponsorColor) inputSponsorColor.addEventListener('input', pintarFondoPreviewSponsor);
+    if (inputSponsorColor2) inputSponsorColor2.addEventListener('input', pintarFondoPreviewSponsor);
     pintarFondoPreviewSponsor();
 
     if (inputSponsorLogoFile) {
@@ -4183,7 +4233,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (formSponsor) formSponsor.reset();
         logoSponsorBase64Temp = null;
         if (previewSponsorWrap) previewSponsorWrap.classList.add('seccion-oculta-staff');
-        if (inputSponsorColor) inputSponsorColor.value = '#3e3f9b';
+        const porDefecto = coloresSponsor({});
+        if (inputSponsorColor) inputSponsorColor.value = porDefecto[0];
+        if (inputSponsorColor2) inputSponsorColor2.value = porDefecto[1];
         pintarFondoPreviewSponsor();
     }
 
@@ -4224,7 +4276,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         listaSponsorsAdminCont.innerHTML = ordenados.map((s, idx) => `
             <div style="display:flex; align-items:center; gap:10px; background: rgba(4, 12, 38,0.6); padding:8px; border-radius:4px; margin-bottom:8px; flex-wrap:wrap;">
-                <img src="${attrSeguro(s.logo || 'Recursos/logo pelota fut.svg')}" style="width:36px; height:36px; object-fit:contain; border-radius:3px; background:${String(s.colorFondo || '#0a1d54').replace(/[^#a-zA-Z0-9(),.%\s-]/g, '')};">
+                <img src="${attrSeguro(s.logo || 'Recursos/logo pelota fut.svg')}" style="width:36px; height:36px; object-fit:contain; border-radius:3px; background:${degradadoSponsor(coloresSponsor(s))};">
                 <div style="flex:1; min-width:120px; text-align:left;">
                     <span style="font-size:12px; color:#fff; font-weight:bold; display:block;">${attrSeguro(s.nombre)}</span>
                     <span style="font-size:9px; color:#869bd8;">${attrSeguro(s.categoria || 'Sin categoría')}</span>
@@ -4248,7 +4300,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 document.getElementById('sponsor-categoria').value = s.categoria || '';
                 document.getElementById('sponsor-descripcion').value = s.descripcion || '';
                 document.getElementById('sponsor-beneficio').value = s.beneficio || '';
-                document.getElementById('sponsor-color-fondo').value = s.colorFondo || '#3e3f9b';
+                const colores = coloresSponsor(s);
+                inputSponsorColor.value = colores[0];
+                inputSponsorColor2.value = colores[1];
                 pintarFondoPreviewSponsor();
                 document.getElementById('sponsor-instagram').value = s.instagram || '';
                 document.getElementById('sponsor-telefono').value = s.telefono || '';
@@ -4295,7 +4349,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 categoria: document.getElementById('sponsor-categoria').value,
                 descripcion: document.getElementById('sponsor-descripcion').value.trim(),
                 beneficio: document.getElementById('sponsor-beneficio').value.trim(),
-                colorFondo: document.getElementById('sponsor-color-fondo').value,
+                colorFondo: inputSponsorColor.value,
+                colorFondo2: inputSponsorColor2.value,
                 instagram: document.getElementById('sponsor-instagram').value.trim().replace('@', ''),
                 telefono: document.getElementById('sponsor-telefono').value.trim(),
                 link: document.getElementById('sponsor-link').value.trim(),
