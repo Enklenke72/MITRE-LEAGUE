@@ -2370,7 +2370,7 @@ document.addEventListener('liga:datos-listos', () => {
             return `
                 <div class="perfil-partido">
                     <div class="perfil-partido-info">
-                        <span class="perfil-partido-fecha">${escaparHtml(nombreFechaPublico(p.fecha))}</span>
+                        <span class="perfil-partido-fecha">${escaparHtml(nombreFasePublico(p))}</span>
                         <span class="perfil-partido-rival">vs ${escaparHtml(esLocal ? p.visitante : p.local)}</span>
                     </div>
                     <div class="perfil-partido-detalle">
@@ -2591,6 +2591,20 @@ document.addEventListener('liga:datos-listos', () => {
         ajustarPestanasDeCiclo('.btn-gol-ciclo', 'data-ciclo-gol', cicloGoleadoresActivo, activos);
         ajustarPestanasDeCiclo('.btn-anual-ciclo', 'data-anual-ciclo', cicloAnualActivo, activos);
         ajustarPestanasDeCiclo('.btn-playoff-ciclo', 'data-ciclo-playoff', cicloPlayoffPublicoActivo, activos);
+
+        // Fixture ("Todos / Solo Superior / Solo Básico"): con un solo ciclo, "Todos" sería lo mismo que ese ciclo, así
+        // que se oculta el filtro entero y el fixture queda en el ciclo que se juega (no muestra partidos del otro).
+        const botonesFixture = [...document.querySelectorAll('.btn-filtro-fixture-ciclo')];
+        const unico = activos.superior && activos.basico ? null : (activos.superior ? 'superior' : 'basico');
+        botonesFixture.forEach(b => {
+            const ciclo = b.getAttribute('data-ciclo-fix');
+            if (ciclo !== 'todos') b.classList.toggle('ciclo-no-se-juega', !activos[ciclo]);
+        });
+        if (botonesFixture[0]) botonesFixture[0].parentElement.classList.toggle('ciclo-no-se-juega', !!unico);
+        if (unico && filtroCicloFixture !== unico) {
+            const boton = botonesFixture.find(b => b.getAttribute('data-ciclo-fix') === unico);
+            if (boton) boton.dispatchEvent(new Event('click'));
+        }
     }
 
     aplicarCiclosQueSeJuegan();
