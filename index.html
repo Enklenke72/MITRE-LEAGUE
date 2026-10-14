@@ -14,6 +14,18 @@
     <meta name="theme-color" content="#0a1d54">
     <link rel="apple-touch-icon" href="Recursos/icono-app-apple-180.png">
     <meta name="apple-mobile-web-app-title" content="Mitre League">
+    <!-- Vista previa al compartir el link (WhatsApp, Instagram, etc.). Sin og:url mientras mitreleague.com
+         muestre "Próximamente": WhatsApp y Facebook leerían esa página en vez de esta. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Mitre League">
+    <meta property="og:locale" content="es_AR">
+    <meta property="og:title" content="Mitre League · Clausura 2026">
+    <meta property="og:description" content="Tabla de posiciones, fixture, resultados y playoffs del torneo de fútbol 5 entre cursos.">
+    <meta property="og:image" content="https://mitreleaguegit.netlify.app/Recursos/og-imagen.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Escudo de la Mitre League 2026">
+    <meta name="twitter:card" content="summary_large_image">
 </head>
 
 <body>
@@ -97,10 +109,6 @@
                     <!-- Podés cambiar la imagen por un icono de libro o documento -->
                     <span class="nav-label">Reglamento</span>
                 </a>
-                <a href="#pantalla-admin" class="nav-item">
-                    <img src="Recursos/admin.svg" alt="Admin">
-                    <span class="nav-label">Admin</span>
-                </a>
             </nav>
 
             <!-- ③ SECCIÓN INFERIOR (search + IG + notificaciones) -->
@@ -181,14 +189,14 @@
 
                 <!-- Pista 3D del Hero -->
                 <div id="hero-track-3d">
-                    <!-- NOTICIA 1 -->
+                    <!-- Tarjeta de espera: se ve mientras cargan los datos o si no hay noticias (main.js la reemplaza) -->
                     <div class="hero-card-3d">
                         <div class="hero-card-bg"
-                            style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.9)), url('Recursos/Fotos/DSC05325.JPG');">
+                            style="background-image: linear-gradient(135deg, #0a1d54, #040c26);">
                         </div>
                         <div class="hero-card-content">
-                            <h2>¡Y SE FUE!...</h2>
-                            <p>Tras un partido muy friccionado, 5to 2da supo plantarse por 2-1 ante 6to 2da.</p>
+                            <h2>Mitre League · Clausura 2026</h2>
+                            <p>Tablas, fixture y resultados del torneo.</p>
                             <a href="" class="hero-action-btn seccion-oculta" data-link-text=""></a>
                         </div>
                     </div>
@@ -347,9 +355,9 @@
                                 <div class="table-wrapper">
                                     <table class="table-style">
                                         <thead>
-                                            <tr style="background-color: #1a3274;">
-                                                <th>Pos</th>
-                                                <th>Equipo</th>
+                                            <tr class="table-head-row" style="background-color: #1a3274;">
+                                                <th class="th-pos">Pos</th>
+                                                <th class="th-team">Equipo</th>
                                                 <th>PJ</th>
                                                 <th>G</th>
                                                 <th>E</th>
@@ -357,7 +365,7 @@
                                                 <th class="col-gf-gc">GF</th>
                                                 <th class="col-gf-gc">GC</th>
                                                 <th>+/-</th>
-                                                <th>PTS</th>
+                                                <th class="th-pts">PTS</th>
                                             </tr>
                                         </thead>
                                         <tbody class="tbody-bas"></tbody>
@@ -379,6 +387,13 @@
                                         style="font-size: 10px; padding: 4px 8px;">Superior</button>
                                     <button class="tab-btn btn-gol-ciclo" data-ciclo-gol="basico"
                                         style="font-size: 10px; padding: 4px 8px;">Básico</button>
+                                </div>
+
+                                <!-- Goleadores por copa: con los playoffs publicados y si el ciclo tiene Copa Oro y Copa Plata -->
+                                <div class="tabs-gol-copa" hidden>
+                                    <button class="tab-btn active btn-gol-copa" data-copa-gol="general">General</button>
+                                    <button class="tab-btn btn-gol-copa" data-copa-gol="oro">Copa Oro</button>
+                                    <button class="tab-btn btn-gol-copa" data-copa-gol="plata">Copa Plata</button>
                                 </div>
 
                                 <div class="table-wrapper">
@@ -868,6 +883,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                         </span>
                     </span>
                 </p>
+                <p><a href="#pantalla-admin" class="footer-acceso-staff">Acceso staff</a></p>
             </footer>
 
         </main>
@@ -989,6 +1005,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                 </div>
 
                 <div id="perfil-jugador-ranking" class="perfil-jugador-ranking"></div>
+                <div id="perfil-jugador-ranking-copa" class="perfil-jugador-ranking" hidden></div>
 
                 <div class="equipo-stats-grid perfil-jugador-stats">
                     <div class="stat-box">

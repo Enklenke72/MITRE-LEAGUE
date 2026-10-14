@@ -39,7 +39,7 @@ service cloud.firestore {
     // tesorería del día a día y avisos internos: solo staff y coordinador.
     match /equiposPrivado/{id} { allow read, write: if esStaff(); }
     match /tesoreriaPartidos/{id} { allow read, write: if esStaff(); }
-    // Sin uso desde el 29/09/2026 (el valor de inscripción pasó a configCoordinador).
+    // Turnos de la jornada y lista de árbitros (14/10/2026).
     match /configStaff/{id} { allow read, write: if esStaff(); }
     match /avisosStaff/{id} { allow read, write: if esStaff(); }
 

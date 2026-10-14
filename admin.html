@@ -11,6 +11,7 @@
     <meta name="theme-color" content="#0a1d54">
     <link rel="apple-touch-icon" href="Recursos/icono-app-apple-180.png">
     <meta name="apple-mobile-web-app-title" content="ML Staff">
+    <meta name="robots" content="noindex, nofollow">
 </head>
 
 <body class="staff-page auth-pendiente">
@@ -26,6 +27,11 @@
     <div id="aviso-cambios-ajenos" class="aviso-cambios-ajenos" role="status" hidden>
         <span>Otra persona cargó cambios. Lo tuyo ya está guardado: actualizá para verlos.</span>
         <button type="button" id="btn-actualizar-cambios" class="auth-gate-btn">Actualizar</button>
+    </div>
+
+    <div id="aviso-fotos-pendientes" class="aviso-cambios-ajenos aviso-fotos-pendientes" role="status" hidden>
+        <span id="texto-fotos-pendientes"></span>
+        <button type="button" id="btn-subir-fotos-ahora" class="auth-gate-btn" hidden>Subir ahora</button>
     </div>
 
     <header class="staff-header">
@@ -252,8 +258,9 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Horario de Juego</label>
-                                <input type="text" id="partido-horario" value="14:20" placeholder="Ej: 14:20">
+                                <label>Horario de Juego (turno)</label>
+                                <!-- Los turnos los arma admin.js desde "Turnos de la Jornada" -->
+                                <select id="partido-horario"></select>
                                 <label class="check-inline-admin">
                                     <input type="checkbox" id="partido-horario-confirmar"> Horario a confirmar
                                 </label>
@@ -273,7 +280,10 @@
 
                         <div class="form-group">
                             <label style="color:#f2c00e;">Árbitro Asignado</label>
-                            <input type="text" id="partido-arbitro-nombre" placeholder="Ej: Carlos Gómez">
+                            <!-- Las opciones salen de la lista de "Árbitros" (admin.js) -->
+                            <select id="partido-arbitro-nombre">
+                                <option value="">Por asignar</option>
+                            </select>
                         </div>
 
                         <button type="submit" id="btn-submit-partido" class="btn-submit-admin"
@@ -290,6 +300,8 @@
                             style="background:#040c26; color:#2edae3; border:1px solid #1a3274; border-radius:3px; padding:4px 8px; font-family:'Oswald'; font-size:11px;">
                             <!-- Dinámico por JS -->
                         </select>
+                        <!-- Hoja de horarios de la fecha elegida en el filtro (la arma admin.js en #vista-imprimible) -->
+                        <button type="button" id="btn-imprimir-horarios" class="btn-imprimir-horarios">Imprimir horarios</button>
                     </div>
                     <div id="lista-partidos-admin" style="max-height: 600px; overflow-y: auto;"></div>
                 </section>
@@ -335,6 +347,45 @@
                             Guardar Calendario
                         </button>
                     </div>
+                </section>
+
+                <!-- TURNOS DE LA JORNADA: arman las opciones de "Horario de Juego" -->
+                <section class="admin-card-panel turnos-bloque">
+                    <h3 class="turnos-encabezado">Turnos de la Jornada</h3>
+                    <p class="calendario-ayuda">
+                        A qué hora arranca la jornada y cuánto dura cada turno. "Horario de Juego" ofrece solo estos turnos.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Arranca a las</label>
+                            <input type="time" id="turnos-inicio" value="13:00" class="turnos-input-hora">
+                        </div>
+                        <div class="form-group">
+                            <label>Minutos por turno</label>
+                            <input type="number" id="turnos-minutos" min="5" max="180" step="5" value="40">
+                        </div>
+                        <div class="form-group">
+                            <label>Cantidad de turnos</label>
+                            <input type="number" id="turnos-cantidad" min="1" max="30" step="1" value="8">
+                        </div>
+                    </div>
+                    <div id="turnos-vista-previa" class="turnos-vista-previa"></div>
+                    <button type="button" id="btn-guardar-turnos" class="btn-submit-admin turnos-btn-guardar">
+                        Guardar Turnos
+                    </button>
+                </section>
+
+                <!-- ÁRBITROS: lista para elegir en "Árbitro Asignado" -->
+                <section class="admin-card-panel arbitros-bloque">
+                    <h3 class="arbitros-encabezado">Árbitros</h3>
+                    <p class="calendario-ayuda">
+                        Cargá una vez a los árbitros del torneo y elegilos de la lista al cargar cada partido. Quitar a uno de la lista no cambia los partidos que ya lo tienen asignado.
+                    </p>
+                    <div class="arbitros-alta">
+                        <input type="text" id="arbitro-nuevo-nombre" maxlength="60" placeholder="Ej: Carlos Gómez">
+                        <button type="button" id="btn-agregar-arbitro" class="btn-submit-admin arbitros-btn-agregar">Agregar</button>
+                    </div>
+                    <ul id="lista-arbitros" class="arbitros-lista"></ul>
                 </section>
 
                 <!-- FIXTURE AUTOMÁTICO DE FASE DE GRUPOS (vista previa abajo, en #fixture-auto-vista-previa) -->
@@ -886,7 +937,7 @@
                     </div>
                     <div class="form-group">
                         <label>Ruta o URL de la Foto</label>
-                        <input type="text" id="noticia-foto" placeholder="Recursos/Fotos/DSC05325.JPG">
+                        <input type="text" id="noticia-foto" placeholder="Recursos/Fotos/nombre-de-la-foto.jpg">
                     </div>
                     <div class="form-group">
                         <label>O subir la foto de la noticia (se comprime sola)</label>
@@ -927,7 +978,7 @@
                     </div>
                     <div class="form-group">
                         <label>Foto de Portada (URL / Ruta)</label>
-                        <input type="text" id="foto-album-portada" placeholder="Recursos/Fotos/DSC05325.JPG">
+                        <input type="text" id="foto-album-portada" placeholder="Recursos/Fotos/nombre-de-la-foto.jpg">
                     </div>
                     <div class="form-group">
                         <label>O subir la foto de portada (se comprime sola)</label>

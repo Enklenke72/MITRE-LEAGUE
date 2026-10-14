@@ -283,6 +283,34 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
+    // Sube un dataURL a Cloudinary y devuelve su URL. Si falla tira un Error: con sinRespuesta si no hubo
+    // respuesta (sin señal o tardó demasiado) y con estado (el código HTTP) si Cloudinary respondió con error.
+    async function enviarACloudinary(imagen) {
+        if (!CLOUDINARY_CONFIG.cloudName || !CLOUDINARY_CONFIG.uploadPreset) {
+            throw new Error('falta configurar Cloudinary (JAVASCRIPT/cloudinary-config.js).');
+        }
+        const datos = new FormData();
+        datos.append('file', imagen);
+        datos.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        let resp;
+        try {
+            resp = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUDINARY_CONFIG.cloudName)}/image/upload`, {
+                method: 'POST', body: datos, signal: AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined
+            });
+        } catch (e) {
+            const sinRed = new Error('no hay conexión o tardó demasiado.');
+            sinRed.sinRespuesta = true;
+            throw sinRed;
+        }
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok || !json.secure_url) {
+            const rechazo = new Error((json.error && json.error.message) || 'Cloudinary respondió con error ' + resp.status + '.');
+            rechazo.estado = resp.status;
+            throw rechazo;
+        }
+        return json.secure_url;
+    }
+
     // Una ruta o URL escrita a mano, o una foto ya subida, se devuelve igual. Un dataURL recién
     // comprimido se sube a Cloudinary y se devuelve su URL. Si falla, avisa y devuelve null.
     async function subirImagen(imagen, boton) {
@@ -290,20 +318,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const textoBoton = boton ? boton.textContent : '';
         if (boton) { boton.disabled = true; boton.textContent = 'Subiendo foto...'; }
         try {
-            if (!CLOUDINARY_CONFIG.cloudName || !CLOUDINARY_CONFIG.uploadPreset) {
-                throw new Error('falta configurar Cloudinary (JAVASCRIPT/cloudinary-config.js).');
-            }
-            const datos = new FormData();
-            datos.append('file', imagen);
-            datos.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-            const resp = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUDINARY_CONFIG.cloudName)}/image/upload`, {
-                method: 'POST', body: datos, signal: AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined
-            }).catch(() => { throw new Error('no hay conexión o tardó demasiado.'); });
-            const json = await resp.json().catch(() => ({}));
-            if (!resp.ok || !json.secure_url) {
-                throw new Error((json.error && json.error.message) || 'Cloudinary respondió con error ' + resp.status + '.');
-            }
-            return json.secure_url;
+            return await enviarACloudinary(imagen);
         } catch (err) {
             alert('No se pudo subir la foto: ' + err.message + '\nNo se guardó nada, probá de nuevo.');
             return null;
@@ -468,11 +483,190 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     // Un partido sin horario definido se guarda con horario vacío; la web pública y el
-    // cronograma lo muestran como "Horario a confirmar".
+    // cronograma lo muestran como "Horario a confirmar". El select conserva el turno para cuando se destilda.
     function aplicarHorarioAConfirmar() {
         if (!checkHorarioConfirmar || !inputHorarioPartido) return;
         inputHorarioPartido.disabled = checkHorarioConfirmar.checked;
-        if (checkHorarioConfirmar.checked) inputHorarioPartido.value = '';
+    }
+
+    // ── Turnos de la jornada (liga_turnos_jornada, en configStaff): "Horario de Juego" ofrece solo estos turnos, así
+    // no se carga un 14:25 cuando los turnos son de 40 minutos.
+    const TURNOS_DEFECTO = { inicio: '13:00', minutos: 40, cantidad: 8 };
+    const PATRON_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const inputTurnosInicio = document.getElementById('turnos-inicio');
+    const inputTurnosMinutos = document.getElementById('turnos-minutos');
+    const inputTurnosCantidad = document.getElementById('turnos-cantidad');
+    const vistaPreviaTurnos = document.getElementById('turnos-vista-previa');
+    const btnGuardarTurnos = document.getElementById('btn-guardar-turnos');
+
+    function turnosDe(cfg) {
+        const [h, m] = cfg.inicio.split(':').map(Number);
+        const turnos = [];
+        for (let i = 0; i < cfg.cantidad; i++) {
+            const total = h * 60 + m + i * cfg.minutos;
+            if (total >= 24 * 60) break;
+            turnos.push(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+        }
+        return turnos;
+    }
+
+    function turnosValidos(cfg) {
+        return PATRON_HORA.test(cfg.inicio)
+            && Number.isInteger(cfg.minutos) && cfg.minutos >= 5 && cfg.minutos <= 180
+            && Number.isInteger(cfg.cantidad) && cfg.cantidad >= 1 && cfg.cantidad <= 30;
+    }
+
+    function obtenerTurnosJornada() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_turnos_jornada')); } catch (e) { guardado = null; }
+        const cfg = guardado ? { inicio: String(guardado.inicio), minutos: Number(guardado.minutos), cantidad: Number(guardado.cantidad) } : null;
+        return cfg && turnosValidos(cfg) ? cfg : { ...TURNOS_DEFECTO };
+    }
+
+    // valorDeseado (al editar un partido o al conservar el turno después de guardar) siempre queda disponible, aunque
+    // no sea un turno (un partido cargado antes de los turnos, o con otros turnos).
+    function armarOpcionesHorario(valorDeseado) {
+        if (!inputHorarioPartido) return;
+        const valor = valorDeseado !== undefined ? valorDeseado : inputHorarioPartido.value;
+        const turnos = turnosDe(obtenerTurnosJornada());
+        let html = turnos.map(t => `<option value="${t}">${t}</option>`).join('');
+        if (valor && !turnos.includes(valor)) html = `<option value="${attrSeguro(valor)}">${attrSeguro(valor)} (fuera de turno)</option>` + html;
+        inputHorarioPartido.innerHTML = html;
+        inputHorarioPartido.value = valor && [...inputHorarioPartido.options].some(o => o.value === valor) ? valor : (turnos[0] || '');
+    }
+
+    function turnosDelFormulario() {
+        return {
+            inicio: inputTurnosInicio ? inputTurnosInicio.value : '',
+            minutos: Number(inputTurnosMinutos ? inputTurnosMinutos.value : NaN),
+            cantidad: Number(inputTurnosCantidad ? inputTurnosCantidad.value : NaN)
+        };
+    }
+
+    function mostrarVistaPreviaTurnos() {
+        if (!vistaPreviaTurnos) return;
+        const cfg = turnosDelFormulario();
+        if (!turnosValidos(cfg)) {
+            vistaPreviaTurnos.textContent = 'Completá la hora de arranque, de 5 a 180 minutos por turno y de 1 a 30 turnos.';
+            return;
+        }
+        const turnos = turnosDe(cfg);
+        vistaPreviaTurnos.textContent = 'Turnos: ' + turnos.join(' · ')
+            + (turnos.length < cfg.cantidad ? ` (entran ${turnos.length}: el resto pasaría de las 24:00)` : '');
+    }
+
+    function mostrarTurnosJornada() {
+        const cfg = obtenerTurnosJornada();
+        if (inputTurnosInicio) inputTurnosInicio.value = cfg.inicio;
+        if (inputTurnosMinutos) inputTurnosMinutos.value = cfg.minutos;
+        if (inputTurnosCantidad) inputTurnosCantidad.value = cfg.cantidad;
+        mostrarVistaPreviaTurnos();
+    }
+
+    [inputTurnosInicio, inputTurnosMinutos, inputTurnosCantidad].forEach(campo => {
+        if (campo) campo.addEventListener('input', mostrarVistaPreviaTurnos);
+    });
+
+    if (btnGuardarTurnos) {
+        btnGuardarTurnos.addEventListener('click', () => {
+            const cfg = turnosDelFormulario();
+            if (!turnosValidos(cfg)) {
+                alert('Revisá los turnos: la hora de arranque, de 5 a 180 minutos por turno y de 1 a 30 turnos.');
+                return;
+            }
+            const turnos = turnosDe(cfg);
+            cfg.cantidad = turnos.length;
+            almacen.setItem('liga_turnos_jornada', JSON.stringify(cfg));
+            mostrarTurnosJornada();
+            // Un horario que ya no es turno se conserva solo si se está editando un partido que lo tiene.
+            const elegido = inputHorarioPartido ? inputHorarioPartido.value : '';
+            armarOpcionesHorario(idPartidoEnEdicion !== null || turnos.includes(elegido) ? elegido : '');
+            alert(`Turnos guardados: ${turnos.join(', ')}.`);
+        });
+    }
+
+    // ── Árbitros (liga_arbitros, en configStaff): lista de nombres para elegir en "Árbitro Asignado". El partido sigue
+    // guardando el nombre como texto, así quitar a alguien de la lista no cambia los partidos ya cargados.
+    const selectArbitroPartido = document.getElementById('partido-arbitro-nombre');
+    const inputArbitroNuevo = document.getElementById('arbitro-nuevo-nombre');
+    const btnAgregarArbitro = document.getElementById('btn-agregar-arbitro');
+    const listaArbitrosEl = document.getElementById('lista-arbitros');
+    const ARBITRO_SIN_ASIGNAR = 'Por asignar';
+
+    function obtenerArbitros() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_arbitros')); } catch (e) { guardado = null; }
+        return Array.isArray(guardado) ? guardado.map(n => String(n).trim()).filter(Boolean) : [];
+    }
+
+    const mismoArbitro = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+    // valorDeseado: el árbitro del partido que se edita, o el elegido antes de guardar. Si no está en la lista
+    // (un partido viejo, o lo quitaron) igual se muestra, para no cambiarlo sin querer.
+    function armarOpcionesArbitro(valorDeseado) {
+        if (!selectArbitroPartido) return;
+        let valor = valorDeseado !== undefined ? valorDeseado : selectArbitroPartido.value;
+        if (!valor || mismoArbitro(valor, ARBITRO_SIN_ASIGNAR)) valor = '';
+        const arbitros = obtenerArbitros().sort((a, b) => a.localeCompare(b, 'es'));
+        const enLista = arbitros.find(n => valor && mismoArbitro(n, valor));
+        selectArbitroPartido.innerHTML = `<option value="">${ARBITRO_SIN_ASIGNAR}</option>`
+            + (valor && !enLista ? `<option value="${attrSeguro(valor)}">${attrSeguro(valor)} (no está en la lista)</option>` : '')
+            + arbitros.map(n => `<option value="${attrSeguro(n)}">${attrSeguro(n)}</option>`).join('');
+        selectArbitroPartido.value = enLista || valor;
+    }
+
+    function renderizarListaArbitros() {
+        if (!listaArbitrosEl) return;
+        const arbitros = obtenerArbitros().sort((a, b) => a.localeCompare(b, 'es'));
+        listaArbitrosEl.innerHTML = arbitros.length === 0
+            ? '<li class="arbitros-vacio">Todavía no hay árbitros cargados.</li>'
+            : arbitros.map(n => `<li class="arbitros-item"><span>${attrSeguro(n)}</span>`
+                + `<button type="button" class="arbitros-btn-quitar" data-nombre="${attrSeguro(n)}">Quitar</button></li>`).join('');
+    }
+
+    function agregarArbitro() {
+        if (!inputArbitroNuevo) return;
+        const nombre = inputArbitroNuevo.value.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+        if (!nombre) {
+            alert('Escribí el nombre del árbitro.');
+            return;
+        }
+        if (mismoArbitro(nombre, ARBITRO_SIN_ASIGNAR)) {
+            alert('"Por asignar" ya es una opción de la lista: escribí el nombre del árbitro.');
+            return;
+        }
+        const arbitros = obtenerArbitros();
+        if (arbitros.some(n => mismoArbitro(n, nombre))) {
+            alert(`${nombre} ya está en la lista.`);
+            return;
+        }
+        arbitros.push(nombre);
+        almacen.setItem('liga_arbitros', JSON.stringify(arbitros));
+        inputArbitroNuevo.value = '';
+        renderizarListaArbitros();
+        armarOpcionesArbitro();
+    }
+
+    if (btnAgregarArbitro) btnAgregarArbitro.addEventListener('click', agregarArbitro);
+    if (inputArbitroNuevo) {
+        inputArbitroNuevo.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                agregarArbitro();
+            }
+        });
+    }
+
+    if (listaArbitrosEl) {
+        listaArbitrosEl.addEventListener('click', (e) => {
+            const boton = e.target.closest('.arbitros-btn-quitar');
+            if (!boton) return;
+            const nombre = boton.dataset.nombre;
+            if (!confirm(`¿Quitar a ${nombre} de la lista de árbitros? Los partidos que ya lo tienen asignado no cambian.`)) return;
+            almacen.setItem('liga_arbitros', JSON.stringify(obtenerArbitros().filter(n => !mismoArbitro(n, nombre))));
+            renderizarListaArbitros();
+            armarOpcionesArbitro();
+        });
     }
 
     if (checkHorarioConfirmar) checkHorarioConfirmar.addEventListener('change', aplicarHorarioAConfirmar);
@@ -1365,12 +1559,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     diaAutocompletado = diaStorageAInput(diaDeCalendario(p.ciclo, p.fecha));
                     if (inputArancelPartido) inputArancelPartido.value = p.arancelExigido || 30000;
                     if (checkHorarioConfirmar) checkHorarioConfirmar.checked = !p.horario;
-                    document.getElementById('partido-horario').value = p.horario || '';
+                    armarOpcionesHorario(p.horario || '');
                     aplicarHorarioAConfirmar();
                     document.getElementById('partido-cancha').value = p.cancha || 'Cancha 1';
                     if (checkCanchaConfirmar) checkCanchaConfirmar.checked = !p.cancha;
                     aplicarCanchaAConfirmar();
-                    document.getElementById('partido-arbitro-nombre').value = p.arbitro || '';
+                    armarOpcionesArbitro(p.arbitro || '');
 
                     recargarPools();
                     const poolEdicion = p.ciclo === 'basico' ? poolBasico : poolSuperior;
@@ -1443,7 +1637,6 @@ document.addEventListener('liga:datos-listos', (evento) => {
         // Conservamos ese contexto y limpiamos sólo lo que cambia de un partido al otro
         // (equipos, goles, dorsales y penales).
         const inputArancel = inputArancelPartido;
-        const inputArbitro = document.getElementById('partido-arbitro-nombre');
         const selectCancha = document.getElementById('partido-cancha');
 
         const contexto = {
@@ -1452,11 +1645,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
             copa: selectCopaPartido ? selectCopaPartido.value : "oro",
             grupo: grupoSelect ? grupoSelect.value : "",
             dia: inputDiaPartido ? inputDiaPartido.value : "",
-            horario: inputHorarioPartido ? inputHorarioPartido.value : "14:20",
+            horario: inputHorarioPartido ? inputHorarioPartido.value : "",
             horarioAConfirmar: checkHorarioConfirmar ? checkHorarioConfirmar.checked : false,
             cancha: selectCancha ? selectCancha.value : "Cancha 1",
             canchaAConfirmar: checkCanchaConfirmar ? checkCanchaConfirmar.checked : false,
-            arbitro: inputArbitro ? inputArbitro.value : "",
+            arbitro: selectArbitroPartido ? selectArbitroPartido.value : "",
             arancel: inputArancel ? inputArancel.value : ""
         };
 
@@ -1476,12 +1669,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (inputDiaPartido) inputDiaPartido.value = contexto.dia;
         diaAutocompletado = diaCalendarioDelFormulario();
         if (checkHorarioConfirmar) checkHorarioConfirmar.checked = contexto.horarioAConfirmar;
-        if (inputHorarioPartido) inputHorarioPartido.value = contexto.horario;
+        // Un horario fuera de turno o un árbitro que no está en la lista (de un partido viejo recién editado) no pasan
+        // al partido siguiente.
+        armarOpcionesHorario(turnosDe(obtenerTurnosJornada()).includes(contexto.horario) ? contexto.horario : '');
         aplicarHorarioAConfirmar();
         if (selectCancha) selectCancha.value = contexto.cancha;
         if (checkCanchaConfirmar) checkCanchaConfirmar.checked = contexto.canchaAConfirmar;
         aplicarCanchaAConfirmar();
-        if (inputArbitro) inputArbitro.value = contexto.arbitro;
+        armarOpcionesArbitro(obtenerArbitros().some(n => contexto.arbitro && mismoArbitro(n, contexto.arbitro)) ? contexto.arbitro : '');
         if (inputArancel && contexto.arancel) inputArancel.value = contexto.arancel;
 
         armarOpcionesMvp('');
@@ -1655,11 +1850,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     : null,
                 horario: (checkHorarioConfirmar && checkHorarioConfirmar.checked)
                     ? ''
-                    : ((inputHorarioPartido ? inputHorarioPartido.value.trim() : '') || "14:20"),
+                    : (inputHorarioPartido ? inputHorarioPartido.value : ''),
                 cancha: (checkCanchaConfirmar && checkCanchaConfirmar.checked)
                     ? ''
                     : (document.getElementById('partido-cancha').value || "Cancha 1"),
-                arbitro: document.getElementById('partido-arbitro-nombre').value.trim() || "Por asignar",
+                arbitro: (selectArbitroPartido ? selectArbitroPartido.value : '') || ARBITRO_SIN_ASIGNAR,
                 goleadoresLocal: arrayGolesLocal,
                 goleadoresVisitante: arrayGolesVisita,
                 amarillasLocal: tarjetas.amarillasLocal,
@@ -2768,6 +2963,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             sancionesTocadas = true;
         });
         if (sancionesTocadas) almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+
+        if (cambioDni) cambiarDniFotoPendiente(antes.dni, despues.dni);
     }
 
     function renderizarTablaJugadores() {
@@ -5145,6 +5342,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // como los goleadores) y de ahí salen los PJ de cada jugador. La ficha médica es un dato del jugador
     // (se comparte con Equipos y Planteles).
     const bfAbiertos = new Set();
+    // Fotos sacadas en cancha que todavía no subieron (clave: solo los dígitos del DNI). Ver "Fotos en cancha".
+    const fotosCola = new Map();
     const MAX_JUGADORES_LISTA = 10;
     const MINIMO_JUGADORES_PARTIDO = 4;
 
@@ -5253,10 +5452,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const etiquetaSusp = susp ? `<span class="bf-tag-susp">SUSPENDIDO · Acta ${attrSeguro(susp.acta)} · ${susp.puntosRestados} ${Number(susp.puntosRestados) === 1 ? 'fecha' : 'fechas'}</span>` : '';
             return `
                 <div class="bf-fila ${presente && (!ficha || susp) ? 'bf-fila-alerta' : ''}" data-susp="${susp ? 1 : 0}">
-                    <div class="bf-jugador">
-                        <span class="bf-nombre">${dorsalBF(j)} ${attrSeguro(j.nombre)}</span>
-                        ${etiquetaSusp}
-                        <span class="bf-dni">DNI ${attrSeguro(j.dni)}</span>
+                    <div class="bf-celda-jugador">
+                        ${htmlFotoBF(j, t.nombre, ciclo)}
+                        <div class="bf-jugador">
+                            <span class="bf-nombre">${dorsalBF(j)} ${attrSeguro(j.nombre)}</span>
+                            ${etiquetaSusp}
+                            <span class="bf-dni">DNI ${attrSeguro(j.dni)}</span>
+                        </div>
                     </div>
                     <label class="bf-check">
                         <input type="checkbox" class="bf-chk-asist" ${datos} data-jid="${id}" ${presente ? 'checked' : ''} aria-label="Asistió: ${attrSeguro(j.nombre)}">
@@ -5426,6 +5628,313 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return { traslado: hallado };
     }
 
+    // ============================================================
+    // FOTOS EN CANCHA (lista de buena fe)
+    // ============================================================
+    // Cada jugador de la lista tiene un botón de cámara: la identidad sale de la fila, no del nombre. La foto se
+    // comprime en el celular y queda guardada en el dispositivo (IndexedDB); una cola la sube sola a Cloudinary
+    // cuando hay señal y recién entonces escribe la URL en el jugador. El staff nunca espera una subida.
+    // La clave de cada foto pendiente son los dígitos del DNI. Si una foto no se puede subir (Cloudinary la
+    // rechaza, se agotan los reintentos o ya no está el jugador) queda un aviso en Avisos Internos, una sola vez.
+    const FOTOS_DB = 'mitre-league-fotos-pendientes';
+    const FOTOS_STORE = 'fotos';
+    const FOTO_ESPERA_BASE_MS = 10000;
+    const FOTO_ESPERA_MAX_MS = 5 * 60 * 1000;
+    const FOTO_INTENTOS_AVISO = 6;
+    const SVG_CAMARA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg>';
+
+    let fotosBase = null;
+    let fotosTimer = null;
+    let fotosProcesando = false;
+    let fotosOcultarAviso = null;
+    let fotosHuboPendientes = false;
+    let fotosAvisoSoloMemoria = false;
+
+    function abrirBaseFotos() {
+        if (fotosBase) return fotosBase;
+        fotosBase = new Promise(resolve => {
+            try {
+                const pedido = indexedDB.open(FOTOS_DB, 1);
+                pedido.onupgradeneeded = () => pedido.result.createObjectStore(FOTOS_STORE, { keyPath: 'dni' });
+                pedido.onsuccess = () => resolve(pedido.result);
+                pedido.onerror = () => resolve(null);
+                pedido.onblocked = () => resolve(null);
+            } catch (e) {
+                resolve(null);
+            }
+        });
+        return fotosBase;
+    }
+
+    async function operarBaseFotos(modo, accion) {
+        const db = await abrirBaseFotos();
+        if (!db) return { ok: false };
+        return new Promise(resolve => {
+            try {
+                const tx = db.transaction(FOTOS_STORE, modo);
+                const pedido = accion(tx.objectStore(FOTOS_STORE));
+                tx.oncomplete = () => resolve({ ok: true, valor: pedido ? pedido.result : undefined });
+                tx.onerror = tx.onabort = () => resolve({ ok: false });
+            } catch (e) {
+                resolve({ ok: false });
+            }
+        });
+    }
+
+    async function guardarFotoEnBase(reg) {
+        return (await operarBaseFotos('readwrite', store => store.put(reg))).ok;
+    }
+
+    async function borrarFotoDeBase(dni) {
+        return (await operarBaseFotos('readwrite', store => store.delete(dni))).ok;
+    }
+
+    async function leerFotosDeBase() {
+        const r = await operarBaseFotos('readonly', store => store.getAll());
+        return r.ok && Array.isArray(r.valor) ? r.valor : [];
+    }
+
+    function estadoFotoBF(j) {
+        const reg = fotosCola.get(soloDigitosDni(j.dni));
+        if (reg) return { clase: (reg.avisada || reg.bloqueada) ? 'problema' : 'pendiente', src: reg.dataUrl, reg };
+        if (j.foto) return { clase: 'ok', src: j.foto };
+        return { clase: 'sin', src: '' };
+    }
+
+    function tituloFotoBF(est) {
+        if (est.clase === 'ok') return 'Tocá para cambiar la foto';
+        if (est.clase === 'pendiente') return 'Foto sacada: se sube sola cuando haya señal. Tocá para sacarla de nuevo';
+        if (est.clase === 'problema') return 'No se pudo subir esta foto' + (est.reg && est.reg.motivo ? ': ' + est.reg.motivo : '') + '. Tocá para sacarla de nuevo';
+        return 'Sacar foto';
+    }
+
+    function htmlVistaFotoBF(est) {
+        return est.src ? `<img src="${attrSeguro(est.src)}" alt="">` : SVG_CAMARA;
+    }
+
+    function htmlFotoBF(j, equipoNombre, ciclo) {
+        const est = estadoFotoBF(j);
+        return `<label class="bf-foto" data-estado="${est.clase}" data-dni="${attrSeguro(soloDigitosDni(j.dni))}" title="${attrSeguro(tituloFotoBF(est))}">
+            <input type="file" accept="image/*" capture="environment" class="bf-foto-input" data-jid="${attrSeguro(idJugadorBF(j))}" data-equipo="${attrSeguro(equipoNombre)}" data-ciclo="${ciclo}" aria-label="Sacar foto: ${attrSeguro(j.nombre)}">
+            <span class="bf-foto-vista">${htmlVistaFotoBF(est)}</span>
+        </label>`;
+    }
+
+    // Repinta el botón de ese jugador en todas las listas abiertas, sin redibujar nada más.
+    function pintarFotoBF(dni) {
+        document.querySelectorAll('.bf-foto[data-dni="' + dni + '"]').forEach(el => {
+            const input = el.querySelector('.bf-foto-input');
+            const equipo = input && buscarEquipoBF(input.dataset.equipo, input.dataset.ciclo);
+            const jugador = equipo && (equipo.jugadores || []).find(x => soloDigitosDni(x.dni) === dni);
+            if (!jugador) return;
+            const est = estadoFotoBF(jugador);
+            el.dataset.estado = est.clase;
+            el.title = tituloFotoBF(est);
+            el.querySelector('.bf-foto-vista').innerHTML = htmlVistaFotoBF(est);
+        });
+    }
+
+    function actualizarAvisoFotos() {
+        const barra = document.getElementById('aviso-fotos-pendientes');
+        const texto = document.getElementById('texto-fotos-pendientes');
+        const boton = document.getElementById('btn-subir-fotos-ahora');
+        if (!barra || !texto || !boton) return;
+        clearTimeout(fotosOcultarAviso);
+        const regs = [...fotosCola.values()];
+
+        if (regs.length === 0) {
+            if (!fotosHuboPendientes) { barra.hidden = true; return; }
+            fotosHuboPendientes = false;
+            texto.textContent = 'Listo: todas las fotos se subieron.';
+            boton.hidden = true;
+            barra.hidden = false;
+            fotosOcultarAviso = setTimeout(() => { barra.hidden = true; }, 5000);
+            return;
+        }
+
+        fotosHuboPendientes = true;
+        const conProblema = regs.filter(r => r.avisada || r.bloqueada).length;
+        let t = regs.length === 1 ? '1 foto pendiente de subir' : `${regs.length} fotos pendientes de subir`;
+        if (!navigator.onLine) t += ' (sin conexión: se suben solas cuando vuelva la señal)';
+        if (conProblema > 0) t += ` · ${conProblema} con problema (mirá Avisos Internos)`;
+        if (fotosAvisoSoloMemoria) t += ' · no cierres el panel: este navegador no las guarda sin conexión';
+        texto.textContent = t;
+        boton.hidden = false;
+        barra.hidden = false;
+    }
+
+    async function tomarFotoJugador(input) {
+        const archivo = input.files && input.files[0];
+        const dni = soloDigitosDni(input.dataset.jid);
+        input.value = '';
+        if (!archivo || dni === '') return;
+        const equipo = buscarEquipoBF(input.dataset.equipo, input.dataset.ciclo);
+        const jugador = equipo && (equipo.jugadores || []).find(j => soloDigitosDni(j.dni) === dni);
+        if (!jugador) return;
+
+        let dataUrl;
+        try {
+            dataUrl = await comprimirImagen(archivo, MAX_LADO_FOTO_JUGADOR, CALIDAD_JPEG);
+        } catch (err) {
+            alert('No se pudo procesar la foto: ' + err.message);
+            return;
+        }
+
+        const reg = {
+            dni, dataUrl,
+            nombre: jugador.nombre,
+            dorsal: (jugador.dorsal === undefined || jugador.dorsal === null) ? '' : String(jugador.dorsal),
+            equipo: equipo.nombre,
+            ciclo: input.dataset.ciclo,
+            estado: 'pendiente', intentos: 0, proximoIntento: 0, motivo: '',
+            avisada: false, bloqueada: false, urlSubida: '',
+            creada: Date.now()
+        };
+        fotosCola.set(dni, reg);
+        if (!(await guardarFotoEnBase(reg)) && !fotosAvisoSoloMemoria) {
+            fotosAvisoSoloMemoria = true;
+            alert('Este navegador no puede guardar fotos sin conexión. La foto se sube igual, pero si cerrás el panel antes de que termine se pierde.');
+        }
+        pintarFotoBF(dni);
+        actualizarAvisoFotos();
+        vaciarColaFotos();
+    }
+
+    function avisarFotoNoSubida(reg) {
+        reg.avisada = true;
+        const motivo = (reg.motivo || 'motivo desconocido').replace(/\.$/, '');
+        const dorsal = reg.dorsal !== '' ? ` (#${reg.dorsal})` : '';
+        registrarAvisoStaff('foto_no_subida', `No se pudo subir la foto de ${reg.nombre}${dorsal}, ${reg.equipo} (${reg.ciclo === 'basico' ? 'Básico' : 'Superior'}): ${motivo}. La foto sigue guardada en este celular: tocá "Subir ahora" o volvé a sacarla.`);
+    }
+
+    async function subirFotoDeCola(reg) {
+        reg.estado = 'subiendo';
+        pintarFotoBF(reg.dni);
+        actualizarAvisoFotos();
+
+        let url = reg.urlSubida;
+        if (!url) {
+            try {
+                url = await enviarACloudinary(reg.dataUrl);
+            } catch (err) {
+                reg.estado = 'pendiente';
+                reg.intentos = (reg.intentos || 0) + 1;
+                reg.motivo = err.message;
+                // Si Cloudinary respondió que no la acepta, reintentar solo no sirve: espera a que alguien la reintente.
+                const rechazada = err.estado >= 400 && err.estado < 500 && err.estado !== 408 && err.estado !== 429;
+                if (rechazada) reg.bloqueada = true;
+                else reg.proximoIntento = Date.now() + Math.min(FOTO_ESPERA_MAX_MS, FOTO_ESPERA_BASE_MS * Math.pow(2, reg.intentos - 1));
+                if ((reg.bloqueada || reg.intentos >= FOTO_INTENTOS_AVISO) && !reg.avisada) avisarFotoNoSubida(reg);
+                // Si mientras subía sacaron otra foto del mismo jugador, esta ya no es la vigente: no se toca la base.
+                if (fotosCola.get(reg.dni) === reg) await guardarFotoEnBase(reg);
+                pintarFotoBF(reg.dni);
+                actualizarAvisoFotos();
+                return;
+            }
+            reg.urlSubida = url;
+        }
+
+        // La foto ya está arriba. Los planteles se leen recién ahora, sin esperas hasta el guardado, así un cambio
+        // ajeno durante la subida no deja esto escrito sobre una copia vieja.
+        recargarPools();
+        const hallado = buscarDniEnTorneo(reg.dni);
+        if (!hallado) {
+            reg.estado = 'pendiente';
+            reg.bloqueada = true;
+            reg.motivo = 'no se encontró al jugador en los planteles (¿le cambiaron el DNI o lo dieron de baja?)';
+            if (!reg.avisada) avisarFotoNoSubida(reg);
+            if (fotosCola.get(reg.dni) === reg) await guardarFotoEnBase(reg);
+            pintarFotoBF(reg.dni);
+            actualizarAvisoFotos();
+            return;
+        }
+        hallado.jugador.foto = url;
+        guardarEquiposEnStorage();
+        // Si sacaron otra foto del mismo jugador mientras subía, esa sigue en la cola y pisará a esta.
+        if (fotosCola.get(reg.dni) === reg) {
+            fotosCola.delete(reg.dni);
+            await borrarFotoDeBase(reg.dni);
+        }
+        pintarFotoBF(reg.dni);
+        if (typeof renderizarTablaJugadores === 'function') renderizarTablaJugadores();
+        actualizarAvisoFotos();
+    }
+
+    async function vaciarColaFotos() {
+        if (fotosProcesando) return;
+        fotosProcesando = true;
+        try {
+            for (const reg of [...fotosCola.values()]) {
+                if (!navigator.onLine) break;
+                if (reg.bloqueada || (reg.proximoIntento && reg.proximoIntento > Date.now())) continue;
+                if (fotosCola.get(reg.dni) !== reg) continue;
+                await subirFotoDeCola(reg);
+            }
+        } finally {
+            fotosProcesando = false;
+        }
+        programarReintentoFotos();
+    }
+
+    function programarReintentoFotos() {
+        clearTimeout(fotosTimer);
+        if (!navigator.onLine) return;
+        const esperas = [...fotosCola.values()].filter(r => !r.bloqueada && r.proximoIntento).map(r => r.proximoIntento - Date.now());
+        if (esperas.length === 0) return;
+        fotosTimer = setTimeout(vaciarColaFotos, Math.max(1000, Math.min(...esperas)));
+    }
+
+    function subirFotosAhora() {
+        fotosCola.forEach(reg => {
+            reg.bloqueada = false;
+            reg.intentos = 0;
+            reg.proximoIntento = 0;
+            guardarFotoEnBase(reg);
+            pintarFotoBF(reg.dni);
+        });
+        actualizarAvisoFotos();
+        vaciarColaFotos();
+    }
+
+    // Si se corrige el DNI de un jugador con la foto todavía sin subir, la foto lo sigue.
+    function cambiarDniFotoPendiente(dniAntes, dniDespues) {
+        const viejo = soloDigitosDni(dniAntes);
+        const nuevo = soloDigitosDni(dniDespues);
+        const reg = fotosCola.get(viejo);
+        if (!reg || viejo === nuevo) return;
+        fotosCola.delete(viejo);
+        borrarFotoDeBase(viejo);
+        reg.dni = nuevo;
+        reg.bloqueada = false;
+        reg.proximoIntento = 0;
+        fotosCola.set(nuevo, reg);
+        guardarFotoEnBase(reg);
+        pintarFotoBF(viejo);
+        pintarFotoBF(nuevo);
+        actualizarAvisoFotos();
+        // Después del guardado de quien corrigió el DNI, no en medio.
+        setTimeout(vaciarColaFotos, 0);
+    }
+
+    async function iniciarColaFotos() {
+        const guardadas = await leerFotosDeBase();
+        guardadas.forEach(reg => {
+            if (fotosCola.has(reg.dni)) return;
+            reg.estado = 'pendiente';
+            fotosCola.set(reg.dni, reg);
+        });
+        document.querySelectorAll('.bf-foto').forEach(el => pintarFotoBF(el.dataset.dni));
+        actualizarAvisoFotos();
+        vaciarColaFotos();
+    }
+
+    const btnSubirFotosAhora = document.getElementById('btn-subir-fotos-ahora');
+    if (btnSubirFotosAhora) btnSubirFotosAhora.addEventListener('click', subirFotosAhora);
+    window.addEventListener('online', () => { actualizarAvisoFotos(); vaciarColaFotos(); });
+    window.addEventListener('offline', actualizarAvisoFotos);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) vaciarColaFotos(); });
+    iniciarColaFotos();
+
     function textoConfirmarTraslado(hallado, equipoDestino) {
         return `${hallado.jugador.nombre} (DNI ${hallado.jugador.dni}) está inscripto en ${hallado.equipo.nombre} y todavía no jugó ningún partido con ese equipo. ¿Pasarlo a ${equipoDestino.nombre}? Se lo saca de ${hallado.equipo.nombre}.`;
     }
@@ -5587,18 +6096,88 @@ document.addEventListener('liga:datos-listos', (evento) => {
             </section>`;
     }
 
-    function imprimirPlanillas(lista) {
-        const aImprimir = lista.filter(p => p && p.local && p.visitante).sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha));
-        if (aImprimir.length === 0) { alert('No hay partidos para imprimir con este filtro.'); return; }
-        recargarPools();
+    function contenedorImprimible() {
         let contenedor = document.getElementById('vista-imprimible');
         if (!contenedor) {
             contenedor = document.createElement('div');
             contenedor.id = 'vista-imprimible';
             document.body.appendChild(contenedor);
         }
-        contenedor.innerHTML = aImprimir.map(htmlPlanillaPartido).join('');
+        return contenedor;
+    }
+
+    function imprimirPlanillas(lista) {
+        const aImprimir = lista.filter(p => p && p.local && p.visitante).sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha));
+        if (aImprimir.length === 0) { alert('No hay partidos para imprimir con este filtro.'); return; }
+        recargarPools();
+        contenedorImprimible().innerHTML = aImprimir.map(htmlPlanillaPartido).join('');
         window.print();
+    }
+
+    // Hoja de horarios de una fecha (pedido de Joaquín, 14/10/2026), con el formato de la planilla que armaban en Excel:
+    // Local | día y hora | Visitante | grupo ("A - BAS" = Grupo A del Básico), más Cancha y Árbitro. Los dos ciclos
+    // juntos, por turno y dentro del turno por cancha; los de horario a confirmar van al final.
+    function etiquetaGrupoHorario(p) {
+        const ciclo = p.ciclo || 'superior';
+        const sigla = ciclo === 'basico' ? 'BAS' : 'SUP';
+        if (Number(p.fecha) >= 100) {
+            const copa = nombreCopa(ciclo, copaDe(p));
+            return `${copa ? copa.replace(/^copa\s+/i, '').toUpperCase() : 'PLAYOFF'} - ${sigla}`;
+        }
+        if (p.grupo === 'Interzonal') return `INTERZ. - ${sigla}`;
+        if (p.grupo === 'Unico') return `ÚNICA - ${sigla}`;
+        return `${p.grupo || '?'} - ${sigla}`;
+    }
+
+    function imprimirHorariosFecha(fecha) {
+        const comparar = (a, b) => (a || '￿').localeCompare(b || '￿', 'es', { numeric: true });
+        const lista = partidos.filter(p => p && p.local && p.visitante && String(p.fecha) === String(fecha))
+            .sort((a, b) => comparar(a.horario, b.horario) || comparar(a.cancha, b.cancha)
+                || ((a.ciclo || 'superior') === (b.ciclo || 'superior') ? 0 : ((a.ciclo || 'superior') === 'superior' ? -1 : 1)));
+        if (lista.length === 0) { alert('Esta fecha no tiene partidos cargados.'); return; }
+
+        let turno = -1, horarioPrevio = null;
+        const filas = lista.map(p => {
+            if (p.horario !== horarioPrevio) { turno++; horarioPrevio = p.horario; }
+            const basico = (p.ciclo || 'superior') === 'basico';
+            return `<tbody class="hor-partido${turno % 2 === 0 ? ' hor-turno-par' : ''}">
+                <tr>
+                    <td rowspan="2" class="hor-equipo">${attrSeguro(p.local)}</td>
+                    <td class="hor-centro">${attrSeguro(p.dia || 'Día a confirmar')}</td>
+                    <td rowspan="2" class="hor-equipo">${attrSeguro(p.visitante)}</td>
+                    <td rowspan="2" class="hor-centro hor-grupo ${basico ? 'hor-grupo-bas' : 'hor-grupo-sup'}">${attrSeguro(etiquetaGrupoHorario(p))}</td>
+                    <td rowspan="2" class="hor-centro">${attrSeguro(p.cancha || 'A confirmar')}</td>
+                    <td rowspan="2" class="hor-centro">${attrSeguro(p.arbitro || ARBITRO_SIN_ASIGNAR)}</td>
+                </tr>
+                <tr><td class="hor-centro hor-hora">${p.horario ? attrSeguro(p.horario) + ' HS' : 'A CONFIRMAR'}</td></tr>
+            </tbody>`;
+        }).join('');
+
+        const playoff = Number(fecha) >= 100;
+        const titulo = playoff ? nombreFaseTeso(fecha) : `FASE DE GRUPOS (${nombreFaseTeso(fecha)})`;
+        contenedorImprimible().innerHTML = `
+            <section class="hor-hoja">
+                <table class="hor-tabla">
+                    <thead>
+                        <tr><th colspan="6" class="hor-titulo">${attrSeguro(titulo)} - MITRE LEAGUE</th></tr>
+                        <tr><th>LOCAL</th><th>DÍA / HORA</th><th>VISITANTE</th><th>${playoff ? 'COPA' : 'GRUPO'}</th><th>CANCHA</th><th>ÁRBITRO</th></tr>
+                    </thead>
+                    ${filas}
+                </table>
+            </section>`;
+        window.print();
+    }
+
+    const btnImprimirHorarios = document.getElementById('btn-imprimir-horarios');
+    if (btnImprimirHorarios) {
+        btnImprimirHorarios.addEventListener('click', () => {
+            const fecha = selectFiltroCronograma ? selectFiltroCronograma.value : 'todas';
+            if (!fecha || fecha === 'todas') {
+                alert('Elegí una fecha en el filtro del Cronograma ("Todas las Fechas" no se imprime) y volvé a tocar "Imprimir horarios".');
+                return;
+            }
+            imprimirHorariosFecha(fecha);
+        });
     }
 
     function renderizarTesoreriaPartidos() {
@@ -5713,7 +6292,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
             else if (btn.classList.contains('bf-alta-guardar')) agregarJugadorEnCancha(btn);
         });
         contenedorTesoPartidos.addEventListener('change', (e) => {
-            if (e.target.classList && e.target.classList.contains('bf-chk-asist')) marcarAsistenciaBF(e.target);
+            if (!e.target.classList) return;
+            if (e.target.classList.contains('bf-chk-asist')) marcarAsistenciaBF(e.target);
+            else if (e.target.classList.contains('bf-foto-input')) tomarFotoJugador(e.target);
         });
         contenedorTesoPartidos.addEventListener('toggle', (e) => {
             if (!e.target.classList || !e.target.classList.contains('bf-detalle')) return;
@@ -6279,6 +6860,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // 9. INICIALIZACIÓN GENERAL AL CARGAR ADMIN.HTML
     // ============================================================
     mostrarFechasGrupos();
+    mostrarTurnosJornada();
+    armarOpcionesHorario();
+    renderizarListaArbitros();
+    armarOpcionesArbitro();
     actualizarOpcionesGrupo();
     renderizarCalendarioFechas();
     autocompletarDiaPartido();

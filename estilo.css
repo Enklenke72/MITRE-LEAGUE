@@ -320,7 +320,7 @@ font-size: 14px;
 .hero-section {
     width: 80%;
     height: 400px;
-    background-image: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url('./Recursos/Fotos/DSC05325.JPG');
+    background-image: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7));
     background-size: cover;       /* La foto cubre todo el espacio*/
     background-position: center;  /* Centra la foto*/
 
@@ -1893,7 +1893,7 @@ body.scrolled .sidebar-bottom {
     font-family: 'Oswald', sans-serif;
 }
 .hero-card-content h2 { margin: 0 0 5px 0; font-size: 26px; text-transform: uppercase; text-shadow: 2px 2px 5px rgba(0,0,0,0.8); }
-.hero-card-content p { margin: 0; font-family: 'Oswald', sans-serif; font-size: 11px; color: #cbd5e1; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
+.hero-card-content p { margin: 0; font-family: 'Oswald', sans-serif; font-size: 13px; color: #cbd5e1; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
 
 /* ── POSICIONES 3D DEL HERO ── */
 .hero-card-3d.hero-center { 
@@ -2843,6 +2843,29 @@ body.scrolled .dashboard-container section {
 .btn-playoff-copa[data-copa-playoff="oro"].active { color: #f2c00e; border-color: rgba(242, 192, 14, 0.6); }
 .btn-playoff-copa[data-copa-playoff="plata"].active { color: #c5cedc; border-color: rgba(197, 206, 220, 0.6); }
 
+/* Título de la copa arriba de las llaves (solo con Oro y Plata) */
+.titulo-copa-playoff {
+    font-family: 'Michroma', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-align: center;
+    margin: 6px 0 14px;
+    color: #f2c00e;
+    text-shadow: 0 0 12px rgba(242, 192, 14, 0.35);
+}
+.titulo-copa-playoff[data-copa="plata"] { color: #c5cedc; text-shadow: 0 0 12px rgba(197, 206, 220, 0.3); }
+.titulo-copa-playoff[hidden] { display: none; }
+@media (max-width: 600px) {
+    .titulo-copa-playoff { font-size: 15px; letter-spacing: 2px; margin-bottom: 10px; }
+}
+
+/* Goleadores por copa: segunda fila de pestañas debajo de Superior / Básico */
+.tabs-gol-copa { display: flex; gap: 5px; justify-content: center; margin-bottom: 12px; }
+.tabs-gol-copa[hidden] { display: none; }
+.tabs-gol-copa .tab-btn { font-size: 10px; padding: 4px 8px; }
+.btn-gol-copa[data-copa-gol="oro"].active { color: #f2c00e; border-color: rgba(242, 192, 14, 0.6); }
+.btn-gol-copa[data-copa-gol="plata"].active { color: #c5cedc; border-color: rgba(197, 206, 220, 0.6); }
+
 
 
 
@@ -2907,7 +2930,9 @@ body.scrolled .dashboard-container section {
 /* Grilla de 3 Columnas */
 .match-header-grid {
     display: grid !important;
-    grid-template-columns: 1fr auto 1fr !important;
+    /* El centro (VS, día, cancha y horario) nunca pasa del 45%: si no, con textos largos como
+       "Cancha a confirmar | Horario a confirmar" les comía el ancho a los equipos. */
+    grid-template-columns: 1fr fit-content(45%) 1fr !important;
     align-items: center !important;
     gap: 10px !important;
 }
@@ -2951,7 +2976,14 @@ body.scrolled .dashboard-container section {
     font-size: 9px !important;
     color: #869bd8 !important;
     margin-top: 3px !important;
-    white-space: nowrap !important;
+    line-height: 1.4 !important;
+}
+
+/* El nombre del equipo se corta entre palabras, nunca letra por letra. */
+.col-team .team-name {
+    word-break: normal;
+    overflow-wrap: break-word;
+    min-width: 0;
 }
 
 .arrow-indicator {
@@ -3702,6 +3734,17 @@ body::-webkit-scrollbar-thumb {
     background: rgba(74, 222, 128, 0.08);
     border: 1px solid rgba(74, 222, 128, 0.3);
 }
+.perfil-jugador-ranking[hidden] { display: none; }
+.perfil-jugador-ranking.copa-oro {
+    color: #f2c00e;
+    background: rgba(242, 192, 14, 0.08);
+    border-color: rgba(242, 192, 14, 0.35);
+}
+.perfil-jugador-ranking.copa-plata {
+    color: #c5cedc;
+    background: rgba(197, 206, 220, 0.08);
+    border-color: rgba(197, 206, 220, 0.35);
+}
 .perfil-jugador-ranking.sin-goles {
     color: #869bd8;
     background: rgba(26, 50, 116, 0.3);
@@ -4108,7 +4151,20 @@ body.rol-staff .solo-admin {
 .bf-encabezado span:first-child { text-align: left; }
 .bf-fila { padding: 6px 0 6px 6px; border-top: 1px solid rgba(255, 255, 255, 0.06); border-left: 3px solid transparent; }
 .bf-fila-alerta { border-left-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
+.bf-celda-jugador { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bf-jugador { display: flex; flex-direction: column; min-width: 0; }
+/* Foto del jugador: el toque abre la cámara. Borde punteado = sin foto, amarillo = sacada y esperando subir, rojo = problema */
+.bf-foto { position: relative; flex: 0 0 44px; width: 44px; height: 44px; box-sizing: border-box; border: 2px solid #1a3274; border-radius: 6px; background: #040c26; color: #869bd8; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; touch-action: manipulation; }
+.bf-foto input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.bf-foto-vista { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; pointer-events: none; }
+.bf-foto-vista img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bf-foto[data-estado="sin"] { border-style: dashed; }
+.bf-foto[data-estado="pendiente"] { border-color: #f2c00e; }
+.bf-foto[data-estado="problema"] { border-color: #f43f5e; }
+.bf-foto[data-estado="pendiente"]::after, .bf-foto[data-estado="problema"]::after { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; line-height: 16px; text-align: center; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; color: #040c26; pointer-events: none; }
+.bf-foto[data-estado="pendiente"]::after { content: '\2191'; background: #f2c00e; }
+.bf-foto[data-estado="problema"]::after { content: '!'; background: #f43f5e; color: #ffffff; }
+.bf-foto:focus-within { outline: 2px solid #2edae3; outline-offset: 2px; }
 .bf-tag-susp { align-self: flex-start; margin-top: 3px; padding: 1px 6px; border-radius: 3px; background: #991b1b; color: #ffffff; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; line-height: 1.4; }
 .bf-aviso-min { flex-basis: 100%; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; color: #f43f5e; }
 .bf-aviso-min:empty { display: none; }
@@ -4210,7 +4266,40 @@ body.rol-staff .solo-admin {
     .plan-tabla th:nth-child(4), .plan-tabla td:nth-child(4) { width: 29%; }
     .plan-jugador { font-weight: bold; text-transform: uppercase; }
     .plan-tabla td.plan-susp { font-size: 9px; font-weight: bold; text-align: center; background: #dddddd; }
+
+    /* Hoja de horarios de una fecha (Carga de Partidos → Cronograma): vertical, como la planilla de Excel */
+    @page horarios { size: A4 portrait; margin: 10mm; }
+    .hor-hoja { page: horarios; width: 100%; }
+    .hor-tabla { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .hor-tabla th, .hor-tabla td { border: 1px solid #000000; padding: 2px 4px; overflow-wrap: anywhere; }
+    .hor-tabla thead th { background: #7030a0; color: #ffffff; font-size: 11px; }
+    .hor-tabla th.hor-titulo { font-size: 15px; padding: 6px 4px; }
+    .hor-tabla th:nth-child(1), .hor-tabla th:nth-child(3) { width: 23%; }
+    .hor-tabla th:nth-child(2) { width: 13%; }
+    .hor-tabla th:nth-child(4), .hor-tabla th:nth-child(5) { width: 11%; }
+    .hor-tabla th:nth-child(6) { width: 19%; }
+    .hor-partido { break-inside: avoid; page-break-inside: avoid; }
+    .hor-turno-par td { background: #f2f2f2; }
+    .hor-equipo { font-weight: bold; text-transform: uppercase; text-align: center; height: 12mm; }
+    .hor-centro { text-align: center; }
+    .hor-hora { font-weight: bold; }
+    .hor-tabla td.hor-grupo { font-weight: bold; }
+    .hor-tabla td.hor-grupo-sup { background: #ff9900; }
+    .hor-tabla td.hor-grupo-bas { background: #00ff00; }
 }
+
+.btn-imprimir-horarios {
+    padding: 4px 10px;
+    border: 1px solid #2edae3;
+    border-radius: 3px;
+    background: #040c26;
+    color: #2edae3;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.btn-imprimir-horarios:hover { background: #2edae3; color: #040c26; }
 
 /* 🎨 BORDES LATERALES PARA TABLA ÚNICA (BOMBOS DE PLAYOFFS) */
 .td-pos-bombo1 { text-align: center; font-weight: bold; color: #23b1f0; box-shadow: inset 3px 0 0 0 #23b1f0 !important; } /* Bombo 1: Celeste */
@@ -4432,6 +4521,15 @@ body.rol-staff .solo-admin {
     width: 100%;
 }
 .main-footer p { margin: 4px 0; }
+/* Acceso al login del staff: discreto a propósito (ya no está en la barra de navegación). */
+.footer-acceso-staff {
+    color: #475569;
+    text-decoration: none;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+.footer-acceso-staff:hover,
+.footer-acceso-staff:focus-visible { color: #869bd8; text-decoration: underline; }
 .autor-firma {
     background: none;
     border: none;
@@ -4810,6 +4908,11 @@ body.auth-pendiente .auth-gate {
 
 .aviso-cambios-ajenos[hidden] {
     display: none;
+}
+
+/* Fotos sacadas en cancha que todavía no subieron (lista de buena fe): mismo cartel fijo, en amarillo */
+.aviso-fotos-pendientes {
+    border-color: #f2c00e;
 }
 
 .staff-title {
@@ -5665,6 +5768,93 @@ body.auth-pendiente .auth-gate {
 
 .fixture-auto-encabezado { margin-top: 0; color: #2edae3; }
 .fixture-auto-label-arancel { color: #f2c00e !important; }
+
+/* ── Turnos de la jornada y lista de árbitros (Carga de Partidos) ── */
+.turnos-bloque,
+.arbitros-bloque { min-width: 0; border-color: #2edae3; text-align: left; }
+
+.turnos-encabezado,
+.arbitros-encabezado { margin-top: 0; color: #2edae3; }
+
+.turnos-vista-previa {
+    margin: 4px 0 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #ffffff;
+    overflow-wrap: anywhere;
+}
+
+.turnos-btn-guardar { background: #0e4f5c; border-color: #2edae3; }
+
+.turnos-input-hora { color-scheme: dark; }
+
+.arbitros-alta {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-bottom: 12px;
+}
+
+.arbitros-alta input {
+    flex: 1 1 auto;
+    min-width: 0;
+    background-color: #040c26;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    padding: 10px;
+    color: white;
+    font-family: 'Oswald', sans-serif;
+    outline: none;
+}
+
+.arbitros-alta input:focus { border-color: #2edae3; }
+
+.arbitros-btn-agregar {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 0 16px;
+    background: #0e4f5c;
+    border-color: #2edae3;
+}
+
+.arbitros-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.arbitros-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-size: 13px;
+}
+
+.arbitros-item span { min-width: 0; overflow-wrap: anywhere; }
+
+.arbitros-btn-quitar {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    border: 1px solid rgba(244, 63, 94, 0.5);
+    border-radius: 3px;
+    background: transparent;
+    color: #f43f5e;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.arbitros-vacio { font-size: 11px; color: #869bd8; }
 
 .fixture-auto-panel {
     grid-column: 1 / -1;

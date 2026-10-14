@@ -51,6 +51,8 @@ const ESQUEMA = [
     { clave: 'liga_desempates_sorteo', tipo: 'config', col: 'config', id: 'desempatesSorteo', nivel: 'publico' },
     { clave: 'liga_ciclos_activos', tipo: 'config', col: 'config', id: 'ciclosActivos', nivel: 'publico' },
     { clave: 'liga_avisos_staff', tipo: 'lista', col: 'avisosStaff', nivel: 'staff' },
+    { clave: 'liga_turnos_jornada', tipo: 'config', col: 'configStaff', id: 'turnosJornada', nivel: 'staff' },
+    { clave: 'liga_arbitros', tipo: 'config', col: 'configStaff', id: 'arbitros', nivel: 'staff' },
     { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
     { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },
     { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configCoordinador', id: 'valorInscripcion', nivel: 'coordinador' },

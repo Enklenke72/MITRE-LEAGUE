@@ -8,3 +8,18 @@
   to = "/staff"
   status = 301
   force = true
+
+# Ninguna otra página puede mostrar el sitio dentro de un iframe (evita que engañen a alguien del staff
+# con el panel metido adentro de otro sitio). El sitio no usa iframes propios.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Que Google no indexe el panel del staff.
+[[headers]]
+  for = "/staff"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"

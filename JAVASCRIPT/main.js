@@ -134,17 +134,37 @@ document.addEventListener('liga:datos-listos', () => {
     }
     // LÓGICA DE GOLEADORES POR CICLO
     let cicloGoleadoresActivo = 'superior';
+    let copaGoleadoresActiva = 'general';
+
+    // Equipos de una copa según sus cruces (los que guarda el Asistente de sorteo o el Armador), en minúsculas.
+    function equiposDeCopa(ciclo, copa) {
+        const cruces = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
+        const nombres = new Set();
+        cruces.forEach(c => {
+            if (c.ciclo !== ciclo || copaDe(c) !== copa) return;
+            [c.local, c.visitante].forEach(n => { if (n) nombres.add(n.trim().toLowerCase()); });
+        });
+        return nombres;
+    }
+
+    // Goleadores por copa: con los playoffs publicados y solo si el ciclo tiene Copa Oro y Copa Plata.
+    function hayGoleadoresPorCopa(ciclo) {
+        return almacen.getItem('liga_playoffs_publicados') === 'true' && tieneCopaPlata(ciclo);
+    }
 
     // Ranking de goleadores de un ciclo. Lo usan la tabla de Goleadores (los 10 primeros) y el perfil del jugador
     // ("#8 en Goleadores"), así nunca dicen cosas distintas. Entre empatados queda el orden del plantel.
-    function rankingGoleadores(ciclo) {
+    // Con copa, solo los jugadores de los equipos de esa copa, con los goles de todo el torneo.
+    function rankingGoleadores(ciclo, copa) {
         const pool = ciclo === 'superior'
             ? (JSON.parse(almacen.getItem('liga_cicloSuperior')) || ligaData.cicloSuperior)
             : (JSON.parse(almacen.getItem('liga_cicloBasico')) || ligaData.cicloBasico);
 
         const partidos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
+        const equiposCopa = copa ? equiposDeCopa(ciclo, copa) : null;
         let listaJugadores = [];
         pool.forEach(eq => {
+            if (equiposCopa && !equiposCopa.has(eq.nombre.trim().toLowerCase())) return;
             if (eq.jugadores) {
                 eq.jugadores.forEach(j => {
                     const goles = golesDeJugador(j, eq, partidos);
@@ -167,11 +187,23 @@ document.addEventListener('liga:datos-listos', () => {
         const tbody = document.getElementById('tbody-goleadores');
         if (!tbody) return;
 
-        const topGoleadores = rankingGoleadores(cicloGoleadoresActivo).slice(0, 10);
+        const conCopas = hayGoleadoresPorCopa(cicloGoleadoresActivo);
+        if (!conCopas) copaGoleadoresActiva = 'general';
+        const tabsCopa = document.querySelector('.tabs-gol-copa');
+        if (tabsCopa) {
+            tabsCopa.hidden = !conCopas;
+            tabsCopa.querySelectorAll('.btn-gol-copa').forEach(b => b.classList.toggle('active', b.getAttribute('data-copa-gol') === copaGoleadoresActiva));
+        }
+        const copa = copaGoleadoresActiva === 'general' ? null : copaGoleadoresActiva;
+
+        const topGoleadores = rankingGoleadores(cicloGoleadoresActivo, copa).slice(0, 10);
 
         tbody.innerHTML = '';
         if (topGoleadores.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#869bd8; padding:10px; font-size:10px;">Sin goles registrados.</td></tr>';
+            const texto = copa && equiposDeCopa(cicloGoleadoresActivo, copa).size === 0
+                ? `Todavía no están los cruces de la ${nombreCopa(cicloGoleadoresActivo, copa)}.`
+                : 'Sin goles registrados.';
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#869bd8; padding:10px; font-size:10px;">${texto}</td></tr>`;
             return;
         }
 
@@ -194,6 +226,13 @@ document.addEventListener('liga:datos-listos', () => {
             document.querySelectorAll('.btn-gol-ciclo').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             cicloGoleadoresActivo = btn.getAttribute('data-ciclo-gol');
+            renderizarGoleadores();
+        });
+    });
+
+    document.querySelectorAll('.btn-gol-copa').forEach(btn => {
+        btn.addEventListener('click', () => {
+            copaGoleadoresActiva = btn.getAttribute('data-copa-gol');
             renderizarGoleadores();
         });
     });
@@ -289,12 +328,12 @@ document.addEventListener('liga:datos-listos', () => {
         // 2. Buscamos el título principal del bloque en la Home/Fixture para ponerle la Fecha
         const tituloSeccion = document.querySelector('#pantalla-fixture h2');
         if (ligaData.partidos.length === 0) {
-            if (tituloSeccion) tituloSeccion.textContent = 'ULTIMOS PARTIDOS';
+            if (tituloSeccion) tituloSeccion.textContent = 'ÚLTIMOS PARTIDOS';
             contenedor.innerHTML = '<p style="color: #869bd8; font-size: 11px; text-align: center; padding: 18px;">Todavía no hay partidos cargados.</p>';
             return;
         }
         if (tituloSeccion) {
-            tituloSeccion.innerHTML = `ULTIMOS PARTIDOS <span style="font-size: 13px; color: #2edae3; font-family: 'Oswald'; display: block; margin-top: 10px;">— ${nombreFechaPublico(fechaSeleccionada)} —</span>`;
+            tituloSeccion.innerHTML = `ÚLTIMOS PARTIDOS <span style="font-size: 13px; color: #2edae3; font-family: 'Oswald'; display: block; margin-top: 10px;">— ${nombreFechaPublico(fechaSeleccionada)} —</span>`;
         }
 
         const partidosFiltrados = ligaData.partidos.filter(partido => partido.fecha === fechaSeleccionada);
@@ -412,13 +451,15 @@ document.addEventListener('liga:datos-listos', () => {
     procesarLiga(); 
     renderizarBotonesGruposPublico();
 
-    // Dibujamos el primer grupo de cada ciclo
-    const gruposIniciales = JSON.parse(almacen.getItem('liga_grupos')) || { superior: ['A'], basico: ['A'] };
-    const primerGrupoSup = (gruposIniciales.superior && gruposIniciales.superior[0]) || 'A';
-    const primerGrupoBas = (gruposIniciales.basico && gruposIniciales.basico[0]) || 'A';
+    // Dibujamos el grupo del botón activo de cada ciclo: en Tabla Única sin grupos es 'Unico', no 'A'.
+    const primerGrupoDe = selectorTabs =>
+        document.querySelector(`${selectorTabs} .tab-btn.active`)?.getAttribute('data-grupo-val') || 'A';
+    const etiquetaGrupo = g => (g === 'Unico') ? 'Tabla Única' : g;
+    const primerGrupoSup = primerGrupoDe('.tabs-sup');
+    const primerGrupoBas = primerGrupoDe('.tabs-bas');
 
-    renderizarTabla(ligaData.cicloSuperior, '.tbody-sup', '.group-name-sup', primerGrupoSup, primerGrupoSup);
-    renderizarTabla(ligaData.cicloBasico, '.tbody-bas', '.group-name-bas', primerGrupoBas, primerGrupoBas);
+    renderizarTabla(ligaData.cicloSuperior, '.tbody-sup', '.group-name-sup', primerGrupoSup, etiquetaGrupo(primerGrupoSup));
+    renderizarTabla(ligaData.cicloBasico, '.tbody-bas', '.group-name-bas', primerGrupoBas, etiquetaGrupo(primerGrupoBas));
 
     renderizarGoleadores()
 
@@ -486,14 +527,30 @@ document.addEventListener('liga:datos-listos', () => {
         document.querySelector('.seccion-tabla-anual')?.classList.add('seccion-oculta');
     }
 
-    navItems.forEach(item => {
+    // La URL lleva el # de la sección: así se puede compartir un link a "Posiciones" y el botón Atrás
+    // vuelve a la sección anterior en vez de salir del sitio.
+    const SECCIONES_NAV = ['#home', '#pantalla-tablas', '#pantalla-fixture', '#pantalla-fotos', '#pantalla-reglamento', '#pantalla-admin'];
+    const seccionDeLaUrl = () => SECCIONES_NAV.includes(location.hash) ? location.hash : '#home';
+
+    function irASeccion(targetId) {
+        mostrarSeccion(targetId);
+        if (seccionDeLaUrl() !== targetId) {
+            history.pushState(null, '', targetId === '#home' ? location.pathname + location.search : targetId);
+        }
+    }
+
+    document.querySelectorAll('.nav-item, .footer-acceso-staff').forEach(item => {
         item.addEventListener('click', (e) => {
-            e.preventDefault(); 
-            navItems.forEach(nav => nav.classList.remove('active'));
-            item.classList.add('active');
-            
-            const targetId = item.getAttribute('href');
-            
+            e.preventDefault();
+            irASeccion(item.getAttribute('href'));
+        });
+    });
+
+    window.addEventListener('popstate', () => mostrarSeccion(seccionDeLaUrl()));
+
+    function mostrarSeccion(targetId) {
+            navItems.forEach(nav => nav.classList.toggle('active', nav.getAttribute('href') === targetId));
+
             if (targetId === '#home') {
         mostrarPantallaInicio();
         
@@ -528,11 +585,12 @@ document.addEventListener('liga:datos-listos', () => {
             }
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-    });
+    }
 
-    // ESTADO INICIAL AL CARGAR LA PÁGINA:
-    mostrarPantallaInicio();
+    // ESTADO INICIAL AL CARGAR LA PÁGINA: la sección que diga la URL (por ejemplo index.html#pantalla-admin,
+    // adonde manda el panel a quien entra sin sesión); sin # o con uno desconocido, el Inicio.
+    if (seccionDeLaUrl() === '#home') mostrarPantallaInicio();
+    else mostrarSeccion(seccionDeLaUrl());
 
     
 
@@ -600,7 +658,7 @@ document.addEventListener('liga:datos-listos', () => {
                     <p>${escaparHtml(s.descripcion || '')}</p>
                     ${s.instagram ? `<a href="https://instagram.com/${escaparHtml(s.instagram.replace('@', ''))}" target="_blank" class="sponsor-contacto-link">@${escaparHtml(s.instagram.replace('@', ''))}</a>` : ''}
                     ${s.telefono ? `<span class="sponsor-contacto-link">${escaparHtml(s.telefono)}</span>` : ''}
-                    ${s.ubicacion ? `<br>${s.ubicacion.trim().startsWith('http') ? `<a href="${urlSegura(s.ubicacion)}" target="_blank" class="sponsor-contacto-link sponsor-ubicacion">${escaparHtml(s.ubicacion)}</a>` : `<span class="sponsor-contacto-link sponsor-ubicacion">${escaparHtml(s.ubicacion)}</span>`}` : ''}
+                    ${s.ubicacion ? `<br>${s.ubicacion.trim().startsWith('http') ? `<a href="${urlSegura(s.ubicacion)}" target="_blank" class="sponsor-contacto-link sponsor-ubicacion">${escaparHtml(s.ubicacion)}</a>` : `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.ubicacion.trim())}" target="_blank" rel="noopener" class="sponsor-contacto-link sponsor-ubicacion">${escaparHtml(s.ubicacion)}</a>`}` : ''}
                     <br>
                     <button class="sponsor-link-btn btn-beneficio">Ver Beneficio</button>
                     <div class="beneficio-secreto">
@@ -1143,6 +1201,20 @@ document.addEventListener('liga:datos-listos', () => {
         }
 
         if (!bracketContenedor) return;
+
+        // Título de la copa arriba de las llaves, solo si el ciclo tiene Oro y Plata. Básico (una sola
+        // copa, sin nombre) queda sin título.
+        let tituloCopa = document.getElementById('titulo-copa-playoff');
+        if (!tituloCopa) {
+            tituloCopa = document.createElement('h3');
+            tituloCopa.id = 'titulo-copa-playoff';
+            tituloCopa.className = 'titulo-copa-playoff';
+            bracketContenedor.parentNode.insertBefore(tituloCopa, bracketContenedor);
+        }
+        const nombreDeLaCopa = conPlata ? nombreCopa(cicloPlayoffPublicoActivo, copa) : '';
+        tituloCopa.textContent = nombreDeLaCopa.toUpperCase();
+        tituloCopa.hidden = !nombreDeLaCopa;
+        tituloCopa.setAttribute('data-copa', copa);
 
         const partidosGuardados = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos || [];
         const crucesGuardadosRaw = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
@@ -1767,6 +1839,7 @@ document.addEventListener('liga:datos-listos', () => {
                             btnFecha.classList.add('active');
                         }
 
+                        fechaActivaFixture = ultimaFecha;
                         renderizarFixtureFecha(ultimaFecha);
 
                         // 7. Buscamos la tarjeta del partido y le aplicamos el destello
@@ -2408,11 +2481,22 @@ document.addEventListener('liga:datos-listos', () => {
             ? `<a href="https://instagram.com/${ig}" target="_blank" class="ig-player-link">@${ig}</a>`
             : '';
 
-        const puesto = rankingGoleadores(ciclo).findIndex(g =>
-            g.equipo.trim().toLowerCase() === equipo.nombre.trim().toLowerCase() && g.dni === jugador.dni) + 1;
+        const nombreEquipo = equipo.nombre.trim().toLowerCase();
+        const puestoEn = lista => lista.findIndex(g => g.equipo.trim().toLowerCase() === nombreEquipo && g.dni === jugador.dni) + 1;
+        const puesto = puestoEn(rankingGoleadores(ciclo));
         const ranking = document.getElementById('perfil-jugador-ranking');
         ranking.textContent = puesto > 0 ? `#${puesto} en Goleadores · Ciclo ${nombreCiclo}` : 'Sin goles todavía';
         ranking.classList.toggle('sin-goles', puesto === 0);
+
+        const copaJugador = puesto > 0 && hayGoleadoresPorCopa(ciclo)
+            ? ['oro', 'plata'].find(c => equiposDeCopa(ciclo, c).has(nombreEquipo))
+            : null;
+        const puestoCopa = copaJugador ? puestoEn(rankingGoleadores(ciclo, copaJugador)) : 0;
+        const rankingCopa = document.getElementById('perfil-jugador-ranking-copa');
+        rankingCopa.hidden = puestoCopa === 0;
+        rankingCopa.textContent = puestoCopa > 0 ? `#${puestoCopa} en Goleadores · ${nombreCopa(ciclo, copaJugador)}` : '';
+        rankingCopa.classList.toggle('copa-oro', copaJugador === 'oro');
+        rankingCopa.classList.toggle('copa-plata', copaJugador === 'plata');
 
         const tarjetas = tarjetasDeJugador(jugador, equipo, partidos);
         document.getElementById('perfil-jugador-pj').textContent = partidosJugadosDeJugador(jugador, equipo, partidos);
