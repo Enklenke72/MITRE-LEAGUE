@@ -1057,14 +1057,117 @@ document.addEventListener('liga:datos-listos', (evento) => {
             })),
             interzonales: nuevos.filter(p => p.grupo === 'Interzonal').length,
             fueraDeGrupo: pool.filter(e => !gruposCiclo.includes(e.grupo)),
+            equiposPorGrupo: Object.fromEntries(grupos.map(g => [g.grupo, g.equipos.map(e => ({ id: e.id !== undefined ? e.id : null, nombre: e.nombre }))])),
             // Si cambian los equipos, los grupos o el calendario entre la vista previa y la confirmación, se vuelve a revisar.
             firma: JSON.stringify(nuevos.map(p => [p.fecha, p.grupo, p.localId, p.local, p.visitanteId, p.visitante, p.dia]))
         };
     }
 
+    // Corrección a mano en la vista previa (pedido de Joaquín, 16/10/2026): cambiar los equipos de un cruce y pasarlo
+    // a otra fecha. Lo que quede raro se avisa pero se deja guardar; solo un equipo contra sí mismo no se guarda.
+    const claveEquipoFixture = (id, nombre) => (id !== null && id !== undefined ? 'id:' + id : 'n:' + String(nombre || '').trim().toLowerCase());
+
+    function equiposParaCruce(f, p) {
+        return p.grupo === 'Interzonal' ? Object.values(f.equiposPorGrupo).flat() : (f.equiposPorGrupo[p.grupo] || []);
+    }
+
+    function problemasFixture(f) {
+        const porPartido = f.nuevos.map(() => []);
+        const generales = [];
+        const nombre = {};
+        const grupoDe = {};
+        Object.entries(f.equiposPorGrupo).forEach(([g, eqs]) => eqs.forEach(e => {
+            const k = claveEquipoFixture(e.id, e.nombre);
+            nombre[k] = e.nombre;
+            grupoDe[k] = g;
+        }));
+        const enFecha = new Map();
+        const porPar = new Map();
+        let contraSiMismo = false;
+        f.nuevos.forEach((p, i) => {
+            const a = claveEquipoFixture(p.localId, p.local), b = claveEquipoFixture(p.visitanteId, p.visitante);
+            nombre[a] = nombre[a] || p.local;
+            nombre[b] = nombre[b] || p.visitante;
+            if (a === b) {
+                contraSiMismo = true;
+                porPartido[i].push('Un equipo no puede jugar contra sí mismo: elegí otro rival.');
+                return;
+            }
+            if (p.grupo === 'Interzonal' && grupoDe[a] && grupoDe[a] === grupoDe[b]) {
+                porPartido[i].push(`Los dos son del ${textoGrupoHistorial(grupoDe[a])}: un interzonal es entre equipos de grupos distintos.`);
+            }
+            [a, b].forEach(k => {
+                const clave = p.fecha + '|' + k;
+                if (!enFecha.has(clave)) enFecha.set(clave, { fecha: p.fecha, equipo: k, indices: [] });
+                enFecha.get(clave).indices.push(i);
+            });
+            const par = [a, b].sort().join('|');
+            if (!porPar.has(par)) porPar.set(par, []);
+            porPar.get(par).push(i);
+        });
+        enFecha.forEach(({ fecha, equipo, indices }) => {
+            if (indices.length < 2) return;
+            indices.forEach(i => porPartido[i].push(`${nombre[equipo]} juega ${indices.length} veces en la Fecha ${fecha}.`));
+        });
+        porPar.forEach(indices => {
+            if (indices.length < 2) return;
+            const p = f.nuevos[indices[0]];
+            const fechas = indices.map(i => f.nuevos[i].fecha).sort((x, y) => x - y);
+            indices.forEach(i => porPartido[i].push(`${p.local} y ${p.visitante} se enfrentan ${indices.length} veces (Fechas ${fechas.join(', ')}).`));
+        });
+        Object.entries(f.equiposPorGrupo).forEach(([g, eqs]) => {
+            for (let i = 0; i < eqs.length; i++) {
+                for (let j = i + 1; j < eqs.length; j++) {
+                    const par = [claveEquipoFixture(eqs[i].id, eqs[i].nombre), claveEquipoFixture(eqs[j].id, eqs[j].nombre)].sort().join('|');
+                    if (!porPar.has(par)) generales.push(`${textoGrupoHistorial(g)}: ${eqs[i].nombre} y ${eqs[j].nombre} no se enfrentan en ninguna fecha.`);
+                }
+            }
+        });
+        return { porPartido, generales, contraSiMismo, cantidad: porPartido.filter(m => m.length).length + generales.length };
+    }
+
+    // Los equipos de cada grupo que no juegan esa fecha (ni en su grupo ni en un interzonal). Un grupo que esa fecha no
+    // juega (ya terminó, porque tiene menos equipos) no se lista.
+    function libresDeFecha(f, fecha) {
+        const juegan = new Set();
+        f.nuevos.filter(p => p.fecha === fecha).forEach(p => {
+            juegan.add(claveEquipoFixture(p.localId, p.local));
+            juegan.add(claveEquipoFixture(p.visitanteId, p.visitante));
+        });
+        const libres = [];
+        Object.entries(f.equiposPorGrupo).forEach(([g, eqs]) => {
+            const sinJugar = eqs.filter(e => !juegan.has(claveEquipoFixture(e.id, e.nombre)));
+            if (eqs.length < 2 || sinJugar.length === eqs.length) return;
+            sinJugar.forEach(e => libres.push({ grupo: g, nombre: e.nombre }));
+        });
+        return libres;
+    }
+
     function renderizarFixtureAuto() {
         if (!panelFixtureAuto || !fixtureAuto) return;
         const f = fixtureAuto;
+        const problemas = problemasFixture(f);
+        const opcionesEquipo = (p, elegido) => equiposParaCruce(f, p).map(e => {
+            const k = claveEquipoFixture(e.id, e.nombre);
+            return `<option value="${attrSeguro(k)}"${k === elegido ? ' selected' : ''}>${attrSeguro(e.nombre)}</option>`;
+        }).join('');
+        const opcionesFecha = elegida => Array.from({ length: f.configuradas }, (_, n) => n + 1)
+            .map(n => `<option value="${n}"${n === elegida ? ' selected' : ''}>Fecha ${n}</option>`).join('');
+        const htmlCruce = (p, i) => {
+            const avisos = problemas.porPartido[i];
+            return `<li class="fixture-auto-cruce fixture-auto-editable${avisos.length ? ' fixture-auto-con-problema' : ''}">
+                <span class="fixture-auto-grupo">${etiquetaGrupo(p.grupo)}${p.corregido ? ' · <span class="fixture-auto-corregido">corregido</span>' : ''}</span>
+                <span class="fixture-auto-equipos">
+                    <select class="fixture-auto-sel" data-i="${i}" data-campo="local" aria-label="Local">${opcionesEquipo(p, claveEquipoFixture(p.localId, p.local))}</select>
+                    <span class="fixture-auto-vs">vs</span>
+                    <select class="fixture-auto-sel" data-i="${i}" data-campo="visitante" aria-label="Visitante">${opcionesEquipo(p, claveEquipoFixture(p.visitanteId, p.visitante))}</select>
+                </span>
+                <label class="fixture-auto-mover">Pasar a
+                    <select class="fixture-auto-sel fixture-auto-sel-fecha" data-i="${i}" data-campo="fecha">${opcionesFecha(p.fecha)}</select>
+                </label>
+                ${avisos.map(a => `<span class="fixture-auto-problema">${attrSeguro(a)}</span>`).join('')}
+            </li>`;
+        };
         const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
         const lineaGrupo = g => {
             const nombre = textoGrupoHistorial(g.grupo);
@@ -1076,26 +1179,35 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const etiquetaGrupo = grupo => (grupo === 'Interzonal' ? 'Interzonal' : `Grupo ${attrSeguro(grupo)}`);
         const dondeEsta = e => (e.grupo === 'Unico' ? 'Tabla Única' : (e.grupo ? `Grupo ${e.grupo}, que no está en los grupos del ciclo` : 'sin grupo'));
         const arancel = f.arancel ? `$${f.arancel.toLocaleString()}` : `el de siempre ($${ARANCEL_PARTIDO_DEFECTO.toLocaleString()})`;
-        const porFecha = f.fechas.map(fe => {
-            const cruces = f.nuevos.filter(p => p.fecha === fe.fecha).map(p =>
-                `<li class="fixture-auto-cruce"><span class="fixture-auto-grupo">${etiquetaGrupo(p.grupo)} — </span>${attrSeguro(p.local)} <span class="fixture-auto-vs">vs</span> ${attrSeguro(p.visitante)}</li>`);
-            const libres = fe.libres.map(l =>
+        // Las fechas que armó el fixture más las que recibieron un partido corregido a mano.
+        const numerosFecha = [...new Set([...f.fechas.map(fe => fe.fecha), ...f.nuevos.map(p => p.fecha)])].sort((a, b) => a - b);
+        const porFecha = numerosFecha.map(fecha => {
+            const dia = diaDeCalendario(f.ciclo, fecha);
+            const cruces = f.nuevos.map((p, i) => (p.fecha === fecha ? htmlCruce(p, i) : '')).filter(Boolean);
+            const libres = libresDeFecha(f, fecha).map(l =>
                 `<li class="fixture-auto-cruce fixture-auto-libre"><span class="fixture-auto-grupo">Grupo ${attrSeguro(l.grupo)} — </span>Libre: ${attrSeguro(l.nombre)}</li>`);
-            return `<div class="fixture-auto-fecha" data-fecha="${fe.fecha}">
-                <h4 class="fixture-auto-fecha-titulo">Fecha ${fe.fecha} · ${fe.dia ? attrSeguro(fe.dia) : '<span class="fixture-auto-sin-dia">sin día en el calendario</span>'}</h4>
-                <ul class="fixture-auto-cruces">${[...cruces, ...libres].join('')}</ul>
+            return `<div class="fixture-auto-fecha" data-fecha="${fecha}">
+                <h4 class="fixture-auto-fecha-titulo">Fecha ${fecha} · ${dia ? attrSeguro(dia) : '<span class="fixture-auto-sin-dia">sin día en el calendario</span>'}</h4>
+                <ul class="fixture-auto-cruces">${cruces.length ? '' : '<li class="fixture-auto-cruce fixture-auto-libre">Sin partidos.</li>'}${[...cruces, ...libres].join('')}</ul>
             </div>`;
         }).join('');
+        const avisosArriba = problemas.cantidad
+            ? `<div class="fixture-auto-problemas">
+                <strong>${plural(problemas.cantidad, 'aviso', 'avisos')} para revisar.</strong> Se puede guardar igual${problemas.contraSiMismo ? ', salvo un equipo contra sí mismo' : ''}.
+                ${problemas.generales.length ? `<ul>${problemas.generales.map(g => `<li>${attrSeguro(g)}</li>`).join('')}</ul>` : ''}
+            </div>`
+            : '';
 
         panelFixtureAuto.innerHTML = `
             <h3 class="fixture-auto-titulo">Vista previa del fixture — Ciclo ${nombreCicloHistorial(f.ciclo)}</h3>
-            <p class="fixture-auto-texto"><strong>${plural(f.nuevos.length, 'partido', 'partidos')} en ${plural(f.fechas.length, 'fecha', 'fechas')}</strong> (el ciclo tiene ${f.configuradas} configuradas). Cada par de equipos se enfrenta una sola vez. Horario y cancha: a confirmar. Arancel: ${arancel} por equipo.</p>
-            <p class="fixture-auto-nota">Todavía no se guardó nada. Al confirmar se crean todos juntos; después cada uno se edita desde el Cronograma (horario, cancha, resultado).</p>
+            <p class="fixture-auto-texto"><strong>${plural(f.nuevos.length, 'partido', 'partidos')} en ${plural(new Set(f.nuevos.map(p => p.fecha)).size, 'fecha', 'fechas')}</strong> (el ciclo tiene ${f.configuradas} configuradas). Cada par de equipos se enfrenta una sola vez. Horario y cancha: a confirmar. Arancel: ${arancel} por equipo.</p>
+            <p class="fixture-auto-nota">Todavía no se guardó nada. Antes de confirmar podés corregir cada cruce: cambiar los equipos o pasarlo a otra fecha. Al confirmar se crean todos juntos; después cada uno se edita desde el Cronograma (horario, cancha, resultado).</p>
             <ul class="fixture-auto-grupos">${f.grupos.map(g => `<li>${attrSeguro(lineaGrupo(g))}</li>`).join('')}${f.interzonales
                 ? `<li>Interzonales: ${plural(f.interzonales, 'partido', 'partidos')} (suman en la tabla del grupo de cada equipo).</li>` : ''}</ul>
             ${f.fueraDeGrupo.length
                 ? `<p class="fixture-auto-texto fixture-auto-aviso">No entran (no están en un grupo del ciclo): ${f.fueraDeGrupo.map(e => `${attrSeguro(e.nombre)} (${attrSeguro(dondeEsta(e))})`).join(', ')}.</p>`
                 : ''}
+            ${avisosArriba}
             <div class="fixture-auto-fechas">${porFecha}</div>
             <div class="fixture-auto-botones">
                 <button type="button" class="importar-btn-cancelar" data-accion="cancelar">Cancelar</button>
@@ -1124,6 +1236,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     function confirmarFixtureAuto() {
+        const problemas = problemasFixture(fixtureAuto);
+        if (problemas.contraSiMismo) {
+            alert('Hay un partido de un equipo contra sí mismo: elegí otro rival en ese cruce antes de confirmar. No se creó nada.');
+            return;
+        }
+        // Se vuelve a armar solo para saber si cambiaron equipos, grupos o calendario: lo que se guarda es lo corregido.
         const actual = armarFixtureCiclo(fixtureAuto.ciclo, fixtureAuto.arancel);
         if (actual.bloqueo) {
             cerrarFixtureAuto();
@@ -1131,17 +1249,25 @@ document.addEventListener('liga:datos-listos', (evento) => {
             return;
         }
         if (actual.firma !== fixtureAuto.firma) {
+            const habiaCorregidos = fixtureAuto.nuevos.some(p => p.corregido);
             fixtureAuto = actual;
             renderizarFixtureAuto();
-            alert('Cambiaron los equipos, los grupos o el calendario desde que se armó la vista previa: revisala de nuevo antes de confirmar. No se creó nada.');
+            alert('Cambiaron los equipos, los grupos o el calendario desde que se armó la vista previa: revisala de nuevo antes de confirmar.'
+                + (habiaCorregidos ? ' El fixture se volvió a armar y se perdieron las correcciones a mano.' : '') + ' No se creó nada.');
             return;
         }
-        const ids = idsNuevosPartido(actual.nuevos.length);
-        actual.nuevos.forEach((p, i) => partidos.push({ id: ids[i], ...p }));
+        if (problemas.cantidad && !confirm(`La vista previa tiene ${problemas.cantidad} ${problemas.cantidad === 1 ? 'aviso' : 'avisos'} (marcados en rojo). ¿Guardar el fixture igual?`)) return;
+
+        const nuevos = fixtureAuto.nuevos.map(({ corregido, ...p }) => p).sort((a, b) => a.fecha - b.fecha);
+        const corregidos = fixtureAuto.nuevos.filter(p => p.corregido).length;
+        const ids = idsNuevosPartido(nuevos.length);
+        nuevos.forEach((p, i) => partidos.push({ id: ids[i], ...p }));
         almacen.setItem('liga_partidos', JSON.stringify(partidos));
-        const cantidad = `${actual.nuevos.length} ${actual.nuevos.length === 1 ? 'partido' : 'partidos'}`;
-        const enFechas = `${actual.fechas.length} ${actual.fechas.length === 1 ? 'fecha' : 'fechas'}`;
-        registrarHistorial('partido', `generó el fixture de FASE DE GRUPOS (${nombreCicloHistorial(actual.ciclo)}): ${cantidad} en ${enFechas}`);
+        const cantidad = `${nuevos.length} ${nuevos.length === 1 ? 'partido' : 'partidos'}`;
+        const totalFechas = new Set(nuevos.map(p => p.fecha)).size;
+        const enFechas = `${totalFechas} ${totalFechas === 1 ? 'fecha' : 'fechas'}`;
+        registrarHistorial('partido', `generó el fixture de FASE DE GRUPOS (${nombreCicloHistorial(actual.ciclo)}): ${cantidad} en ${enFechas}`
+            + (corregidos ? ` (${corregidos} ${corregidos === 1 ? 'cruce corregido' : 'cruces corregidos'} a mano)` : ''));
 
         cerrarFixtureAuto();
         actualizarListaAdmin();
@@ -1171,6 +1297,25 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (!boton || !fixtureAuto) return;
             if (boton.dataset.accion === 'cancelar') cerrarFixtureAuto();
             else if (boton.dataset.accion === 'confirmar') confirmarFixtureAuto();
+        });
+
+        panelFixtureAuto.addEventListener('change', (e) => {
+            const sel = e.target.closest('select[data-campo]');
+            if (!sel || !fixtureAuto) return;
+            const p = fixtureAuto.nuevos[Number(sel.dataset.i)];
+            if (!p) return;
+            if (sel.dataset.campo === 'fecha') {
+                p.fecha = Number(sel.value);
+                p.dia = diaDeCalendario(fixtureAuto.ciclo, p.fecha);
+            } else {
+                const eq = equiposParaCruce(fixtureAuto, p).find(x => claveEquipoFixture(x.id, x.nombre) === sel.value);
+                if (!eq) return;
+                const lado = sel.dataset.campo === 'local' ? 'local' : 'visitante';
+                p[lado] = eq.nombre;
+                p[lado + 'Id'] = eq.id;
+            }
+            p.corregido = true;
+            renderizarFixtureAuto();
         });
 
         // La vista previa es de un ciclo y un arancel: si cambian, hay que volver a armarla.

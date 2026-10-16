@@ -5931,11 +5931,50 @@ body.auth-pendiente .auth-gate {
 .fixture-auto-vs { color: #2edae3; font-weight: bold; }
 .fixture-auto-libre { color: #869bd8; font-style: italic; }
 
+/* Cruces corregibles en la vista previa: equipos y fecha con desplegables, avisos en rojo */
+.fixture-auto-editable { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
+.fixture-auto-equipos { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.fixture-auto-equipos .fixture-auto-sel { flex: 1 1 0; }
+
+.fixture-auto-sel {
+    min-width: 0;
+    max-width: 100%;
+    padding: 4px 6px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+}
+
+.fixture-auto-sel:focus { outline: none; border-color: #2edae3; }
+.fixture-auto-mover { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #869bd8; }
+.fixture-auto-sel-fecha { flex: 0 0 auto; }
+.fixture-auto-corregido { color: #f2c00e; }
+.fixture-auto-con-problema { border-left: 3px solid #f43f5e; padding-left: 8px; }
+.fixture-auto-problema { font-size: 11px; color: #f43f5e; line-height: 1.35; }
+
+.fixture-auto-problemas {
+    margin: 8px 0;
+    padding: 8px 10px;
+    border: 1px solid rgba(244, 63, 94, 0.5);
+    border-radius: 3px;
+    background: rgba(244, 63, 94, 0.08);
+    font-size: 12px;
+    color: #fda4af;
+    overflow-wrap: anywhere;
+}
+
+.fixture-auto-problemas strong { color: #f43f5e; }
+.fixture-auto-problemas ul { margin: 6px 0 0; padding-left: 18px; }
+
 .fixture-auto-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .fixture-auto-botones .btn-submit-admin { width: auto; min-height: 44px; }
 
 @media (max-width: 800px) {
     .calendario-input { min-height: 44px; font-size: 16px; }
+    .fixture-auto-sel { min-height: 40px; font-size: 16px; }
     .fixture-auto-botones { flex-direction: column-reverse; }
     .fixture-auto-botones .btn-submit-admin,
     .fixture-auto-botones .importar-btn-cancelar { width: 100%; }
