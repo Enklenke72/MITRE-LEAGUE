@@ -6045,6 +6045,15 @@ body.auth-pendiente .auth-gate {
 .horarios-auto-nuevo { color: #2edae3; font-weight: bold; }
 .fixture-auto-botones .btn-submit-admin:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Capitanes de los equipos (Planteles → Crear / Mover Equipos y Grupos, solo Coordinador) */
+.capitanes-bloque { grid-column: 1 / -1; min-width: 0; border-color: #2edae3; text-align: left; }
+.capitanes-encabezado { margin-top: 0; color: #2edae3; }
+.capitanes-resumen { margin-bottom: 12px; font-size: 12px; color: #cbd5e1; overflow-wrap: anywhere; }
+.capitanes-ok { margin: 0 0 6px; color: #ffffff; }
+.capitanes-faltan { margin: 0; padding-left: 18px; line-height: 1.5; color: #fda4af; }
+.capitanes-faltan strong { color: #f43f5e; }
+#btn-exportar-capitanes:disabled { opacity: 0.6; cursor: wait; }
+
 @media (max-width: 800px) {
     .calendario-input { min-height: 44px; font-size: 16px; }
     .fixture-auto-sel { min-height: 40px; font-size: 16px; }

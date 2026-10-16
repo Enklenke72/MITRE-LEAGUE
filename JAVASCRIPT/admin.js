@@ -3470,6 +3470,82 @@ document.addEventListener('liga:datos-listos', (evento) => {
             actualizarSelectsFormatoTorneo();
             actualizarChecksCiclosActivos();
             renderizarEquiposCargados();
+            renderizarCapitanes();
+        });
+    }
+
+    // ── Capitanes de los equipos (pedido de Joaquín, 16/10/2026): el capitán es el jugador con "(C)" en el nombre, el
+    // teléfono es su Celular y el curso es el nombre del equipo. Solo el Coordinador los ve y los exporta (datos de menores).
+    const resumenCapitanesEl = document.getElementById('capitanes-resumen');
+    const btnExportarCapitanes = document.getElementById('btn-exportar-capitanes');
+    const PATRON_CAPITAN = /\(\s*c\s*\)/i;
+
+    function capitanesPorEquipo() {
+        recargarPools();
+        const filas = [];
+        [['superior', poolSuperior], ['basico', poolBasico]].forEach(([ciclo, pool]) => {
+            pool.slice().sort((a, b) => String(a.grupo || '').localeCompare(String(b.grupo || ''), 'es')
+                || a.nombre.localeCompare(b.nombre, 'es', { numeric: true })).forEach(eq => {
+                filas.push({ ciclo, eq, capitanes: (eq.jugadores || []).filter(j => PATRON_CAPITAN.test(j.nombre || '')) });
+            });
+        });
+        return filas;
+    }
+
+    const nombreSinMarcaCapitan = nombre => String(nombre || '').replace(PATRON_CAPITAN, '').replace(/\s+/g, ' ').trim();
+    const grupoCapitanes = eq => (eq.grupo ? textoGrupoHistorial(eq.grupo) : 'Sin grupo');
+
+    function renderizarCapitanes() {
+        if (!resumenCapitanesEl || usuarioPanel.rol !== 'coordinador') return;
+        const filas = capitanesPorEquipo();
+        const etiqueta = f => `${attrSeguro(f.eq.nombre)} (${nombreCicloHistorial(f.ciclo)})`;
+        const sinCapitan = filas.filter(f => f.capitanes.length === 0);
+        const varios = filas.filter(f => f.capitanes.length > 1);
+        const sinTelefono = filas.filter(f => f.capitanes.some(j => !String(j.celular || '').trim()));
+        const lineas = [];
+        if (sinCapitan.length) lineas.push(`<li><strong>Sin capitán (${sinCapitan.length}):</strong> ${sinCapitan.map(etiqueta).join(', ')}.</li>`);
+        if (varios.length) lineas.push(`<li><strong>Con más de un (C):</strong> ${varios.map(etiqueta).join(', ')}.</li>`);
+        if (sinTelefono.length) lineas.push(`<li><strong>Capitán sin celular cargado:</strong> ${sinTelefono.map(etiqueta).join(', ')}.</li>`);
+        resumenCapitanesEl.innerHTML = filas.length === 0
+            ? '<p class="capitanes-ok">Todavía no hay equipos cargados.</p>'
+            : `<p class="capitanes-ok">${filas.length - sinCapitan.length} de ${filas.length} equipos tienen capitán.</p>`
+                + (lineas.length ? `<ul class="capitanes-faltan">${lineas.join('')}</ul>` : '');
+    }
+
+    if (btnExportarCapitanes) {
+        btnExportarCapitanes.addEventListener('click', async () => {
+            if (usuarioPanel.rol !== 'coordinador') return;
+            const filas = capitanesPorEquipo();
+            renderizarCapitanes();
+            if (filas.length === 0) { alert('Todavía no hay equipos cargados.'); return; }
+            const textoOriginal = btnExportarCapitanes.textContent;
+            btnExportarCapitanes.disabled = true;
+            btnExportarCapitanes.textContent = 'Preparando el Excel...';
+            try {
+                const XLSX = await cargarSheetJS();
+                const tabla = [['Ciclo', 'Grupo', 'Curso', 'Capitán', 'N°', 'Teléfono']];
+                filas.forEach(f => {
+                    const base = [nombreCicloHistorial(f.ciclo), grupoCapitanes(f.eq), f.eq.nombre];
+                    if (f.capitanes.length === 0) tabla.push([...base, 'FALTA EL (C)', '', '']);
+                    f.capitanes.forEach(j => tabla.push([...base, nombreSinMarcaCapitan(j.nombre),
+                        j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal) !== '' ? Number(j.dorsal) : '',
+                        String(j.celular || '').trim() || 'SIN CELULAR']));
+                });
+                const hoja = XLSX.utils.aoa_to_sheet(tabla);
+                hoja['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 30 }, { wch: 5 }, { wch: 18 }];
+                const libro = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(libro, hoja, 'Capitanes');
+                const hoy = new Date();
+                const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+                XLSX.writeFile(libro, `capitanes-mitre-league-${fecha}.xlsx`);
+            } catch (e) {
+                alert(e && e.sinLector
+                    ? 'No se pudo bajar el armador de Excel: hace falta conexión a internet. Probá de nuevo con señal.'
+                    : 'No se pudo armar el Excel de capitanes.');
+            } finally {
+                btnExportarCapitanes.disabled = false;
+                btnExportarCapitanes.textContent = textoOriginal;
+            }
         });
     }
 
