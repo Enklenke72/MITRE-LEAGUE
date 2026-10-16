@@ -5967,6 +5967,40 @@ body.auth-pendiente .auth-gate {
 }
 
 .fixture-auto-problemas strong { color: #f43f5e; }
+.fixture-auto-pedido { color: #2edae3; font-weight: bold; }
+.fixture-auto-resumen-pedidos { color: #2edae3; }
+
+/* Pedidos de los equipos (tarjeta del fixture automático) */
+.pedidos-fixture {
+    margin: 4px 0 14px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(46, 218, 227, 0.35);
+    text-align: left;
+}
+
+.pedidos-fixture-alta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.pedidos-fixture-alta select {
+    flex: 1 1 140px;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+}
+
+.pedidos-fixture-alta select:focus { outline: none; border-color: #2edae3; }
+.pedidos-fixture-alta #pedido-fixture-fecha { flex: 0 1 110px; }
+.pedidos-fixture-alta .arbitros-btn-agregar { align-self: stretch; }
 .fixture-auto-problemas ul { margin: 6px 0 0; padding-left: 18px; }
 
 .fixture-auto-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
@@ -5975,6 +6009,10 @@ body.auth-pendiente .auth-gate {
 @media (max-width: 800px) {
     .calendario-input { min-height: 44px; font-size: 16px; }
     .fixture-auto-sel { min-height: 40px; font-size: 16px; }
+    .pedidos-fixture-alta { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+    .pedidos-fixture-alta select { min-height: 44px; font-size: 16px; }
+    .pedidos-fixture-alta #pedido-fixture-fecha,
+    .pedidos-fixture-alta .arbitros-btn-agregar { grid-column: 1 / -1; min-height: 44px; }
     .fixture-auto-botones { flex-direction: column-reverse; }
     .fixture-auto-botones .btn-submit-admin,
     .fixture-auto-botones .importar-btn-cancelar { width: 100%; }

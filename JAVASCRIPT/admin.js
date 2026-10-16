@@ -958,6 +958,108 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const panelFixtureAuto = document.getElementById('fixture-auto-vista-previa');
     let fixtureAuto = null;
 
+    // ── Pedidos de los equipos (liga_pedidos_fixture, en configStaff; pedido de Joaquín, 16/10/2026): "A vs B en la
+    // Fecha N", entre dos equipos del mismo grupo. Se cargan de a uno y el fixture automático busca cumplirlos.
+    const selPedidoEquipo1 = document.getElementById('pedido-fixture-equipo-1');
+    const selPedidoEquipo2 = document.getElementById('pedido-fixture-equipo-2');
+    const selPedidoFecha = document.getElementById('pedido-fixture-fecha');
+    const btnAgregarPedido = document.getElementById('btn-agregar-pedido-fixture');
+    const listaPedidosEl = document.getElementById('lista-pedidos-fixture');
+
+    function obtenerPedidosFixture() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_pedidos_fixture')); } catch (e) { guardado = null; }
+        return Array.isArray(guardado)
+            ? guardado.filter(pd => pd && (pd.ciclo === 'superior' || pd.ciclo === 'basico') && pd.a && pd.b && Number.isInteger(pd.fecha) && pd.fecha >= 1)
+            : [];
+    }
+
+    function cicloDePedidos() {
+        return selectCicloFixture && selectCicloFixture.value === 'basico' ? 'basico' : 'superior';
+    }
+
+    // El nombre de hoy del equipo del pedido (si no está más, el que tenía al cargarlo).
+    function nombreEnPedido(pd, lado) {
+        recargarPools();
+        const pool = pd.ciclo === 'basico' ? poolBasico : poolSuperior;
+        const eq = pool.find(e => claveEquipoFixture(e.id, e.nombre) === pd[lado]);
+        return eq ? eq.nombre : pd[lado === 'a' ? 'nombreA' : 'nombreB'];
+    }
+
+    function armarOpcionesPedidos() {
+        if (!selPedidoEquipo1 || !selPedidoEquipo2 || !selPedidoFecha) return;
+        recargarPools();
+        const ciclo = cicloDePedidos();
+        const pool = ciclo === 'basico' ? poolBasico : poolSuperior;
+        const opciones = '<option value="">— Equipo —</option>' + (gruposTorneo[ciclo] || []).map(g => {
+            const equipos = pool.filter(e => e.grupo === g);
+            return equipos.length ? `<optgroup label="${attrSeguro(textoGrupoHistorial(g))}">${equipos.map(e =>
+                `<option value="${attrSeguro(claveEquipoFixture(e.id, e.nombre))}">${attrSeguro(e.nombre)}</option>`).join('')}</optgroup>` : '';
+        }).join('');
+        [selPedidoEquipo1, selPedidoEquipo2].forEach(sel => {
+            const elegido = sel.value;
+            sel.innerHTML = opciones;
+            sel.value = [...sel.options].some(o => o.value === elegido) ? elegido : '';
+        });
+        const fechaElegida = selPedidoFecha.value;
+        selPedidoFecha.innerHTML = Array.from({ length: obtenerFechasGrupos()[ciclo] }, (_, n) => `<option value="${n + 1}">Fecha ${n + 1}</option>`).join('');
+        if ([...selPedidoFecha.options].some(o => o.value === fechaElegida)) selPedidoFecha.value = fechaElegida;
+    }
+
+    function renderizarPedidosFixture() {
+        if (!listaPedidosEl) return;
+        const ciclo = cicloDePedidos();
+        const pedidos = obtenerPedidosFixture().filter(pd => pd.ciclo === ciclo).sort((x, y) => x.fecha - y.fecha);
+        listaPedidosEl.innerHTML = pedidos.length === 0
+            ? `<li class="arbitros-vacio">Sin pedidos para el ciclo ${nombreCicloHistorial(ciclo)}.</li>`
+            : pedidos.map(pd => `<li class="arbitros-item"><span>${attrSeguro(nombreEnPedido(pd, 'a'))} vs ${attrSeguro(nombreEnPedido(pd, 'b'))} — Fecha ${pd.fecha}</span>`
+                + `<button type="button" class="arbitros-btn-quitar" data-id="${attrSeguro(pd.id)}">Quitar</button></li>`).join('');
+    }
+
+    function agregarPedidoFixture() {
+        const ciclo = cicloDePedidos();
+        const a = selPedidoEquipo1.value, b = selPedidoEquipo2.value, fecha = Number(selPedidoFecha.value);
+        if (!a || !b) { alert('Elegí los dos equipos del pedido.'); return; }
+        if (a === b) { alert('Elegí dos equipos distintos.'); return; }
+        recargarPools();
+        const pool = ciclo === 'basico' ? poolBasico : poolSuperior;
+        const eqA = pool.find(e => claveEquipoFixture(e.id, e.nombre) === a), eqB = pool.find(e => claveEquipoFixture(e.id, e.nombre) === b);
+        if (!eqA || !eqB) { alert('No encontré alguno de los dos equipos: recargá la página.'); return; }
+        if (eqA.grupo !== eqB.grupo) { alert(`${eqA.nombre} y ${eqB.nombre} son de grupos distintos: el fixture solo cruza equipos del mismo grupo.`); return; }
+        const pedidos = obtenerPedidosFixture();
+        const mismoPar = pedidos.find(pd => pd.ciclo === ciclo && [pd.a, pd.b].sort().join('|') === [a, b].sort().join('|'));
+        if (mismoPar) { alert(`Ya hay un pedido para ${eqA.nombre} vs ${eqB.nombre} (Fecha ${mismoPar.fecha}). Quitalo si querés cambiar la fecha.`); return; }
+        const choca = pedidos.find(pd => pd.ciclo === ciclo && pd.fecha === fecha && [pd.a, pd.b].some(k => k === a || k === b));
+        if (choca) {
+            alert(`En la Fecha ${fecha} ya hay un pedido de ${nombreEnPedido(choca, 'a')} vs ${nombreEnPedido(choca, 'b')}: un equipo juega una sola vez por fecha.`);
+            return;
+        }
+        pedidos.push({ id: Date.now(), ciclo, a, b, nombreA: eqA.nombre, nombreB: eqB.nombre, fecha });
+        almacen.setItem('liga_pedidos_fixture', JSON.stringify(pedidos));
+        selPedidoEquipo1.value = '';
+        selPedidoEquipo2.value = '';
+        cerrarFixtureAuto();
+        renderizarPedidosFixture();
+    }
+
+    if (btnAgregarPedido) btnAgregarPedido.addEventListener('click', agregarPedidoFixture);
+    // Los equipos pueden haber cambiado en Planteles desde que se armaron las opciones: se rearman al volver a la pestaña.
+    const btnTabJornada = document.querySelector('.staff-tab-btn[data-target="sec-jornada"]');
+    if (btnTabJornada) btnTabJornada.addEventListener('click', () => { armarOpcionesPedidos(); renderizarPedidosFixture(); });
+    if (selectCicloFixture) selectCicloFixture.addEventListener('change', () => { armarOpcionesPedidos(); renderizarPedidosFixture(); });
+    if (listaPedidosEl) {
+        listaPedidosEl.addEventListener('click', (e) => {
+            const boton = e.target.closest('.arbitros-btn-quitar');
+            if (!boton) return;
+            const pedidos = obtenerPedidosFixture();
+            const pd = pedidos.find(x => String(x.id) === boton.dataset.id);
+            if (!pd || !confirm(`¿Quitar el pedido ${nombreEnPedido(pd, 'a')} vs ${nombreEnPedido(pd, 'b')} (Fecha ${pd.fecha})?`)) return;
+            almacen.setItem('liga_pedidos_fixture', JSON.stringify(pedidos.filter(x => x !== pd)));
+            cerrarFixtureAuto();
+            renderizarPedidosFixture();
+        });
+    }
+
     // Método del círculo: el primero queda fijo y el resto rota. Con cantidad impar, cada ronda uno queda libre.
     function rondasTodosContraTodos(equipos) {
         const lista = equipos.slice();
@@ -976,6 +1078,93 @@ document.addEventListener('liga:datos-listos', (evento) => {
             lista.splice(1, 0, lista.pop());
         }
         return rondas;
+    }
+
+    // Todos los órdenes de una lista (algoritmo de Heap), el original primero.
+    function* permutaciones(lista) {
+        const a = lista.slice();
+        const c = new Array(a.length).fill(0);
+        yield a.slice();
+        let i = 1;
+        while (i < a.length) {
+            if (c[i] < i) {
+                const j = i % 2 === 0 ? 0 : c[i];
+                [a[j], a[i]] = [a[i], a[j]];
+                yield a.slice();
+                c[i]++;
+                i = 1;
+            } else {
+                c[i] = 0;
+                i++;
+            }
+        }
+    }
+
+    // Un grupo tiene muchos fixtures válidos: cambiando qué equipo ocupa cada lugar del método del círculo y en qué
+    // orden van las fechas. Se recorren buscando uno donde cada pedido caiga en su fecha. Con 6 equipos son 720 lugares
+    // posibles; el tope cubre grupos de hasta 8 enteros.
+    const TOPE_ORDENES_PEDIDOS = 50000;
+
+    function fixtureQueCumple(equipos, pedidos, cantidadFechas) {
+        const clave = e => claveEquipoFixture(e.id, e.nombre);
+        let probados = 0;
+        for (const orden of permutaciones(equipos)) {
+            if (++probados > TOPE_ORDENES_PEDIDOS) return null;
+            const rondas = rondasTodosContraTodos(orden);
+            const rondaDelPar = new Map();
+            rondas.forEach((ronda, i) => ronda.cruces.forEach(([x, y]) => rondaDelPar.set([clave(x), clave(y)].sort().join('|'), i)));
+            const rondaEnFecha = new Array(cantidadFechas).fill(null);
+            const usadas = new Set();
+            const cumple = pedidos.every(pd => {
+                const ronda = rondaDelPar.get([pd.a, pd.b].sort().join('|'));
+                const lugar = pd.fecha - 1;
+                if (ronda === undefined) return false;
+                if (rondaEnFecha[lugar] === null && !usadas.has(ronda)) {
+                    rondaEnFecha[lugar] = ronda;
+                    usadas.add(ronda);
+                    return true;
+                }
+                return rondaEnFecha[lugar] === ronda;
+            });
+            if (!cumple) continue;
+            const resto = rondas.map((_, i) => i).filter(i => !usadas.has(i));
+            return rondaEnFecha.map(i => rondas[i === null ? resto.shift() : i]);
+        }
+        return null;
+    }
+
+    // Las rondas del grupo cumpliendo la mayor cantidad de pedidos posible. Sin pedidos, las de siempre.
+    function rondasConPedidos(equipos, pedidos) {
+        const base = rondasTodosContraTodos(equipos);
+        if (pedidos.length === 0) return { rondas: base, cumplidos: [], incumplidos: [] };
+        const posibles = [];
+        const incumplidos = [];
+        pedidos.forEach(pd => {
+            if (pd.fecha > base.length) incumplidos.push({ pedido: pd, motivo: `el grupo juega ${base.length} ${base.length === 1 ? 'fecha' : 'fechas'}` });
+            else posibles.push(pd);
+        });
+        // Con muchos pedidos probar todas las combinaciones tarda: se suman de a uno, en el orden en que se cargaron.
+        if (posibles.length > 8) {
+            const elegidos = [];
+            let rondas = null;
+            posibles.forEach(pd => {
+                const prueba = fixtureQueCumple(equipos, [...elegidos, pd], base.length);
+                if (prueba) { elegidos.push(pd); rondas = prueba; } else incumplidos.push({ pedido: pd, motivo: 'no se puede cumplir junto con los otros pedidos del grupo' });
+            });
+            return { rondas: rondas || base, cumplidos: elegidos, incumplidos };
+        }
+        // Primero todos juntos; si no se puede, de a grupos más chicos (gana el que cumple más).
+        const mascaras = Array.from({ length: (1 << posibles.length) - 1 }, (_, n) => n + 1)
+            .sort((x, y) => posibles.filter((_, i) => y & (1 << i)).length - posibles.filter((_, i) => x & (1 << i)).length);
+        for (const mascara of mascaras) {
+            const elegidos = posibles.filter((_, i) => mascara & (1 << i));
+            const rondas = fixtureQueCumple(equipos, elegidos, base.length);
+            if (!rondas) continue;
+            posibles.filter((_, i) => !(mascara & (1 << i))).forEach(pd => incumplidos.push({ pedido: pd, motivo: 'no se puede cumplir junto con los otros pedidos del grupo' }));
+            return { rondas, cumplidos: elegidos, incumplidos };
+        }
+        posibles.forEach(pd => incumplidos.push({ pedido: pd, motivo: 'no hay ningún fixture del grupo que lo cumpla' }));
+        return { rondas: base, cumplidos: [], incumplidos };
     }
 
     // Mismo criterio que el alta a mano: sin un monto mayor a 0, Tesorería usa el arancel por defecto.
@@ -998,9 +1187,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
         recargarPools();
         const pool = ciclo === 'basico' ? poolBasico : poolSuperior;
         const gruposCiclo = gruposTorneo[ciclo] || [];
+        const pedidosCiclo = obtenerPedidosFixture().filter(pd => pd.ciclo === ciclo);
+        const grupoDe = new Map(pool.map(e => [claveEquipoFixture(e.id, e.nombre), e.grupo]));
+        const incumplidos = pedidosCiclo
+            .filter(pd => !grupoDe.has(pd.a) || !grupoDe.has(pd.b) || grupoDe.get(pd.a) !== grupoDe.get(pd.b) || !gruposCiclo.includes(grupoDe.get(pd.a)))
+            .map(pd => ({ pedido: pd, motivo: 'los dos equipos ya no están en el mismo grupo del ciclo' }));
         const grupos = gruposCiclo.map(g => {
             const equipos = pool.filter(e => e.grupo === g);
-            return { grupo: g, equipos, rondas: equipos.length >= 2 ? rondasTodosContraTodos(equipos) : [] };
+            const pedidos = pedidosCiclo.filter(pd => grupoDe.get(pd.a) === g && grupoDe.get(pd.b) === g);
+            const r = equipos.length >= 2 ? rondasConPedidos(equipos, pedidos) : { rondas: [], incumplidos: [] };
+            incumplidos.push(...r.incumplidos);
+            return { grupo: g, equipos, rondas: r.rondas };
         });
         const fechasNecesarias = Math.max(0, ...grupos.map(g => g.rondas.length));
         if (fechasNecesarias === 0) {
@@ -1058,6 +1255,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
             interzonales: nuevos.filter(p => p.grupo === 'Interzonal').length,
             fueraDeGrupo: pool.filter(e => !gruposCiclo.includes(e.grupo)),
             equiposPorGrupo: Object.fromEntries(grupos.map(g => [g.grupo, g.equipos.map(e => ({ id: e.id !== undefined ? e.id : null, nombre: e.nombre }))])),
+            // Cada pedido con el motivo si al armar no se pudo cumplir (si después se mueve algo, se vuelve a revisar).
+            pedidos: pedidosCiclo.map(pd => {
+                const inc = incumplidos.find(x => x.pedido === pd);
+                return { a: pd.a, b: pd.b, fecha: pd.fecha, nombreA: nombreEnPedido(pd, 'a'), nombreB: nombreEnPedido(pd, 'b'), motivo: inc ? inc.motivo : '' };
+            }),
             // Si cambian los equipos, los grupos o el calendario entre la vista previa y la confirmación, se vuelve a revisar.
             firma: JSON.stringify(nuevos.map(p => [p.fecha, p.grupo, p.localId, p.local, p.visitanteId, p.visitante, p.dia]))
         };
@@ -1123,7 +1325,41 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 }
             }
         });
+        (f.pedidos || []).forEach(pd => {
+            const indices = porPar.get([pd.a, pd.b].sort().join('|')) || [];
+            if (indices.some(i => f.nuevos[i].fecha === pd.fecha)) return;
+            const ahora = indices.map(i => f.nuevos[i].fecha);
+            generales.push(`Pedido no cumplido: ${pd.nombreA} vs ${pd.nombreB} en la Fecha ${pd.fecha}`
+                + (pd.motivo ? ` (${pd.motivo})` : (ahora.length ? ` (ahora está en la Fecha ${ahora.join(', ')})` : '')) + '.');
+        });
         return { porPartido, generales, contraSiMismo, cantidad: porPartido.filter(m => m.length).length + generales.length };
+    }
+
+    // Pasar un partido a otra fecha sin que nadie juegue dos veces (decisión de Joaquín, 16/10/2026): entre la fecha de
+    // origen y la de destino se junta el bloque mínimo de partidos que hay que intercambiar. Primero los del destino
+    // que tienen a alguno de los equipos que van, después los del origen que tienen a alguno de los que vuelven, y así
+    // hasta que no quede ninguno. Si las dos fechas estaban bien (cada equipo una vez), quedan bien; los interzonales
+    // entran en el bloque como cualquier otro partido.
+    function planMoverPartido(f, indice, destino) {
+        const origen = f.nuevos[indice].fecha;
+        const equiposDe = i => [claveEquipoFixture(f.nuevos[i].localId, f.nuevos[i].local), claveEquipoFixture(f.nuevos[i].visitanteId, f.nuevos[i].visitante)];
+        const aDestino = new Set([indice]);
+        const aOrigen = new Set();
+        let crecio = true;
+        while (crecio) {
+            crecio = false;
+            [[aDestino, aOrigen, destino], [aOrigen, aDestino, origen]].forEach(([moviendo, vuelta, fechaQueRecibe]) => {
+                const equipos = new Set([...moviendo].flatMap(equiposDe));
+                f.nuevos.forEach((p, i) => {
+                    if (p.fecha !== fechaQueRecibe || vuelta.has(i) || moviendo.has(i)) return;
+                    if (equiposDe(i).some(k => equipos.has(k))) {
+                        vuelta.add(i);
+                        crecio = true;
+                    }
+                });
+            });
+        }
+        return { origen, destino, aDestino: [...aDestino], aOrigen: [...aOrigen] };
     }
 
     // Los equipos de cada grupo que no juegan esa fecha (ni en su grupo ni en un interzonal). Un grupo que esa fecha no
@@ -1153,10 +1389,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }).join('');
         const opcionesFecha = elegida => Array.from({ length: f.configuradas }, (_, n) => n + 1)
             .map(n => `<option value="${n}"${n === elegida ? ' selected' : ''}>Fecha ${n}</option>`).join('');
+        const parDe = p => [claveEquipoFixture(p.localId, p.local), claveEquipoFixture(p.visitanteId, p.visitante)].sort().join('|');
+        const esPedido = p => (f.pedidos || []).some(pd => pd.fecha === p.fecha && [pd.a, pd.b].sort().join('|') === parDe(p));
+        const pedidosCumplidos = (f.pedidos || []).filter(pd => f.nuevos.some(p => p.fecha === pd.fecha && parDe(p) === [pd.a, pd.b].sort().join('|'))).length;
         const htmlCruce = (p, i) => {
             const avisos = problemas.porPartido[i];
             return `<li class="fixture-auto-cruce fixture-auto-editable${avisos.length ? ' fixture-auto-con-problema' : ''}">
-                <span class="fixture-auto-grupo">${etiquetaGrupo(p.grupo)}${p.corregido ? ' · <span class="fixture-auto-corregido">corregido</span>' : ''}</span>
+                <span class="fixture-auto-grupo">${etiquetaGrupo(p.grupo)}${esPedido(p) ? ' · <span class="fixture-auto-pedido">pedido</span>' : ''}${p.corregido ? ' · <span class="fixture-auto-corregido">corregido</span>' : ''}</span>
                 <span class="fixture-auto-equipos">
                     <select class="fixture-auto-sel" data-i="${i}" data-campo="local" aria-label="Local">${opcionesEquipo(p, claveEquipoFixture(p.localId, p.local))}</select>
                     <span class="fixture-auto-vs">vs</span>
@@ -1201,9 +1440,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
         panelFixtureAuto.innerHTML = `
             <h3 class="fixture-auto-titulo">Vista previa del fixture — Ciclo ${nombreCicloHistorial(f.ciclo)}</h3>
             <p class="fixture-auto-texto"><strong>${plural(f.nuevos.length, 'partido', 'partidos')} en ${plural(new Set(f.nuevos.map(p => p.fecha)).size, 'fecha', 'fechas')}</strong> (el ciclo tiene ${f.configuradas} configuradas). Cada par de equipos se enfrenta una sola vez. Horario y cancha: a confirmar. Arancel: ${arancel} por equipo.</p>
-            <p class="fixture-auto-nota">Todavía no se guardó nada. Antes de confirmar podés corregir cada cruce: cambiar los equipos o pasarlo a otra fecha. Al confirmar se crean todos juntos; después cada uno se edita desde el Cronograma (horario, cancha, resultado).</p>
+            <p class="fixture-auto-nota">Todavía no se guardó nada. Antes de confirmar podés corregir cada cruce: cambiar los equipos o pasarlo a otra fecha (los partidos que haga falta para que nadie juegue dos veces se acomodan solos, y antes te dice cuáles). Al confirmar se crean todos juntos; después cada uno se edita desde el Cronograma (horario, cancha, resultado).</p>
             <ul class="fixture-auto-grupos">${f.grupos.map(g => `<li>${attrSeguro(lineaGrupo(g))}</li>`).join('')}${f.interzonales
-                ? `<li>Interzonales: ${plural(f.interzonales, 'partido', 'partidos')} (suman en la tabla del grupo de cada equipo).</li>` : ''}</ul>
+                ? `<li>Interzonales: ${plural(f.interzonales, 'partido', 'partidos')} (suman en la tabla del grupo de cada equipo).</li>` : ''}${(f.pedidos || []).length
+                ? `<li class="fixture-auto-resumen-pedidos">Pedidos de los equipos: ${pedidosCumplidos} de ${f.pedidos.length} ${pedidosCumplidos === 1 ? 'cumplido' : 'cumplidos'}.</li>` : ''}</ul>
             ${f.fueraDeGrupo.length
                 ? `<p class="fixture-auto-texto fixture-auto-aviso">No entran (no están en un grupo del ciclo): ${f.fueraDeGrupo.map(e => `${attrSeguro(e.nombre)} (${attrSeguro(dondeEsta(e))})`).join(', ')}.</p>`
                 : ''}
@@ -1305,8 +1545,24 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const p = fixtureAuto.nuevos[Number(sel.dataset.i)];
             if (!p) return;
             if (sel.dataset.campo === 'fecha') {
-                p.fecha = Number(sel.value);
-                p.dia = diaDeCalendario(fixtureAuto.ciclo, p.fecha);
+                const indice = Number(sel.dataset.i);
+                const plan = planMoverPartido(fixtureAuto, indice, Number(sel.value));
+                if (plan.destino === plan.origen) return;
+                const textoMovido = (k, de, a) => `• ${fixtureAuto.nuevos[k].local} vs ${fixtureAuto.nuevos[k].visitante} (Fecha ${de} → Fecha ${a})`;
+                const otros = [
+                    ...plan.aDestino.filter(k => k !== indice).map(k => textoMovido(k, plan.origen, plan.destino)),
+                    ...plan.aOrigen.map(k => textoMovido(k, plan.destino, plan.origen))
+                ];
+                if (otros.length && !confirm(`Para que nadie juegue dos veces en la misma fecha, al pasar ${p.local} vs ${p.visitante} a la Fecha ${plan.destino} también se mueven:\n\n${otros.join('\n')}\n\n¿Hacer el cambio?`)) {
+                    renderizarFixtureAuto();
+                    return;
+                }
+                [[plan.aDestino, plan.destino], [plan.aOrigen, plan.origen]].forEach(([indices, fecha]) => indices.forEach(k => {
+                    const movido = fixtureAuto.nuevos[k];
+                    movido.fecha = fecha;
+                    movido.dia = diaDeCalendario(fixtureAuto.ciclo, fecha);
+                    movido.corregido = true;
+                }));
             } else {
                 const eq = equiposParaCruce(fixtureAuto, p).find(x => claveEquipoFixture(x.id, x.nombre) === sel.value);
                 if (!eq) return;
@@ -7009,6 +7265,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     armarOpcionesHorario();
     renderizarListaArbitros();
     armarOpcionesArbitro();
+    armarOpcionesPedidos();
+    renderizarPedidosFixture();
     actualizarOpcionesGrupo();
     renderizarCalendarioFechas();
     autocompletarDiaPartido();

@@ -407,6 +407,23 @@
                             <input type="number" id="fixture-auto-arancel" value="30000" step="500" min="0">
                         </div>
                     </div>
+
+                    <!-- PEDIDOS DE LOS EQUIPOS: el fixture busca cumplirlos (las opciones y la lista las arma admin.js) -->
+                    <div class="pedidos-fixture">
+                        <h4 class="calendario-titulo">Pedidos de los equipos</h4>
+                        <p class="calendario-ayuda">
+                            Si un equipo pidió jugar contra otro de su grupo en una fecha puntual, cargalo acá. Al armar el fixture del ciclo elegido arriba se busca uno que cumpla todos los pedidos; si no se puede, se cumplen la mayor cantidad y se avisa cuáles no.
+                        </p>
+                        <div class="pedidos-fixture-alta">
+                            <select id="pedido-fixture-equipo-1" aria-label="Equipo"></select>
+                            <span class="fixture-auto-vs">vs</span>
+                            <select id="pedido-fixture-equipo-2" aria-label="Rival"></select>
+                            <select id="pedido-fixture-fecha" aria-label="Fecha"></select>
+                            <button type="button" id="btn-agregar-pedido-fixture" class="btn-submit-admin arbitros-btn-agregar">Agregar pedido</button>
+                        </div>
+                        <ul id="lista-pedidos-fixture" class="arbitros-lista"></ul>
+                    </div>
+
                     <button type="button" id="btn-fixture-auto" class="btn-submit-admin">Armar fixture</button>
                 </section>
 
