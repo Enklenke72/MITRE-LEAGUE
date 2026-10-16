@@ -314,26 +314,32 @@ document.addEventListener('liga:datos-listos', () => {
 
         contenedor.innerHTML = ''; 
 
-        // 1. Si no le pasamos fecha, detecta automáticamente la última fecha con partidos en el sistema.
-        // Los playoffs entran en la cuenta: sus códigos (108/104/102/100) no se pueden comparar con
-        // Math.max porque van al revés, así que se ordenan con ordenCronologicoFechaPublico.
+        // 1. Si no le pasamos fecha: la última fecha con algún partido jugado ("Últimos partidos"); si todavía no se
+        // jugó ninguno, la primera fecha cargada ("Próximos partidos"). Antes tomaba la fecha más avanzada con partidos
+        // cargados, y con el fixture entero guardado mostraba la última fecha sin haberse jugado la primera.
+        // Los playoffs entran en la cuenta: sus códigos (108/104/102/100) van al revés, así que se ordenan con
+        // ordenCronologicoFechaPublico.
+        const masReciente = (a, b) => (ordenCronologicoFechaPublico(b) > ordenCronologicoFechaPublico(a) ? b : a);
+        const fechasJugadas = ligaData.partidos.filter(p => p.jugado).map(p => p.fecha);
+        const hayJugados = fechasJugadas.length > 0;
         if (!fechaSeleccionada) {
             const fechasCargadas = ligaData.partidos.map(p => p.fecha);
-            fechaSeleccionada = fechasCargadas.length > 0
-                ? fechasCargadas.reduce((masReciente, f) =>
-                    ordenCronologicoFechaPublico(f) > ordenCronologicoFechaPublico(masReciente) ? f : masReciente)
+            if (hayJugados) fechaSeleccionada = fechasJugadas.reduce(masReciente);
+            else fechaSeleccionada = fechasCargadas.length > 0
+                ? fechasCargadas.reduce((a, b) => (ordenCronologicoFechaPublico(b) < ordenCronologicoFechaPublico(a) ? b : a))
                 : 1;
         }
 
         // 2. Buscamos el título principal del bloque en la Home/Fixture para ponerle la Fecha
         const tituloSeccion = document.querySelector('#pantalla-fixture h2');
+        const textoTitulo = hayJugados ? 'ÚLTIMOS PARTIDOS' : 'PRÓXIMOS PARTIDOS';
         if (ligaData.partidos.length === 0) {
-            if (tituloSeccion) tituloSeccion.textContent = 'ÚLTIMOS PARTIDOS';
+            if (tituloSeccion) tituloSeccion.textContent = textoTitulo;
             contenedor.innerHTML = '<p style="color: #869bd8; font-size: 11px; text-align: center; padding: 18px;">Todavía no hay partidos cargados.</p>';
             return;
         }
         if (tituloSeccion) {
-            tituloSeccion.innerHTML = `ÚLTIMOS PARTIDOS <span style="font-size: 13px; color: #2edae3; font-family: 'Oswald'; display: block; margin-top: 10px;">— ${nombreFechaPublico(fechaSeleccionada)} —</span>`;
+            tituloSeccion.innerHTML = `${textoTitulo} <span style="font-size: 13px; color: #2edae3; font-family: 'Oswald'; display: block; margin-top: 10px;">— ${nombreFechaPublico(fechaSeleccionada)} —</span>`;
         }
 
         const partidosFiltrados = ligaData.partidos.filter(partido => partido.fecha === fechaSeleccionada);
