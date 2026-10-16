@@ -430,6 +430,56 @@
                 <!-- VISTA PREVIA DEL FIXTURE AUTOMÁTICO (la arma admin.js) -->
                 <section id="fixture-auto-vista-previa" class="admin-card-panel fixture-auto-panel seccion-oculta-staff"
                     aria-label="Vista previa del fixture"></section>
+
+                <!-- ARMADOR DE HORARIOS (vista previa abajo, en #horarios-auto-vista-previa) -->
+                <section class="admin-card-panel fixture-auto-bloque">
+                    <h3 class="fixture-auto-encabezado">Armador de Horarios</h3>
+                    <p class="calendario-ayuda">
+                        Acomoda en los turnos y las canchas los partidos de una fecha que tienen horario o cancha a confirmar, como mucho 3 por turno (uno por cancha). Los dos ciclos juntos. Lo que ya acomodaste a mano queda fijo. Antes de guardar se ve una vista previa.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <select id="horarios-auto-fecha"></select>
+                        </div>
+                    </div>
+
+                    <!-- ÁRBITRO DE CADA CANCHA en la fecha elegida (las opciones las arma admin.js) -->
+                    <div class="pedidos-fixture">
+                        <h4 class="calendario-titulo">Árbitro de cada cancha</h4>
+                        <p class="calendario-ayuda">
+                            Quién dirige en cada cancha en la fecha elegida arriba. Al cargar un partido en esa cancha y esa fecha el árbitro se completa solo, y el armador lo pone en los partidos que acomoda.
+                        </p>
+                        <div id="arbitros-cancha-lista" class="arbitros-cancha-lista"></div>
+                        <button type="button" id="btn-guardar-arbitros-cancha" class="btn-submit-admin turnos-btn-guardar">Guardar árbitros de la fecha</button>
+                    </div>
+
+                    <!-- PEDIDOS DE HORARIO de los equipos (las opciones y la lista las arma admin.js) -->
+                    <div class="pedidos-fixture">
+                        <h4 class="calendario-titulo">Pedidos de horario</h4>
+                        <p class="calendario-ayuda">
+                            Si un equipo pidió jugar en un turno, más temprano o más tarde, cargalo acá: para una fecha o para todas. El armador busca cumplir todos; si no se puede, cumple la mayor cantidad y avisa cuáles no.
+                        </p>
+                        <div class="pedidos-fixture-alta pedidos-horario-alta">
+                            <select id="pedido-horario-equipo" aria-label="Equipo"></select>
+                            <select id="pedido-horario-tipo" aria-label="Tipo de pedido">
+                                <option value="exacto">A las</option>
+                                <option value="desde">No antes de las</option>
+                                <option value="hasta">No después de las</option>
+                            </select>
+                            <select id="pedido-horario-turno" aria-label="Turno"></select>
+                            <select id="pedido-horario-fecha" aria-label="Fecha"></select>
+                            <button type="button" id="btn-agregar-pedido-horario" class="btn-submit-admin arbitros-btn-agregar">Agregar pedido</button>
+                        </div>
+                        <ul id="lista-pedidos-horario" class="arbitros-lista"></ul>
+                    </div>
+
+                    <button type="button" id="btn-armar-horarios" class="btn-submit-admin">Armar horarios</button>
+                </section>
+
+                <!-- VISTA PREVIA DEL ARMADOR DE HORARIOS (la arma admin.js) -->
+                <section id="horarios-auto-vista-previa" class="admin-card-panel fixture-auto-panel seccion-oculta-staff"
+                    aria-label="Vista previa de los horarios"></section>
             </div>
 
             <!-- SUB-VISTA 2: ARMADOR DE PLAYOFFS -->

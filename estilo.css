@@ -6006,6 +6006,45 @@ body.auth-pendiente .auth-gate {
 .fixture-auto-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .fixture-auto-botones .btn-submit-admin { width: auto; min-height: 44px; }
 
+/* Armador de horarios: árbitro de cada cancha, pedidos de horario y vista previa por turno */
+.arbitros-cancha-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.arbitros-cancha-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    font-size: 12px;
+    color: #869bd8;
+}
+
+.arbitros-cancha-sel {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+}
+
+.arbitros-cancha-sel:focus { outline: none; border-color: #2edae3; }
+.pedidos-horario-alta #pedido-horario-equipo { flex: 2 1 200px; }
+.pedidos-horario-alta #pedido-horario-turno { flex: 0 1 90px; }
+
+.horarios-auto-fila { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+.horarios-auto-cancha { font-size: 11px; color: #2edae3; text-transform: uppercase; }
+.horarios-auto-arbitro { font-size: 11px; color: #f2c00e; }
+.horarios-auto-marcas { font-size: 11px; }
+.horarios-auto-nuevo { color: #2edae3; font-weight: bold; }
+.fixture-auto-botones .btn-submit-admin:disabled { opacity: 0.5; cursor: not-allowed; }
+
 @media (max-width: 800px) {
     .calendario-input { min-height: 44px; font-size: 16px; }
     .fixture-auto-sel { min-height: 40px; font-size: 16px; }
@@ -6013,6 +6052,10 @@ body.auth-pendiente .auth-gate {
     .pedidos-fixture-alta select { min-height: 44px; font-size: 16px; }
     .pedidos-fixture-alta #pedido-fixture-fecha,
     .pedidos-fixture-alta .arbitros-btn-agregar { grid-column: 1 / -1; min-height: 44px; }
+    .pedidos-horario-alta { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .pedidos-horario-alta #pedido-horario-equipo,
+    .pedidos-horario-alta #pedido-horario-fecha { grid-column: 1 / -1; }
+    .arbitros-cancha-sel { min-height: 44px; font-size: 16px; }
     .fixture-auto-botones { flex-direction: column-reverse; }
     .fixture-auto-botones .btn-submit-admin,
     .fixture-auto-botones .importar-btn-cancelar { width: 100%; }

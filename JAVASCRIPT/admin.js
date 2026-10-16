@@ -581,6 +581,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             // Un horario que ya no es turno se conserva solo si se está editando un partido que lo tiene.
             const elegido = inputHorarioPartido ? inputHorarioPartido.value : '';
             armarOpcionesHorario(idPartidoEnEdicion !== null || turnos.includes(elegido) ? elegido : '');
+            armarOpcionesPedidosHorario();
+            cerrarHorariosAuto();
             alert(`Turnos guardados: ${turnos.join(', ')}.`);
         });
     }
@@ -645,6 +647,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         inputArbitroNuevo.value = '';
         renderizarListaArbitros();
         armarOpcionesArbitro();
+        renderizarArbitrosCancha();
     }
 
     if (btnAgregarArbitro) btnAgregarArbitro.addEventListener('click', agregarArbitro);
@@ -666,6 +669,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             almacen.setItem('liga_arbitros', JSON.stringify(obtenerArbitros().filter(n => !mismoArbitro(n, nombre))));
             renderizarListaArbitros();
             armarOpcionesArbitro();
+            renderizarArbitrosCancha();
         });
     }
 
@@ -809,6 +813,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             armarOpcionesFechaPartido();
             armarOpcionesFechaEgreso();
             renderizarCalendarioFechas();
+            armarOpcionesFechaHorarios();
+            armarOpcionesPedidosHorario();
 
             const fueraDeRango = [['superior', 'Superior'], ['basico', 'Básico']].map(([ciclo, nombre]) => {
                 const fuera = fechasGruposConPartidos(ciclo).filter(f => f > nuevo[ciclo]).sort((a, b) => a - b);
@@ -1515,6 +1521,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         armarOpcionesFechaPartido();
         armarOpcionesFechaEgreso();
         renderizarCalendarioFechas();
+        armarOpcionesFechaHorarios();
         if (typeof actualizarFiltroFechasTesoreria === 'function') actualizarFiltroFechasTesoreria();
         alert(`Fixture del ciclo ${nombreCicloHistorial(actual.ciclo)} guardado: ${cantidad} en ${enFechas}. Horario y cancha quedan a confirmar: completalos con "Editar" en el Cronograma.`);
     }
@@ -1577,6 +1584,537 @@ document.addEventListener('liga:datos-listos', (evento) => {
         // La vista previa es de un ciclo y un arancel: si cambian, hay que volver a armarla.
         [selectCicloFixture, inputArancelFixture].forEach(campo => {
             if (campo) campo.addEventListener('change', cerrarFixtureAuto);
+        });
+    }
+
+    // ── Armador de horarios (pedido de Joaquín, 16/10/2026): acomoda en los turnos y las canchas los partidos de una
+    // fecha que tienen horario o cancha a confirmar, como mucho 3 por turno (uno por cancha). Lo que ya está acomodado a
+    // mano queda fijo. Los dos ciclos juntos, como la hoja de horarios. El árbitro sale de la cancha: cada fecha tiene
+    // su árbitro por cancha (liga_arbitros_cancha) y los pedidos de horario de los equipos (liga_pedidos_horario) valen
+    // para una fecha o para todas.
+    const MAX_PARTIDOS_TURNO = 3;
+    const selectFechaHorarios = document.getElementById('horarios-auto-fecha');
+    const contenedorArbitrosCancha = document.getElementById('arbitros-cancha-lista');
+    const btnGuardarArbitrosCancha = document.getElementById('btn-guardar-arbitros-cancha');
+    const selPedidoHorarioEquipo = document.getElementById('pedido-horario-equipo');
+    const selPedidoHorarioTipo = document.getElementById('pedido-horario-tipo');
+    const selPedidoHorarioTurno = document.getElementById('pedido-horario-turno');
+    const selPedidoHorarioFecha = document.getElementById('pedido-horario-fecha');
+    const btnAgregarPedidoHorario = document.getElementById('btn-agregar-pedido-horario');
+    const listaPedidosHorarioEl = document.getElementById('lista-pedidos-horario');
+    const btnArmarHorarios = document.getElementById('btn-armar-horarios');
+    const panelHorariosAuto = document.getElementById('horarios-auto-vista-previa');
+    const TIPOS_PEDIDO_HORARIO = { exacto: 'a las', desde: 'no antes de las', hasta: 'no después de las' };
+    let horariosAuto = null;
+    // Árbitro de la cancha elegida en el formulario de partido: si el elegido es ese, se toma como automático y cambia
+    // con la Cancha o la Fecha; uno elegido a mano no se toca (igual que el Día con el calendario).
+    let arbitroAutocompletado = '';
+
+    function canchasDisponibles() {
+        const sel = document.getElementById('partido-cancha');
+        const canchas = sel ? [...sel.options].map(o => o.value).filter(Boolean) : [];
+        return canchas.length ? canchas : ['Cancha 1', 'Cancha 2', 'Cancha 3'];
+    }
+
+    function obtenerArbitrosCancha() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_arbitros_cancha')); } catch (e) { guardado = null; }
+        return guardado && typeof guardado === 'object' && !Array.isArray(guardado) ? guardado : {};
+    }
+
+    function arbitroDeCancha(fecha, cancha) {
+        const deLaFecha = obtenerArbitrosCancha()[String(Number(fecha))];
+        return cancha && deLaFecha && typeof deLaFecha[cancha] === 'string' ? deLaFecha[cancha].trim() : '';
+    }
+
+    function arbitroDeCanchaFormulario() {
+        if (!inputFechaPartido || (checkCanchaConfirmar && checkCanchaConfirmar.checked)) return '';
+        const selectCancha = document.getElementById('partido-cancha');
+        return arbitroDeCancha(inputFechaPartido.value, selectCancha ? selectCancha.value : '');
+    }
+
+    function autocompletarArbitroPartido() {
+        if (!selectArbitroPartido) return;
+        const arbitro = arbitroDeCanchaFormulario();
+        const actual = selectArbitroPartido.value;
+        if (!actual || (arbitroAutocompletado && mismoArbitro(actual, arbitroAutocompletado))) armarOpcionesArbitro(arbitro);
+        arbitroAutocompletado = arbitro;
+    }
+
+    const selectCanchaPartido = document.getElementById('partido-cancha');
+    if (selectCanchaPartido) selectCanchaPartido.addEventListener('change', autocompletarArbitroPartido);
+    if (checkCanchaConfirmar) checkCanchaConfirmar.addEventListener('change', autocompletarArbitroPartido);
+
+    // Las fechas de grupos del ciclo que tiene más, más los playoffs (como los egresos: una jornada junta los dos ciclos).
+    function fechasParaHorarios() {
+        const config = obtenerFechasGrupos();
+        return [...listaFechasGrupos(Math.max(config.superior, config.basico), fechasGruposConPartidos(null)),
+            ...fechasPlayoffOfrecidas(null).map(([f]) => f)];
+    }
+
+    function armarOpcionesFechaHorarios() {
+        if (!selectFechaHorarios) return;
+        const valor = selectFechaHorarios.value;
+        const fechas = fechasParaHorarios();
+        selectFechaHorarios.innerHTML = fechas.map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
+        if ([...selectFechaHorarios.options].some(o => o.value === valor)) {
+            selectFechaHorarios.value = valor;
+        } else {
+            // La primera fecha que tiene partidos sin horario o sin cancha.
+            const pendiente = fechas.find(f => partidos.some(p => p && Number(p.fecha) === f && !p.jugado && (!p.horario || !p.cancha)));
+            if (pendiente !== undefined) selectFechaHorarios.value = String(pendiente);
+        }
+        renderizarArbitrosCancha();
+    }
+
+    function renderizarArbitrosCancha() {
+        if (!contenedorArbitrosCancha || !selectFechaHorarios) return;
+        const fecha = selectFechaHorarios.value;
+        const lista = obtenerArbitros().sort((a, b) => a.localeCompare(b, 'es'));
+        contenedorArbitrosCancha.innerHTML = canchasDisponibles().map(cancha => {
+            const elegido = arbitroDeCancha(fecha, cancha);
+            const enLista = lista.find(n => elegido && mismoArbitro(n, elegido));
+            const opciones = `<option value="">${ARBITRO_SIN_ASIGNAR}</option>`
+                + (elegido && !enLista ? `<option value="${attrSeguro(elegido)}" selected>${attrSeguro(elegido)} (no está en la lista)</option>` : '')
+                + lista.map(n => `<option value="${attrSeguro(n)}"${n === enLista ? ' selected' : ''}>${attrSeguro(n)}</option>`).join('');
+            return `<label class="arbitros-cancha-item"><span>${attrSeguro(cancha)}</span>`
+                + `<select class="arbitros-cancha-sel" data-cancha="${attrSeguro(cancha)}">${opciones}</select></label>`;
+        }).join('');
+    }
+
+    const distintoArbitro = (a, b) => (a || '').trim().toLowerCase() !== (b || '').trim().toLowerCase();
+    const arbitroDelPartido = p => (p.arbitro && !mismoArbitro(p.arbitro, ARBITRO_SIN_ASIGNAR) ? p.arbitro.trim() : '');
+
+    if (selectFechaHorarios) {
+        selectFechaHorarios.addEventListener('change', () => {
+            renderizarArbitrosCancha();
+            cerrarHorariosAuto();
+        });
+    }
+
+    if (btnGuardarArbitrosCancha) {
+        btnGuardarArbitrosCancha.addEventListener('click', () => {
+            const fecha = Number(selectFechaHorarios ? selectFechaHorarios.value : NaN);
+            if (!Number.isFinite(fecha)) { alert('Elegí una fecha.'); return; }
+            const todos = obtenerArbitrosCancha();
+            const anterior = todos[String(fecha)] || {};
+            const nuevo = {};
+            contenedorArbitrosCancha.querySelectorAll('.arbitros-cancha-sel').forEach(sel => { if (sel.value) nuevo[sel.dataset.cancha] = sel.value; });
+            if (Object.keys(nuevo).length) todos[String(fecha)] = nuevo;
+            else delete todos[String(fecha)];
+            almacen.setItem('liga_arbitros_cancha', JSON.stringify(todos));
+
+            // Igual que el calendario: se ofrece pasar el árbitro nuevo a los partidos sin jugar de esa cancha que
+            // estaban "Por asignar" o con el árbitro anterior de la cancha. Uno elegido a mano para un partido no se toca.
+            const afectados = partidos.filter(p => p && p.local && p.visitante && Number(p.fecha) === fecha && !p.jugado && p.cancha).filter(p => {
+                const actual = arbitroDelPartido(p);
+                const antes = (anterior[p.cancha] || '').trim();
+                return (actual === '' || (antes && !distintoArbitro(actual, antes))) && distintoArbitro(actual, nuevo[p.cancha] || '');
+            });
+            let actualizados = 0;
+            if (afectados.length && confirm(`Hay partidos de ${nombreFaseTeso(fecha)} en esas canchas:\n\n`
+                + afectados.map(p => `• ${p.horario || 'Horario a confirmar'} · ${p.cancha}: ${p.local} vs ${p.visitante} → ${nuevo[p.cancha] || ARBITRO_SIN_ASIGNAR}`).join('\n')
+                + '\n\nLos partidos con un árbitro elegido a mano no se tocan. ¿Actualizar el árbitro de esos partidos?')) {
+                const ids = new Set(afectados.map(p => p.id));
+                partidos = partidos.map(p => (p && ids.has(p.id) ? { ...p, arbitro: nuevo[p.cancha] || ARBITRO_SIN_ASIGNAR } : p));
+                almacen.setItem('liga_partidos', JSON.stringify(partidos));
+                actualizados = afectados.length;
+                registrarHistorial('partido', `asignó los árbitros por cancha de ${nombreFaseTeso(fecha)} en ${actualizados} ${actualizados === 1 ? 'partido' : 'partidos'}`);
+                actualizarListaAdmin();
+            }
+            if (idPartidoEnEdicion === null) autocompletarArbitroPartido();
+            cerrarHorariosAuto();
+            renderizarArbitrosCancha();
+            alert(`Árbitros de ${nombreFaseTeso(fecha)} guardados.` + (afectados.length
+                ? (actualizados ? ' Se actualizó el árbitro de esos partidos.' : ' Los partidos ya cargados quedaron con el árbitro que tenían.')
+                : ''));
+        });
+    }
+
+    function obtenerPedidosHorario() {
+        let guardado = null;
+        try { guardado = JSON.parse(almacen.getItem('liga_pedidos_horario')); } catch (e) { guardado = null; }
+        return Array.isArray(guardado)
+            ? guardado.filter(pd => pd && (pd.ciclo === 'superior' || pd.ciclo === 'basico') && pd.equipo && TIPOS_PEDIDO_HORARIO[pd.tipo]
+                && PATRON_HORA.test(String(pd.turno)) && Number.isInteger(pd.fecha) && pd.fecha >= 0)
+            : [];
+    }
+
+    function nombrePedidoHorario(pd) {
+        const pool = pd.ciclo === 'basico' ? poolBasico : poolSuperior;
+        const eq = pool.find(e => claveEquipoFixture(e.id, e.nombre) === pd.equipo);
+        return eq ? eq.nombre : pd.nombre;
+    }
+
+    function textoPedidoHorario(pd) {
+        return `${nombrePedidoHorario(pd)} (${nombreCicloHistorial(pd.ciclo)}): ${TIPOS_PEDIDO_HORARIO[pd.tipo]} ${pd.turno}`
+            + ` — ${pd.fecha ? nombreFaseTeso(pd.fecha) : 'todas las fechas'}`;
+    }
+
+    function armarOpcionesPedidosHorario() {
+        if (!selPedidoHorarioEquipo || !selPedidoHorarioTurno || !selPedidoHorarioFecha) return;
+        recargarPools();
+        const elegido = selPedidoHorarioEquipo.value;
+        selPedidoHorarioEquipo.innerHTML = '<option value="">— Equipo —</option>' + [['superior', poolSuperior], ['basico', poolBasico]].map(([ciclo, pool]) => {
+            const grupos = [...new Set(pool.map(e => e.grupo || ''))].sort((a, b) => a.localeCompare(b, 'es'));
+            return grupos.map(g => {
+                const equipos = pool.filter(e => (e.grupo || '') === g).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+                return `<optgroup label="${nombreCicloHistorial(ciclo)} — ${attrSeguro(g ? textoGrupoHistorial(g) : 'Sin grupo')}">${equipos.map(e =>
+                    `<option value="${ciclo}|${attrSeguro(claveEquipoFixture(e.id, e.nombre))}">${attrSeguro(e.nombre)}</option>`).join('')}</optgroup>`;
+            }).join('');
+        }).join('');
+        selPedidoHorarioEquipo.value = [...selPedidoHorarioEquipo.options].some(o => o.value === elegido) ? elegido : '';
+
+        const turnoElegido = selPedidoHorarioTurno.value;
+        const turnos = turnosDe(obtenerTurnosJornada());
+        selPedidoHorarioTurno.innerHTML = turnos.map(t => `<option value="${t}">${t}</option>`).join('');
+        if (turnos.includes(turnoElegido)) selPedidoHorarioTurno.value = turnoElegido;
+
+        const fechaElegida = selPedidoHorarioFecha.value;
+        selPedidoHorarioFecha.innerHTML = '<option value="0">Todas las fechas</option>'
+            + fechasParaHorarios().map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
+        if ([...selPedidoHorarioFecha.options].some(o => o.value === fechaElegida)) selPedidoHorarioFecha.value = fechaElegida;
+    }
+
+    function renderizarPedidosHorario() {
+        if (!listaPedidosHorarioEl) return;
+        recargarPools();
+        const pedidos = obtenerPedidosHorario().sort((x, y) => x.fecha - y.fecha || nombrePedidoHorario(x).localeCompare(nombrePedidoHorario(y), 'es', { numeric: true }));
+        listaPedidosHorarioEl.innerHTML = pedidos.length === 0
+            ? '<li class="arbitros-vacio">Sin pedidos de horario.</li>'
+            : pedidos.map(pd => `<li class="arbitros-item"><span>${attrSeguro(textoPedidoHorario(pd))}</span>`
+                + `<button type="button" class="arbitros-btn-quitar" data-id="${attrSeguro(pd.id)}">Quitar</button></li>`).join('');
+    }
+
+    function agregarPedidoHorario() {
+        const [ciclo, equipo] = (selPedidoHorarioEquipo.value || '').split('|');
+        const tipo = selPedidoHorarioTipo ? selPedidoHorarioTipo.value : '';
+        const turno = selPedidoHorarioTurno.value;
+        const fecha = Number(selPedidoHorarioFecha.value);
+        if (!equipo) { alert('Elegí el equipo del pedido.'); return; }
+        if (!TIPOS_PEDIDO_HORARIO[tipo] || !PATRON_HORA.test(turno) || !Number.isInteger(fecha)) { alert('Elegí el tipo de pedido, el turno y la fecha.'); return; }
+        recargarPools();
+        const eq = (ciclo === 'basico' ? poolBasico : poolSuperior).find(e => claveEquipoFixture(e.id, e.nombre) === equipo);
+        if (!eq) { alert('No encontré ese equipo: recargá la página.'); return; }
+        const pedidos = obtenerPedidosHorario();
+        const mismoAlcance = pd => pd.ciclo === ciclo && pd.equipo === equipo && (pd.fecha === fecha || pd.fecha === 0 || fecha === 0);
+        if (pedidos.some(pd => mismoAlcance(pd) && pd.fecha === fecha && pd.tipo === tipo && pd.turno === turno)) {
+            alert(`${eq.nombre} ya tiene ese pedido.`);
+            return;
+        }
+        const exacto = pedidos.find(pd => mismoAlcance(pd) && pd.tipo === 'exacto' && tipo === 'exacto' && pd.turno !== turno);
+        if (exacto) {
+            alert(`${eq.nombre} ya pidió jugar a las ${exacto.turno} (${exacto.fecha ? nombreFaseTeso(exacto.fecha) : 'todas las fechas'}). Quitá ese pedido si querés cambiarlo.`);
+            return;
+        }
+        pedidos.push({ id: Date.now(), ciclo, equipo, nombre: eq.nombre, tipo, turno, fecha });
+        almacen.setItem('liga_pedidos_horario', JSON.stringify(pedidos));
+        selPedidoHorarioEquipo.value = '';
+        cerrarHorariosAuto();
+        renderizarPedidosHorario();
+    }
+
+    if (btnAgregarPedidoHorario) btnAgregarPedidoHorario.addEventListener('click', agregarPedidoHorario);
+    if (listaPedidosHorarioEl) {
+        listaPedidosHorarioEl.addEventListener('click', (e) => {
+            const boton = e.target.closest('.arbitros-btn-quitar');
+            if (!boton) return;
+            const pedidos = obtenerPedidosHorario();
+            const pd = pedidos.find(x => String(x.id) === boton.dataset.id);
+            if (!pd || !confirm(`¿Quitar el pedido ${textoPedidoHorario(pd)}?`)) return;
+            almacen.setItem('liga_pedidos_horario', JSON.stringify(pedidos.filter(x => x !== pd)));
+            cerrarHorariosAuto();
+            renderizarPedidosHorario();
+        });
+    }
+    if (btnTabJornada) {
+        btnTabJornada.addEventListener('click', () => {
+            armarOpcionesFechaHorarios();
+            armarOpcionesPedidosHorario();
+            renderizarPedidosHorario();
+        });
+    }
+
+    // El equipo del partido como lo guardan los pedidos (por id; un partido viejo sin id se busca por nombre).
+    function claveEquipoDePartido(p, lado) {
+        const id = p[lado + 'Id'], nombre = String(p[lado] || '').trim().toLowerCase();
+        const pool = (p.ciclo || 'superior') === 'basico' ? poolBasico : poolSuperior;
+        const eq = (id !== null && id !== undefined && pool.find(e => e.id === id)) || pool.find(e => e.nombre.trim().toLowerCase() === nombre);
+        return eq ? claveEquipoFixture(eq.id, eq.nombre) : claveEquipoFixture(id, nombre);
+    }
+
+    function cumplePedidoHorario(pd, turno) {
+        if (pd.tipo === 'exacto') return turno === pd.turno;
+        return pd.tipo === 'desde' ? turno >= pd.turno : turno <= pd.turno;
+    }
+
+    function armarHorariosFecha(fecha) {
+        recargarPools();
+        const turnos = turnosDe(obtenerTurnosJornada());
+        const canchas = canchasDisponibles();
+        const capacidad = Math.min(MAX_PARTIDOS_TURNO, canchas.length);
+        const pedidos = obtenerPedidosHorario();
+        const arbitrosFecha = obtenerArbitrosCancha()[String(fecha)] || {};
+        const deLaFecha = partidos.filter(p => p && p.local && p.visitante && Number(p.fecha) === fecha);
+        const firma = JSON.stringify([turnos, canchas, arbitrosFecha, pedidos,
+            deLaFecha.map(p => [p.id, p.horario || '', p.cancha || '', p.arbitro || '', !!p.jugado, p.local, p.visitante])]);
+        if (deLaFecha.length === 0) return { bloqueo: `${nombreFaseTeso(fecha)} no tiene partidos cargados.` };
+        if (!deLaFecha.some(p => !p.jugado && (!p.horario || !p.cancha))) {
+            return { bloqueo: `Todos los partidos de ${nombreFaseTeso(fecha)} ya tienen horario y cancha, o ya se jugaron. Para que el armador acomode uno, editalo en el Cronograma y tildá "Horario a confirmar".` };
+        }
+
+        const equiposDe = p => ['local', 'visitante'].map(lado => (p.ciclo || 'superior') + '|' + claveEquipoDePartido(p, lado));
+        const pedidosDe = p => {
+            const claves = ['local', 'visitante'].map(lado => claveEquipoDePartido(p, lado));
+            return pedidos.filter(pd => pd.ciclo === (p.ciclo || 'superior') && claves.includes(pd.equipo) && (pd.fecha === 0 || pd.fecha === fecha));
+        };
+
+        // Lo que ya tiene horario ocupa su turno (y su cancha, si la tiene); un horario fuera de turno ocupa el suyo.
+        const estado = new Map();
+        const lugar = h => {
+            if (!estado.has(h)) estado.set(h, { canchas: new Set(), cantidad: 0, equipos: new Set() });
+            return estado.get(h);
+        };
+        turnos.forEach(lugar);
+        const conHorario = deLaFecha.filter(p => p.horario);
+        conHorario.forEach(p => {
+            const s = lugar(p.horario);
+            s.cantidad++;
+            if (p.cancha) s.canchas.add(p.cancha);
+            equiposDe(p).forEach(k => s.equipos.add(k));
+        });
+        const variables = deLaFecha.filter(p => !p.jugado && !p.horario)
+            .map(p => ({ p, cancha: p.cancha || '', equipos: equiposDe(p), pedidos: pedidosDe(p) }));
+
+        const cabe = (v, t) => {
+            const s = estado.get(t);
+            return s.cantidad < capacidad && !(v.cancha && s.canchas.has(v.cancha)) && !v.equipos.some(k => s.equipos.has(k));
+        };
+        const poner = (v, t) => {
+            const s = estado.get(t);
+            s.cantidad++;
+            if (v.cancha) s.canchas.add(v.cancha);
+            v.equipos.forEach(k => s.equipos.add(k));
+        };
+        const sacar = (v, t) => {
+            const s = estado.get(t);
+            s.cantidad--;
+            if (v.cancha) s.canchas.delete(v.cancha);
+            v.equipos.forEach(k => s.equipos.delete(k));
+        };
+
+        // Búsqueda con poda: primero que se cumpla la mayor cantidad de pedidos, después que la jornada termine lo más
+        // temprano posible. Un partido que no entra en ningún turno cuenta como mucho peor que un pedido sin cumplir.
+        const SIN_LUGAR = 1000, TOPE_NODOS = 200000;
+        const fallas = (v, t) => v.pedidos.filter(pd => !cumplePedidoHorario(pd, t)).length;
+        const orden = variables.map((v, i) => i).sort((a, b) =>
+            turnos.filter(t => fallas(variables[a], t) === 0).length - turnos.filter(t => fallas(variables[b], t) === 0).length
+            || variables[b].pedidos.length - variables[a].pedidos.length);
+        const asignado = new Array(variables.length).fill(-1);
+        let mejor = null, nodos = 0;
+        const buscar = (k, costo, ultimo) => {
+            if (++nodos > TOPE_NODOS) return;
+            if (mejor && (costo > mejor.costo || (costo === mejor.costo && ultimo >= mejor.ultimo))) return;
+            if (k === orden.length) { mejor = { costo, ultimo, asignado: asignado.slice() }; return; }
+            const i = orden[k], v = variables[i];
+            const opciones = turnos.map((t, ti) => ({ t, ti, f: fallas(v, t) })).filter(o => cabe(v, o.t))
+                .sort((a, b) => a.f - b.f || a.ti - b.ti);
+            for (const o of opciones) {
+                poner(v, o.t);
+                asignado[i] = o.ti;
+                buscar(k + 1, costo + o.f, Math.max(ultimo, o.ti));
+                sacar(v, o.t);
+            }
+            asignado[i] = -1;
+            buscar(k + 1, costo + SIN_LUGAR, ultimo);
+        };
+        buscar(0, 0, -1);
+
+        // Horario final de cada partido; después las canchas, turno por turno: las fijas quedan y el resto toma las libres en orden.
+        const horarioFinal = new Map(deLaFecha.map(p => [p.id, p.horario || '']));
+        const sinLugar = [];
+        variables.forEach((v, i) => {
+            const ti = mejor ? mejor.asignado[i] : -1;
+            if (ti >= 0) horarioFinal.set(v.p.id, turnos[ti]);
+            else sinLugar.push(v.p);
+        });
+        const canchaFinal = new Map(deLaFecha.map(p => [p.id, p.cancha || '']));
+        const sinCancha = [];
+        const porHorario = new Map();
+        deLaFecha.forEach(p => {
+            const h = horarioFinal.get(p.id);
+            if (!h) return;
+            if (!porHorario.has(h)) porHorario.set(h, []);
+            porHorario.get(h).push(p);
+        });
+        porHorario.forEach(lista => {
+            const usadas = new Set(lista.map(p => p.cancha).filter(Boolean));
+            const libres = canchas.filter(c => !usadas.has(c));
+            lista.filter(p => !p.cancha && !p.jugado).forEach(p => {
+                if (libres.length) canchaFinal.set(p.id, libres.shift());
+                else sinCancha.push(p);
+            });
+        });
+
+        // El árbitro de la cancha, salvo que el partido tenga uno elegido a mano (distinto de los árbitros por cancha de la fecha).
+        const automatico = a => !a || Object.values(arbitrosFecha).some(x => x && !distintoArbitro(x, a));
+        const cambios = new Map();
+        let acomodados = 0, arbitrosCompletados = 0;
+        deLaFecha.filter(p => !p.jugado).forEach(p => {
+            const horario = horarioFinal.get(p.id), cancha = canchaFinal.get(p.id);
+            const actual = arbitroDelPartido(p);
+            const deCancha = cancha ? (arbitrosFecha[cancha] || '').trim() : '';
+            const movido = horario !== (p.horario || '') || cancha !== (p.cancha || '');
+            let arbitro = actual;
+            if (movido ? automatico(actual) : (actual === '' && deCancha)) arbitro = deCancha;
+            if (movido) acomodados++;
+            else if (distintoArbitro(arbitro, actual)) arbitrosCompletados++;
+            if (movido || distintoArbitro(arbitro, actual)) cambios.set(p.id, { horario, cancha, arbitro: arbitro || ARBITRO_SIN_ASIGNAR });
+        });
+
+        // Pedidos: uno por equipo y partido de esta fecha.
+        const motivoNoCumplido = (p, pd) => {
+            if (!p.jugado && p.horario) return `el partido ya tenía horario cargado (${p.horario})`;
+            if (!horarioFinal.get(p.id)) return 'el partido no entró en ningún turno';
+            if (pd.tipo === 'exacto' && !turnos.includes(pd.turno)) return `las ${pd.turno} no es un turno de la jornada`;
+            return `no entra junto con los otros pedidos y el máximo de ${capacidad} partidos por turno (queda a las ${horarioFinal.get(p.id)})`;
+        };
+        let pedidosTotal = 0, pedidosCumplidos = 0;
+        const incumplidos = [];
+        const pedidosPorPartido = new Map();
+        deLaFecha.filter(p => !p.jugado).forEach(p => {
+            const estados = pedidosDe(p).map(pd => {
+                const cumple = !!horarioFinal.get(p.id) && cumplePedidoHorario(pd, horarioFinal.get(p.id));
+                pedidosTotal++;
+                if (cumple) pedidosCumplidos++;
+                else incumplidos.push(`${textoPedidoHorario(pd)}: ${motivoNoCumplido(p, pd)}.`);
+                return cumple;
+            });
+            if (estados.length) pedidosPorPartido.set(p.id, estados.every(Boolean));
+        });
+
+        return {
+            fecha, firma, turnos, canchas, capacidad, deLaFecha, horarioFinal, canchaFinal, cambios, sinLugar, sinCancha,
+            acomodados, arbitrosCompletados, pedidosTotal, pedidosCumplidos, incumplidos, pedidosPorPartido,
+            incompleto: nodos > TOPE_NODOS
+        };
+    }
+
+    function renderizarHorariosAuto() {
+        if (!panelHorariosAuto || !horariosAuto) return;
+        const h = horariosAuto;
+        const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+        const lineaPartido = p => {
+            const cambio = h.cambios.get(p.id);
+            const arbitro = cambio ? cambio.arbitro : (p.arbitro || ARBITRO_SIN_ASIGNAR);
+            const movido = cambio && (cambio.horario !== (p.horario || '') || cambio.cancha !== (p.cancha || ''));
+            const pedido = h.pedidosPorPartido.get(p.id);
+            const marcas = [
+                p.jugado ? '<span class="fixture-auto-libre">jugado</span>' : (movido ? '<span class="horarios-auto-nuevo">nuevo</span>' : '<span class="fixture-auto-libre">ya estaba</span>'),
+                pedido === true ? '<span class="fixture-auto-pedido">pedido cumplido</span>' : '',
+                pedido === false ? '<span class="fixture-auto-problema">pedido sin cumplir</span>' : ''
+            ].filter(Boolean).join(' · ');
+            return `<span class="horarios-auto-arbitro">Árbitro: ${attrSeguro(arbitro)}</span>
+                <span>${attrSeguro(p.local)} <span class="fixture-auto-vs">vs</span> ${attrSeguro(p.visitante)} <span class="fixture-auto-grupo">(${attrSeguro(etiquetaGrupoHorario(p))})</span></span>
+                <span class="horarios-auto-marcas">${marcas}</span>`;
+        };
+        const fueraDeTurno = [...new Set(h.deLaFecha.map(p => h.horarioFinal.get(p.id)).filter(x => x && !h.turnos.includes(x)))];
+        const horarios = [...h.turnos, ...fueraDeTurno].sort();
+        const tarjetas = horarios.map(horario => {
+            const enTurno = h.deLaFecha.filter(p => h.horarioFinal.get(p.id) === horario);
+            const filas = h.canchas.map(cancha => {
+                const p = enTurno.find(x => h.canchaFinal.get(x.id) === cancha);
+                return `<li class="fixture-auto-cruce horarios-auto-fila"><span class="horarios-auto-cancha">${attrSeguro(cancha)}</span>`
+                    + (p ? lineaPartido(p) : '<span class="fixture-auto-libre">Libre</span>') + '</li>';
+            });
+            enTurno.filter(p => !h.canchas.includes(h.canchaFinal.get(p.id))).forEach(p => filas.push(
+                `<li class="fixture-auto-cruce horarios-auto-fila"><span class="horarios-auto-cancha">${attrSeguro(h.canchaFinal.get(p.id) || 'Cancha a confirmar')}</span>${lineaPartido(p)}</li>`));
+            return `<div class="fixture-auto-fecha">
+                <h4 class="fixture-auto-fecha-titulo">${attrSeguro(horario)} HS${h.turnos.includes(horario) ? '' : ' <span class="fixture-auto-sin-dia">(fuera de turno)</span>'} · ${plural(enTurno.length, 'partido', 'partidos')}</h4>
+                <ul class="fixture-auto-cruces">${filas.join('')}</ul>
+            </div>`;
+        }).join('');
+        const textoPartido = p => `${p.local} vs ${p.visitante} (${etiquetaGrupoHorario(p)})`;
+        const avisos = [
+            ...h.sinLugar.map(p => `No entró en ningún turno: ${textoPartido(p)}. Queda con horario a confirmar (sumá turnos en "Turnos de la Jornada" o acomodalo a mano).`),
+            ...h.sinCancha.map(p => `Sin cancha libre a las ${h.horarioFinal.get(p.id)}: ${textoPartido(p)}. Queda con cancha a confirmar.`),
+            ...h.incumplidos.map(t => `Pedido no cumplido: ${t}`)
+        ];
+        const dia = [...new Set(h.deLaFecha.map(p => p.dia).filter(Boolean))].join(' / ');
+        panelHorariosAuto.innerHTML = `
+            <h3 class="fixture-auto-titulo">Vista previa de los horarios — ${attrSeguro(nombreFaseTeso(h.fecha))}${dia ? ' · ' + attrSeguro(dia) : ''}</h3>
+            <p class="fixture-auto-texto"><strong>${plural(h.acomodados, 'partido acomodado', 'partidos acomodados')}</strong> en turno y cancha, como mucho ${h.capacidad} por turno.${h.arbitrosCompletados ? ` Además se completa el árbitro de ${plural(h.arbitrosCompletados, 'partido', 'partidos')} que ya tenían horario.` : ''}</p>
+            <p class="fixture-auto-nota">Todavía no se guardó nada. Los partidos que ya tenían horario y cancha quedan donde estaban. El árbitro sale de "Árbitro de cada cancha" de esta fecha; un árbitro elegido a mano en un partido no se cambia. Después cada partido se edita desde el Cronograma.</p>
+            ${h.pedidosTotal ? `<ul class="fixture-auto-grupos"><li class="fixture-auto-resumen-pedidos">Pedidos de horario: ${h.pedidosCumplidos} de ${h.pedidosTotal} ${h.pedidosCumplidos === 1 ? 'cumplido' : 'cumplidos'}.</li></ul>` : ''}
+            ${h.incompleto ? '<p class="fixture-auto-texto fixture-auto-aviso">Había demasiadas combinaciones para revisarlas todas: este es el mejor reparto que se encontró.</p>' : ''}
+            ${avisos.length ? `<div class="fixture-auto-problemas"><strong>${plural(avisos.length, 'aviso', 'avisos')} para revisar.</strong> Se puede guardar igual.<ul>${avisos.map(a => `<li>${attrSeguro(a)}</li>`).join('')}</ul></div>` : ''}
+            <div class="fixture-auto-fechas">${tarjetas}</div>
+            <div class="fixture-auto-botones">
+                <button type="button" class="importar-btn-cancelar" data-accion="cancelar">Cancelar</button>
+                <button type="button" class="btn-submit-admin" data-accion="confirmar"${h.cambios.size ? '' : ' disabled'}>Confirmar (${plural(h.cambios.size, 'partido', 'partidos')})</button>
+            </div>`;
+        panelHorariosAuto.classList.remove('seccion-oculta-staff');
+    }
+
+    function cerrarHorariosAuto() {
+        horariosAuto = null;
+        if (panelHorariosAuto) {
+            panelHorariosAuto.innerHTML = '';
+            panelHorariosAuto.classList.add('seccion-oculta-staff');
+        }
+    }
+
+    function confirmarHorariosAuto() {
+        const actual = armarHorariosFecha(horariosAuto.fecha);
+        if (actual.bloqueo) {
+            cerrarHorariosAuto();
+            alert(actual.bloqueo);
+            return;
+        }
+        if (actual.firma !== horariosAuto.firma) {
+            horariosAuto = actual;
+            renderizarHorariosAuto();
+            alert('Cambiaron los partidos, los turnos, los árbitros o los pedidos desde que se armó la vista previa: revisala de nuevo antes de confirmar. No se guardó nada.');
+            return;
+        }
+        if (actual.cambios.size === 0) return;
+        if ((actual.sinLugar.length || actual.sinCancha.length || actual.incumplidos.length)
+            && !confirm('La vista previa tiene avisos (marcados en rojo). ¿Guardar los horarios igual?')) return;
+        partidos = partidos.map(p => (p && actual.cambios.has(p.id) ? { ...p, ...actual.cambios.get(p.id) } : p));
+        almacen.setItem('liga_partidos', JSON.stringify(partidos));
+        registrarHistorial('partido', `armó los horarios de ${nombreFaseTeso(actual.fecha)}: ${actual.acomodados} ${actual.acomodados === 1 ? 'partido acomodado' : 'partidos acomodados'} en turno y cancha`
+            + (actual.arbitrosCompletados ? `, y el árbitro de ${actual.arbitrosCompletados} ${actual.arbitrosCompletados === 1 ? 'partido' : 'partidos'} más` : ''));
+        cerrarHorariosAuto();
+        // El Cronograma queda en esa fecha, así "Imprimir horarios" la imprime directo.
+        actualizarSelectFechasCronograma();
+        if (selectFiltroCronograma && [...selectFiltroCronograma.options].some(o => o.value === String(actual.fecha))) {
+            selectFiltroCronograma.value = String(actual.fecha);
+            fechaFiltroActiva = selectFiltroCronograma.value;
+        }
+        actualizarListaAdmin();
+        alert(`Horarios de ${nombreFaseTeso(actual.fecha)} guardados. El Cronograma quedó en esa fecha: con "Imprimir horarios" sale la hoja.`);
+    }
+
+    if (btnArmarHorarios && panelHorariosAuto) {
+        btnArmarHorarios.addEventListener('click', () => {
+            const fecha = Number(selectFechaHorarios ? selectFechaHorarios.value : NaN);
+            if (!Number.isFinite(fecha)) { alert('Elegí una fecha.'); return; }
+            const resultado = armarHorariosFecha(fecha);
+            if (resultado.bloqueo) {
+                cerrarHorariosAuto();
+                alert(resultado.bloqueo);
+                return;
+            }
+            horariosAuto = resultado;
+            renderizarHorariosAuto();
+            panelHorariosAuto.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        panelHorariosAuto.addEventListener('click', (e) => {
+            const boton = e.target.closest('[data-accion]');
+            if (!boton || !horariosAuto) return;
+            if (boton.dataset.accion === 'cancelar') cerrarHorariosAuto();
+            else if (boton.dataset.accion === 'confirmar') confirmarHorariosAuto();
         });
     }
 
@@ -1843,6 +2381,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // Después de los de arriba: cuando se completa el Día, la Fecha ya quedó ajustada al ciclo.
     if (inputFechaPartido) inputFechaPartido.addEventListener('change', autocompletarDiaPartido);
     if (cicloSelect) cicloSelect.addEventListener('change', autocompletarDiaPartido);
+    if (inputFechaPartido) inputFechaPartido.addEventListener('change', autocompletarArbitroPartido);
+    if (cicloSelect) cicloSelect.addEventListener('change', autocompletarArbitroPartido);
 
     // Dibujar Cronograma de Partidos
     function actualizarListaAdmin() {
@@ -1966,6 +2506,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     if (checkCanchaConfirmar) checkCanchaConfirmar.checked = !p.cancha;
                     aplicarCanchaAConfirmar();
                     armarOpcionesArbitro(p.arbitro || '');
+                    arbitroAutocompletado = arbitroDeCanchaFormulario();
 
                     recargarPools();
                     const poolEdicion = p.ciclo === 'basico' ? poolBasico : poolSuperior;
@@ -2078,6 +2619,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (checkCanchaConfirmar) checkCanchaConfirmar.checked = contexto.canchaAConfirmar;
         aplicarCanchaAConfirmar();
         armarOpcionesArbitro(obtenerArbitros().some(n => contexto.arbitro && mismoArbitro(n, contexto.arbitro)) ? contexto.arbitro : '');
+        arbitroAutocompletado = '';
+        autocompletarArbitroPartido();
         if (inputArancel && contexto.arancel) inputArancel.value = contexto.arancel;
 
         armarOpcionesMvp('');
@@ -7267,9 +7810,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
     armarOpcionesArbitro();
     armarOpcionesPedidos();
     renderizarPedidosFixture();
+    armarOpcionesFechaHorarios();
+    armarOpcionesPedidosHorario();
+    renderizarPedidosHorario();
     actualizarOpcionesGrupo();
     renderizarCalendarioFechas();
     autocompletarDiaPartido();
+    autocompletarArbitroPartido();
     actualizarListaAdmin();
     actualizarSelectFechasCronograma();
     actualizarSelectsPlayoffs();

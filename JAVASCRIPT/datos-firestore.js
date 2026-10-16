@@ -54,6 +54,8 @@ const ESQUEMA = [
     { clave: 'liga_turnos_jornada', tipo: 'config', col: 'configStaff', id: 'turnosJornada', nivel: 'staff' },
     { clave: 'liga_arbitros', tipo: 'config', col: 'configStaff', id: 'arbitros', nivel: 'staff' },
     { clave: 'liga_pedidos_fixture', tipo: 'config', col: 'configStaff', id: 'pedidosFixture', nivel: 'staff' },
+    { clave: 'liga_arbitros_cancha', tipo: 'config', col: 'configStaff', id: 'arbitrosCancha', nivel: 'staff' },
+    { clave: 'liga_pedidos_horario', tipo: 'config', col: 'configStaff', id: 'pedidosHorario', nivel: 'staff' },
     { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
     { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },
     { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configCoordinador', id: 'valorInscripcion', nivel: 'coordinador' },
