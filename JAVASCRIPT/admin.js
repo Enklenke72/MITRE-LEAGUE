@@ -7215,15 +7215,29 @@ document.addEventListener('liga:datos-listos', (evento) => {
             return;
         }
 
-        partidosFiltrados.sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha));
+        // Por fecha y dentro de la fecha por turno (pedido de Joaquín, 16/10/2026), con un título por turno; dentro del
+        // turno, por cancha. Los de horario a confirmar van al final de su fecha.
+        const compararTexto = (a, b) => (a || '￿').localeCompare(b || '￿', 'es', { numeric: true });
+        partidosFiltrados.sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha)
+            || compararTexto(a.horario, b.horario) || compararTexto(a.cancha, b.cancha)
+            || ((a.ciclo || 'superior') === (b.ciclo || 'superior') ? 0 : ((a.ciclo || 'superior') === 'superior' ? -1 : 1)));
+        const claveTurno = p => `${p.fecha}|${p.horario || ''}`;
+        const cantidadPorTurno = {};
+        partidosFiltrados.forEach(p => { if (p && p.local && p.visitante) cantidadPorTurno[claveTurno(p)] = (cantidadPorTurno[claveTurno(p)] || 0) + 1; });
+        let turnoPrevio = null;
 
         contenedor.innerHTML = partidosFiltrados.map(p => {
             if (!p || !p.local || !p.visitante) return '';
+            const n = cantidadPorTurno[claveTurno(p)];
+            const tituloTurno = claveTurno(p) === turnoPrevio ? ''
+                : `<h4 class="teso-turno-titulo">${attrSeguro(nombreFaseTeso(p.fecha))} · ${p.horario ? attrSeguro(p.horario) + ' HS' : 'HORARIO A CONFIRMAR'}`
+                    + ` <span class="teso-turno-cantidad">(${n} ${n === 1 ? 'partido' : 'partidos'})</span></h4>`;
+            turnoPrevio = claveTurno(p);
             const ev = evaluaciones[p.id];
             const faseLabel = nombreFasePartido(p);
             const avisosHtml = ev.avisos.map(a => `<div class="teso-aviso teso-aviso-${a.tipo}">${attrSeguro(a.texto)}</div>`).join('');
 
-            return `
+            return `${tituloTurno}
                 <div class="teso-match-card">
                     <div class="teso-match-header">
                         <span><strong>${faseLabel}</strong> — ${attrSeguro(p.cancha || 'Cancha a confirmar')} (${p.horario ? attrSeguro(p.horario) + ' hs' : 'A confirmar'})</span>

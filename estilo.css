@@ -3928,6 +3928,23 @@ body.rol-staff .solo-admin {
     text-align: left !important;
 }
 
+/* Título de cada turno en Aranceles por Partido (los partidos van agrupados por fecha y turno) */
+.teso-turno-titulo {
+    margin: 18px 0 8px;
+    padding: 6px 10px;
+    border-left: 3px solid #2edae3;
+    border-radius: 3px;
+    background: rgba(46, 218, 227, 0.08);
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    color: #ffffff;
+    text-align: left;
+}
+
+.teso-turno-titulo:first-child { margin-top: 0; }
+.teso-turno-cantidad { color: #869bd8; font-size: 12px; }
+
 .teso-match-header {
     display: flex !important;
     justify-content: space-between !important;
@@ -4139,7 +4156,7 @@ body.rol-staff .solo-admin {
 .teso-aviso-alerta { background: rgba(244, 63, 94, 0.08); border-color: #f43f5e; color: #fca5a5; }
 
 /* Lista de buena fe en cancha (Tesorería): un toque por jugador, pensada para celular */
-.bf-detalle { border-top: 1px dashed rgba(46, 218, 227, 0.25); padding-top: 4px; }
+.bf-detalle { border-top: 1px dashed rgba(46, 218, 227, 0.25); padding-top: 4px; container-type: inline-size; }
 .bf-resumen { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 10px; min-height: 44px; cursor: pointer; list-style: none; font-family: 'Oswald', sans-serif; }
 .bf-resumen::-webkit-details-marker { display: none; }
 .bf-titulo { font-size: 14px; color: #2edae3; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -4181,6 +4198,14 @@ body.rol-staff .solo-admin {
 .bf-check input:checked + .bf-check-caja { background: #166534; border-color: #4ade80; }
 .bf-check input:checked + .bf-check-caja::after { content: '\2713'; color: #ffffff; font-size: 22px; font-weight: 700; line-height: 1; }
 .bf-check input:focus-visible + .bf-check-caja { outline: 2px solid #2edae3; outline-offset: 2px; }
+/* Lista angosta (la tarjeta del partido en celular mide unos 240 px): con la foto al lado, el nombre quedaba en 25 px y
+   se partía letra por letra. La foto pasa arriba del nombre y los botones se achican un poco. */
+@container (max-width: 360px) {
+    .bf-encabezado, .bf-fila { grid-template-columns: minmax(0, 1fr) 48px 64px; gap: 6px; }
+    .bf-celda-jugador { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .bf-jugador { max-width: 100%; }
+    .bf-nombre { word-break: normal; overflow-wrap: break-word; }
+}
 .bf-alta { margin-top: 8px; border-top: 1px dashed rgba(255, 255, 255, 0.12); }
 .bf-alta-titulo { display: flex; align-items: center; min-height: 44px; list-style: none; cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 13px; color: #2edae3; text-transform: uppercase; letter-spacing: 0.5px; }
 .bf-alta-titulo::-webkit-details-marker { display: none; }
