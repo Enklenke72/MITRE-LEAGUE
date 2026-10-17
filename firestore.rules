@@ -55,6 +55,12 @@ service cloud.firestore {
     match /tesoreriaInscripciones/{id} { allow read, write: if esCoordinador(); }
     match /egresos/{id} { allow read, write: if esCoordinador(); }
     match /configCoordinador/{id} { allow read, write: if esCoordinador(); }
+    // Lo que le falta pagar de inscripción a cada equipo (solo el monto, sin pagos ni beneficios), para mostrarlo en
+    // Aranceles por Partido (17/10/2026): lo escribe el panel del coordinador y el staff solo lo lee.
+    match /deudasInscripcion/{id} {
+      allow read: if esStaff();
+      allow write: if esCoordinador();
+    }
 
     // Caja por Fecha: el staff registra cada pago que marca, pero solo el coordinador la ve.
     match /cajaMovimientos/{id} {

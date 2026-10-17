@@ -170,6 +170,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     function guardarEquiposEnStorage() {
         almacen.setItem('liga_cicloSuperior', JSON.stringify(poolSuperior));
         almacen.setItem('liga_cicloBasico', JSON.stringify(poolBasico));
+        sincronizarDeudasInscripcion(); // la cantidad de jugadores cambia lo que se debe de inscripción
     }
 
     function guardarGruposEnStorage() {
@@ -5959,6 +5960,107 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const ARANCEL_PARTIDO_DEFECTO = 30000;
     const PUNTOS_QUITA_AUSENCIA = 2;
 
+    // ── Derecho de partido para todo el torneo (pedido de Joaquín, 17/10/2026): el arancel subió y cambiarlo partido por
+    // partido no servía. Solo el Coordinador. Cambia los partidos sin jugar (los jugados quedan con lo que se cobró) y
+    // queda como valor de los partidos nuevos (liga_arancel_partido). ARANCEL_PARTIDO_DEFECTO sigue siendo lo que vale un
+    // partido viejo guardado sin arancel.
+    const inputArancelNuevo = document.getElementById('arancel-partido-nuevo');
+    const btnAplicarArancel = document.getElementById('btn-aplicar-arancel-partido');
+    const textoArancelActual = document.getElementById('arancel-partido-actual');
+
+    function arancelPorDefecto() {
+        const valor = parseFloat(almacen.getItem('liga_arancel_partido'));
+        return valor > 0 ? valor : ARANCEL_PARTIDO_DEFECTO;
+    }
+
+    function mostrarArancelPartido() {
+        const valor = arancelPorDefecto();
+        if (inputArancelNuevo && document.activeElement !== inputArancelNuevo) inputArancelNuevo.value = valor;
+        if (textoArancelActual) textoArancelActual.textContent = `Valor actual para los partidos nuevos: $${valor.toLocaleString()} por equipo.`;
+        if (inputArancelPartido && idPartidoEnEdicion === null) inputArancelPartido.value = valor;
+        if (inputArancelFixture) inputArancelFixture.value = valor;
+    }
+
+    function aplicarArancelPartidos() {
+        if (usuarioPanel.rol !== 'coordinador' || !inputArancelNuevo) return;
+        const nuevo = Math.round(parseFloat(inputArancelNuevo.value));
+        if (!(nuevo > 0)) { alert('Escribí el arancel por equipo, mayor a $0.'); return; }
+        const dinero = n => `$${Math.round(n).toLocaleString()}`;
+        const arancelDe = p => p.arancelExigido || ARANCEL_PARTIDO_DEFECTO;
+        const sinJugar = partidos.filter(p => p && p.local && p.visitante && !p.jugado);
+        const aCambiar = sinJugar.filter(p => arancelDe(p) !== nuevo);
+        const anteriores = [...new Set(aCambiar.map(arancelDe))];
+
+        // Un arancel cargado a mano para un equipo: si era igual al del partido, pasa a seguir al partido; si era distinto
+        // (por ejemplo, un descuento), se respeta.
+        const sacarOverride = [], respetados = [], conPago = [];
+        sinJugar.forEach(p => ['local', 'visita'].forEach(lado => {
+            const clave = claveTesoreria(p, lado);
+            const d = tesoreriaPartidos[clave];
+            if (!d) return;
+            const nombre = lado === 'local' ? p.local : p.visitante;
+            if (d.arancel && (d.arancel === arancelDe(p) || d.arancel === nuevo)) sacarOverride.push(clave);
+            else if (d.arancel) respetados.push(`${nombre} en ${nombreFasePartido(p)} (${dinero(d.arancel)})`);
+            if (!d.arancel && arancelDe(p) !== nuevo && ((d.ef || 0) + (d.tr || 0)) > 0) conPago.push(`${nombre} en ${nombreFasePartido(p)}`);
+        }));
+
+        if (aCambiar.length || sacarOverride.length) {
+            const lineas = [`El derecho de partido pasa a ${dinero(nuevo)} por equipo en ${aCambiar.length} ${aCambiar.length === 1 ? 'partido sin jugar' : 'partidos sin jugar'}`
+                + (anteriores.length === 1 ? ` (era ${dinero(anteriores[0])}).` : '.') + ' Los ya jugados no cambian.'];
+            if (respetados.length) lineas.push(`Se respeta el arancel cargado a mano de: ${respetados.join('; ')}.`);
+            if (conPago.length) lineas.push(`Ya pagaron algo de esos partidos: ${conPago.join('; ')}. Si pagaron el valor anterior, van a quedar debiendo la diferencia.`);
+            lineas.push(`También queda ${dinero(nuevo)} para los partidos nuevos. ¿Aplicar?`);
+            if (!confirm(lineas.join('\n\n'))) return;
+            const ids = new Set(sinJugar.map(p => p.id));
+            partidos = partidos.map(p => (p && ids.has(p.id) ? { ...p, arancelExigido: nuevo } : p));
+            almacen.setItem('liga_partidos', JSON.stringify(partidos));
+            if (sacarOverride.length) {
+                sacarOverride.forEach(clave => { delete tesoreriaPartidos[clave].arancel; });
+                guardarTesoreriaPartidos();
+            }
+            registrarHistorial('pago', `cambió el derecho de partido a ${dinero(nuevo)} por equipo en ${aCambiar.length} ${aCambiar.length === 1 ? 'partido sin jugar' : 'partidos sin jugar'}`
+                + (anteriores.length === 1 ? ` (era ${dinero(anteriores[0])})` : ''));
+        }
+        const cambioDefecto = arancelPorDefecto() !== nuevo;
+        almacen.setItem('liga_arancel_partido', String(nuevo));
+        if (!aCambiar.length && !sacarOverride.length && cambioDefecto) registrarHistorial('pago', `dejó ${dinero(nuevo)} como derecho de partido para los partidos nuevos`);
+        mostrarArancelPartido();
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
+        alert(aCambiar.length
+            ? `Listo: ${aCambiar.length} ${aCambiar.length === 1 ? 'partido quedó' : 'partidos quedaron'} en ${dinero(nuevo)} por equipo, y los nuevos salen con ese valor.`
+            : `No había partidos sin jugar con otro valor. Los partidos nuevos salen con ${dinero(nuevo)} por equipo.`);
+    }
+
+    if (btnAplicarArancel) btnAplicarArancel.addEventListener('click', aplicarArancelPartidos);
+
+    // ── Deuda de inscripción en Aranceles por Partido (pedido de Joaquín, 17/10/2026), también para el Staff. El Staff no
+    // recibe pagos ni beneficios de inscripción: el panel del Coordinador calcula solo lo que falta por equipo y lo guarda
+    // en liga_deudas_inscripcion (colección deudasInscripcion: la lee el Staff, la escribe el Coordinador).
+    function deudasInscripcionCalculadas() {
+        recargarPools();
+        const valor = valorInscripcionGuardado();
+        const deudas = {};
+        [...(poolSuperior || []), ...(poolBasico || [])].forEach(eq => {
+            const clave = claveInscripcion(eq);
+            const pago = tesoreriaInscripciones[clave] || {};
+            const falta = montosInscripcion((eq.jugadores || []).length, valor, pago.beneficio).exigido - ((pago.ef || 0) + (pago.tr || 0));
+            if (falta > 0) deudas[clave] = falta;
+        });
+        return deudas;
+    }
+
+    function sincronizarDeudasInscripcion() {
+        if (usuarioPanel.rol !== 'coordinador') return;
+        const texto = JSON.stringify(deudasInscripcionCalculadas());
+        if (texto !== almacen.getItem('liga_deudas_inscripcion')) almacen.setItem('liga_deudas_inscripcion', texto);
+    }
+
+    function deudasInscripcionParaMostrar() {
+        if (usuarioPanel.rol === 'coordinador') return deudasInscripcionCalculadas();
+        try { return JSON.parse(almacen.getItem('liga_deudas_inscripcion')) || {}; } catch (e) { return {}; }
+    }
+
     function guardarTesoreriaPartidos() {
         almacen.setItem('liga_tesoreria_partidos_v2', JSON.stringify(tesoreriaPartidos));
     }
@@ -7016,7 +7118,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (typeof renderizarResumenStaff === 'function') renderizarResumenStaff();
     }
 
-    function htmlCajaEquipoTeso(t, ev, faseLabel, hist, p) {
+    function htmlCajaEquipoTeso(t, ev, faseLabel, hist, p, deudasInsc) {
         const dinero = n => `$${Math.round(n).toLocaleString()}`;
         const cancelado = t.falta <= 0;
         const sancion = ev.sanciones.find(s => s.t.clave === t.clave);
@@ -7042,6 +7144,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const badgeDeuda = hist.deudaTotal > 0
             ? `<div style="font-family:'Michroma',sans-serif; font-size:11px; color:#f2c00e; background:rgba(242, 192, 14,0.1); padding:7px 8px; border-radius:2px; border:1px solid rgba(242, 192, 14,0.3); margin-top:8px; text-align:center; line-height:1.5;">Arrastra deuda de $${hist.deudaTotal.toLocaleString()} (${hist.fechasDeuda.join(', ')})</div>`
             : '';
+        const deudaInsc = deudasInsc ? deudasInsc[equipoTeso(p, t.lado)] : 0;
+        const chipInscripcion = deudaInsc > 0 ? `<div class="teso-chip teso-chip-inscripcion">Debe inscripción: ${dinero(deudaInsc)}</div>` : '';
 
         return `
             <div class="teso-team-box">
@@ -7075,6 +7179,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 ${notasHtml}
                 ${chip}
                 ${badgeDeuda}
+                ${chipInscripcion}
                 ${htmlListaBuenaFe(t, p)}
             </div>
         `;
@@ -7207,6 +7312,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         recargarPools();
         const { calc, evaluaciones } = sincronizarAusencias();
         contenedor.innerHTML = '';
+        const deudasInsc = deudasInscripcionParaMostrar();
 
         const partidosFiltrados = obtenerPartidosFiltradosTeso();
 
@@ -7246,8 +7352,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     </div>
 
                     <div class="teso-match-teams-grid">
-                        ${htmlCajaEquipoTeso(ev.L, ev, faseLabel, obtenerDeudaHistorica(calc, equipoTeso(p, 'local'), p.fecha), p)}
-                        ${htmlCajaEquipoTeso(ev.V, ev, faseLabel, obtenerDeudaHistorica(calc, equipoTeso(p, 'visita'), p.fecha), p)}
+                        ${htmlCajaEquipoTeso(ev.L, ev, faseLabel, obtenerDeudaHistorica(calc, equipoTeso(p, 'local'), p.fecha), p, deudasInsc)}
+                        ${htmlCajaEquipoTeso(ev.V, ev, faseLabel, obtenerDeudaHistorica(calc, equipoTeso(p, 'visita'), p.fecha), p, deudasInsc)}
                     </div>
                     ${avisosHtml ? `<div class="teso-avisos-partido">${avisosHtml}</div>` : ''}
                 </div>
@@ -7476,6 +7582,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             txtBonificado.textContent = bonificado > 0 ? `Bonificado: $${bonificado.toLocaleString()} (no suma)` : '';
         }
         renderizarRecaudacionPorFecha();
+        sincronizarDeudasInscripcion();
     }
 
     // RECAUDACIÓN POR FECHA (EXCLUSIVO COORDINADOR): aranceles cobrados y egresos de cada fecha del torneo.
@@ -7903,6 +8010,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     armarOpcionesFechaHorarios();
     armarOpcionesPedidosHorario();
     renderizarPedidosHorario();
+    mostrarArancelPartido();
     actualizarOpcionesGrupo();
     renderizarCalendarioFechas();
     autocompletarDiaPartido();

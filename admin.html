@@ -1301,6 +1301,19 @@
 
             <!-- SUB-VISTA A: VISTA DE TARJETAS DE PARTIDOS -->
             <div id="sub-vista-teso-partidos" style="width: 100%;">
+                <!-- DERECHO DE PARTIDO PARA TODO EL TORNEO (solo Coordinador) -->
+                <section class="admin-card-panel solo-admin turnos-bloque arancel-torneo-bloque">
+                    <h3 class="turnos-encabezado">Derecho de Partido</h3>
+                    <p class="calendario-ayuda">
+                        Cambia el arancel por equipo de todos los partidos que todavía no se jugaron, y queda como valor para los partidos nuevos (formulario y fixture automático). Los ya jugados no cambian. Si a un equipo le cargaste a mano un arancel distinto en un partido, se respeta.
+                    </p>
+                    <div class="arbitros-alta">
+                        <input type="number" id="arancel-partido-nuevo" min="0" step="500" aria-label="Arancel por equipo">
+                        <button type="button" id="btn-aplicar-arancel-partido" class="btn-submit-admin arbitros-btn-agregar">Aplicar a los partidos sin jugar</button>
+                    </div>
+                    <p id="arancel-partido-actual" class="turnos-vista-previa"></p>
+                </section>
+
                 <section class="admin-card-panel">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">

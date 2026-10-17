@@ -56,6 +56,12 @@ const ESQUEMA = [
     { clave: 'liga_pedidos_fixture', tipo: 'config', col: 'configStaff', id: 'pedidosFixture', nivel: 'staff' },
     { clave: 'liga_arbitros_cancha', tipo: 'config', col: 'configStaff', id: 'arbitrosCancha', nivel: 'staff' },
     { clave: 'liga_pedidos_horario', tipo: 'config', col: 'configStaff', id: 'pedidosHorario', nivel: 'staff' },
+    { clave: 'liga_arancel_partido', tipo: 'config', col: 'configStaff', id: 'arancelPartido', nivel: 'staff' },
+    // Lo que le falta pagar de inscripción a cada equipo, sin pagos ni beneficios: lo calcula y lo escribe el panel del
+    // Coordinador (el único que tiene esos datos) y el Staff solo lo lee. opcional: si la regla todavía no está pegada en
+    // la consola, el panel carga igual, sin este dato. enVivo: lo que escribe el Coordinador se aplica solo, sin el
+    // aviso de cambios ajenos (el Staff nunca lo escribe, así que no hay copia que se pueda pisar).
+    { clave: 'liga_deudas_inscripcion', tipo: 'config', col: 'deudasInscripcion', id: 'actual', nivel: 'staff', escribeCoordinador: true, opcional: true, enVivo: true },
     { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
     { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },
     { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configCoordinador', id: 'valorInscripcion', nivel: 'coordinador' },
@@ -101,6 +107,7 @@ function puedeLeer(def) {
 }
 
 function puedeEscribir(def) {
+    if (def.escribeCoordinador && rolActual !== 'coordinador') return false;
     return rolActual !== 'publico' && (puedeLeer(def) || !!def.escribeStaff);
 }
 
@@ -371,7 +378,10 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
     const alCambiar = (clave, col, def) => snap => {
         vigente[clave] = snap;
         if (!cargaHecha) return;
-        if (esPanel) {
+        if (esPanel && def && def.enVivo) {
+            aplicar(def, snap);
+            avisarActualizacion([def.clave]);
+        } else if (esPanel) {
             programarResumen();
             if (alCambiarAjeno && difiereDeLoConocido(col, def, snap)) alCambiarAjeno();
         } else if (def) {
@@ -384,7 +394,11 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
     };
 
     const escucha = (clave, ref, col, def) => escuchar(ref, alCambiar(clave, col, def), esPanel)
-        .then(snap => { if (!vigente[clave]) vigente[clave] = snap; });
+        .then(snap => { if (!vigente[clave]) vigente[clave] = snap; })
+        .catch(error => {
+            if (!(def && def.opcional)) throw error;
+            console.warn(`[Datos] No se pudo leer ${def.col} (¿regla sin pegar en la consola?); el panel sigue sin ese dato.`, error);
+        });
 
     const { db, fsSdk } = fs;
     await Promise.all([
@@ -394,7 +408,7 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
     ]);
     // Los equipos primero: de equiposPrivado sale la traducción código → DNI que usan partidos y sanciones.
     aplicarEquipos(defsEquipos, vigente.equipos.docs, docsPrivados());
-    otras.forEach(def => aplicar(def, vigente[def.clave]));
+    otras.forEach(def => { if (vigente[def.clave]) aplicar(def, vigente[def.clave]); });
     cargaHecha = true;
     if (esPanel) {
         revisarResumen();
@@ -707,14 +721,15 @@ function avisarError(error) {
 
 // Cada escritura es independiente: si una falla (por ejemplo, otro borró ese partido), no arrastra a las demás.
 // No se espera la confirmación del servidor: sin señal quedan en cola y Firestore las manda al volver.
-function enviar(ops) {
+function enviar(ops, opcional) {
     const { db, fsSdk } = fs;
     ops.forEach(op => {
         const ref = fsSdk.doc(db, op.col, op.id);
         const promesa = op.tipo === 'set' ? fsSdk.setDoc(ref, op.datos)
             : op.tipo === 'update' ? fsSdk.updateDoc(ref, op.datos)
             : fsSdk.deleteDoc(ref);
-        promesa.catch(avisarError);
+        // Un dato opcional (regla quizás sin pegar) no interrumpe con el cartel de "Recargá la página".
+        promesa.catch(opcional ? (error => console.warn(`[Datos] No se pudo guardar ${op.col}/${op.id}:`, error)) : avisarError);
     });
 }
 
@@ -724,7 +739,7 @@ async function guardar(def, valor) {
     else if (def.tipo === 'lista') await planLista(def, JSON.parse(valor) || [], ops);
     else if (def.tipo === 'mapa') planMapa(def, JSON.parse(valor) || {}, ops);
     else planConfig(def, valor, ops);
-    enviar(ops);
+    enviar(ops, !!def.opcional);
     new Set(ops.map(op => seccionDe(op.col)).filter(Boolean)).forEach(programarResumen);
 }
 

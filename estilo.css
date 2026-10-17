@@ -4038,6 +4038,8 @@ body.rol-staff .solo-admin {
 .teso-chip-rojo { background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #f43f5e; }
 .teso-chip-verde { background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); color: #4ade80; }
 .teso-chip-gris { background: rgba(134, 155, 216, 0.1); border: 1px solid rgba(134, 155, 216, 0.3); color: #869bd8; }
+/* Deuda de inscripción del equipo en Aranceles por Partido (ámbar: no es una sanción) */
+.teso-chip-inscripcion { margin-top: 8px; background: rgba(242, 192, 14, 0.1); border: 1px solid rgba(242, 192, 14, 0.35); color: #f2c00e; }
 
 /* Inscripciones por Jugador: tarjetas por equipo (reemplaza la tabla de 6 columnas, ilegible en celular) */
 .teso-insc-grid {
