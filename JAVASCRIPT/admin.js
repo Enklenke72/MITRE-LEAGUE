@@ -464,6 +464,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     let idPartidoEnEdicion = null;
+    let contextoAntesDeEditar = null;
+    const avisoEdicionPartido = document.getElementById('partido-aviso-edicion');
+    const btnCancelarEdicionPartido = document.getElementById('btn-cancelar-edicion-partido');
+    if (btnCancelarEdicionPartido) btnCancelarEdicionPartido.addEventListener('click', () => cancelarEdicionPartido(contextoAntesDeEditar));
     let fechaFiltroActiva = "todas";
 
     // El modelo guarda el día de calendario como "DD/MM/AAAA" (ver data.js), pero el
@@ -2422,6 +2426,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
             else if (p.fecha === 100) faseLabel = "Final";
             const copaDelPartido = p.fecha >= 100 ? nombreCopa(p.ciclo || 'superior', copaDe(p)) : '';
             if (copaDelPartido) faseLabel += ` · ${copaDelPartido}`;
+            // Marcado en Aranceles por Partido: no hay que cargarle resultado acá (el 3-0 lo pone el panel solo).
+            const ausentes = p.ausencia ? [p.ausencia.local && p.local, p.ausencia.visitante && p.visitante].filter(Boolean) : [];
+            const marcaAusencia = ausentes.length === 2 ? 'No se presentó ninguno'
+                : ausentes.length ? `No se presentó ${ausentes[0]}${p.resultadoAuto ? ' · 3-0 automático' : ''}` : '';
 
             if (horarioActual !== ultimoHorario) {
                 ultimoHorario = horarioActual;
@@ -2437,6 +2445,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     <div style="text-align:left;">
                         <span style="font-size:9px; color:#869bd8; display:block;">${faseLabel} — ${p.dia ? attrSeguro(p.dia) + ' — ' : ''}${attrSeguro(p.cancha || 'Cancha a confirmar')} (${p.ciclo ? p.ciclo.toUpperCase() : 'SUP'})</span>
                         <span style="font-size:12px; color:white;">${attrSeguro(p.local)} <strong style="color:#2edae3;">${attrSeguro(marcador)}</strong> ${attrSeguro(p.visitante)}</span>
+                        ${marcaAusencia ? `<span class="cronograma-ausencia">${attrSeguro(marcaAusencia)}</span>` : ''}
                     </div>
                     <div style="display:flex; gap:5px;">
                         <button class="btn-editar-partido" data-id="${p.id}" style="background-color:#1a3274; color:white; border:none; padding:4px 7px; border-radius:2px; cursor:pointer; font-size:10px; font-family:'Oswald';">Editar</button>
@@ -2479,6 +2488,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const idEditar = parseInt(btn.getAttribute('data-id'));
                 const p = partidos.find(part => part.id === idEditar);
                 if (p) {
+                    // Lo que había en el formulario antes de tocar "Editar", para que "Cancelar edición" lo devuelva.
+                    if (idPartidoEnEdicion === null) contextoAntesDeEditar = contextoFormularioPartido();
                     idPartidoEnEdicion = p.id;
                     equiposDeLosCampos = null;
                     if (cicloSelect) cicloSelect.value = p.ciclo;
@@ -2527,7 +2538,18 @@ document.addEventListener('liga:datos-listos', (evento) => {
                         submitBtnPartido.textContent = 'Actualizar Partido';
                         submitBtnPartido.style.backgroundColor = '#d97706';
                     }
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    if (avisoEdicionPartido) {
+                        avisoEdicionPartido.textContent = `Editando: ${p.local} vs ${p.visitante} (${nombreFasePartido(p)}, ${nombreCicloHistorial(p.ciclo)}). No se guarda nada hasta tocar "Actualizar Partido".`;
+                        avisoEdicionPartido.hidden = false;
+                    }
+                    if (btnCancelarEdicionPartido) btnCancelarEdicionPartido.hidden = false;
+                    // Al formulario y no al principio de la página (pedido de Joaquín, 18/10/2026); en escritorio, si ya
+                    // se ve, no se mueve.
+                    const tarjetaForm = formPartido ? formPartido.closest('.admin-card-panel') : null;
+                    if (tarjetaForm) {
+                        const arriba = tarjetaForm.getBoundingClientRect().top;
+                        if (arriba < 0 || arriba > window.innerHeight * 0.4) tarjetaForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             });
         });
@@ -2572,17 +2594,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return dorsales.join(', ');
     }
 
-    function cancelarEdicionPartido() {
-        idPartidoEnEdicion = null;
-        equiposDeLosCampos = null;
-
-        // El staff carga varios partidos seguidos de la misma fecha, ciclo, grupo y día.
-        // Conservamos ese contexto y limpiamos sólo lo que cambia de un partido al otro
-        // (equipos, goles, dorsales y penales).
-        const inputArancel = inputArancelPartido;
+    function contextoFormularioPartido() {
         const selectCancha = document.getElementById('partido-cancha');
-
-        const contexto = {
+        return {
             fecha: inputFechaPartido ? inputFechaPartido.value : "1",
             ciclo: cicloSelect ? cicloSelect.value : "superior",
             copa: selectCopaPartido ? selectCopaPartido.value : "oro",
@@ -2593,10 +2607,31 @@ document.addEventListener('liga:datos-listos', (evento) => {
             cancha: selectCancha ? selectCancha.value : "Cancha 1",
             canchaAConfirmar: checkCanchaConfirmar ? checkCanchaConfirmar.checked : false,
             arbitro: selectArbitroPartido ? selectArbitroPartido.value : "",
-            arancel: inputArancel ? inputArancel.value : ""
+            arancel: inputArancelPartido ? inputArancelPartido.value : ""
         };
+    }
+
+    // contextoForzado: lo que había antes de tocar "Editar" (botón "Cancelar edición"). Sin él, después de guardar.
+    function cancelarEdicionPartido(contextoForzado) {
+        const idEditado = idPartidoEnEdicion;
+        idPartidoEnEdicion = null;
+        equiposDeLosCampos = null;
+        contextoAntesDeEditar = null;
+        if (avisoEdicionPartido) avisoEdicionPartido.hidden = true;
+        if (btnCancelarEdicionPartido) btnCancelarEdicionPartido.hidden = true;
+
+        // El staff carga varios partidos seguidos de la misma fecha, ciclo, grupo y día.
+        // Conservamos ese contexto y limpiamos sólo lo que cambia de un partido al otro
+        // (equipos, goles, dorsales y penales).
+        const inputArancel = inputArancelPartido;
+        const selectCancha = document.getElementById('partido-cancha');
+        const contexto = contextoForzado || contextoFormularioPartido();
 
         if (formPartido) formPartido.reset();
+        if (contextoForzado && cicloSelect) {
+            cicloSelect.value = contexto.ciclo;
+            armarOpcionesFechaPartido(contexto.fecha);
+        }
 
         if (inputFechaPartido) inputFechaPartido.value = contexto.fecha;
         if (cicloSelect) cicloSelect.value = contexto.ciclo;
@@ -2630,6 +2665,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
             submitBtnPartido.textContent = 'GUARDAR Y COMPUTAR PARTIDO';
             submitBtnPartido.style.backgroundColor = '#1a3274';
         }
+
+        // De vuelta al partido que se estaba editando en el Cronograma (después de que se redibuje).
+        if (idEditado !== null) setTimeout(() => {
+            const boton = document.querySelector(`#lista-partidos-admin .btn-editar-partido[data-id="${idEditado}"]`);
+            if (boton) boton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 0);
     }
 
     // Submit de Partido
@@ -5179,7 +5220,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
     function cancelarEdicionSancion() {
         idSancionEnEdicion = null;
+        const cicloElegido = sancionCiclo ? sancionCiclo.value : '';
         if (formSancion) formSancion.reset();
+        if (sancionCiclo && cicloElegido) sancionCiclo.value = cicloElegido;
         actualizarEquiposSancion();
         if (submitBtnSancion) {
             submitBtnSancion.textContent = 'PUBLICAR RESOLUCIÓN TRIBUNAL';
@@ -5687,6 +5730,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         diasOrdenados.forEach(dia => {
             const movimientosDia = grupos[dia].slice().sort((a, b) => new Date(b.fechaHora) - new Date(a.fechaHora));
             const totalDia = movimientosDia.reduce((acc, m) => acc + (m.monto || 0), 0);
+            const efectivoDia = movimientosDia.reduce((acc, m) => acc + (m.medio === 'Efectivo' ? (m.monto || 0) : 0), 0);
             const fechaObj = dia ? new Date(dia + 'T12:00:00') : null;
             const fechaLegible = fechaObj && !isNaN(fechaObj)
                 ? fechaObj.toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -5714,6 +5758,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                         <h4 style="color:#f2c00e; margin:0;">${fechaLegible}</h4>
                         <span style="color:#4ade80; font-weight:bold; font-family:'Michroma'; font-size:13px;">Total del día: $${totalDia.toLocaleString()}</span>
                     </div>
+                    <p class="teso-caja-medios">Efectivo: $${efectivoDia.toLocaleString()} · Mercado Pago: $${(totalDia - efectivoDia).toLocaleString()}</p>
                     ${filasHtml}
                 </div>
             `;
@@ -6253,10 +6298,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const arancelBase = data.arancel || p.arancelExigido || ARANCEL_PARTIDO_DEFECTO;
                 const asistencia = data.asistencia || '';
                 const ausente = asistencia === 'sin_aviso' || asistencia === 'con_aviso';
+                // Beneficio de ese equipo en ese partido (exento o % de descuento, Hecho #47): lo bonificado no es plata
+                // que entró, así que no suma a ninguna recaudación.
+                const pctBeneficio = porcentajeBeneficio(data.beneficio);
+                const exento = pctBeneficio >= 100;
+                const arancelNeto = Math.round(arancelBase * (1 - pctBeneficio / 100));
 
                 // El ausente debe el 50 % del derecho de partido; el que se presenta, el 100 %.
                 // En Play-Offs el ausente queda eliminado y no juega: no debe nada.
-                const exigidoBruto = ausente ? (Number(p.fecha) >= 100 ? 0 : arancelBase * 0.5) : arancelBase;
+                const exigidoDe = arancel => (ausente ? (Number(p.fecha) >= 100 ? 0 : arancel * 0.5) : arancel);
+                const exigidoBruto = exigidoDe(arancelNeto);
+                const bonificado = exigidoDe(arancelBase) - exigidoBruto;
                 const saldoPrevio = saldos[equipoKey] || 0;
                 const saldoAplicado = Math.min(saldoPrevio, exigidoBruto);
                 const exigido = exigidoBruto - saldoAplicado;
@@ -6267,9 +6319,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
                 const cubierto = pagado + saldoAplicado;
                 porClave[clave] = {
-                    clave, nombre, lado, data, arancelBase, asistencia, ausente,
+                    clave, nombre, lado, data, arancelBase, arancelNeto, exento, bonificado, asistencia, ausente,
                     exigidoBruto, saldoAplicado, exigido, pagado, falta, saldoGenerado, cubierto,
-                    porcentaje: arancelBase > 0 ? cubierto / arancelBase : 1
+                    porcentaje: arancelNeto > 0 ? cubierto / arancelNeto : 1
                 };
                 if (!historial[equipoKey]) historial[equipoKey] = [];
                 historial[equipoKey].push({ orden: ordenCronologicoFecha(p.fecha), fecha: p.fecha, falta });
@@ -6301,13 +6353,23 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const rivalDe = t => (t === L ? V : L);
         const dinero = n => `$${Math.round(n).toLocaleString()}`;
 
-        if (L.ausente && V.ausente) {
-            ev.avisos.push({ tipo: 'alerta', texto: 'Ambos equipos figuran como ausentes. El reglamento no define este caso: resolvelo a mano.' });
+        // Si no se presenta ninguno: partido no jugado y sin puntos; cada uno pierde 2 puntos hasta abonar el 50%
+        // (decisión de Joaquín, 18/10/2026; eso último lo hace el recorrido de abajo, igual que con un solo ausente).
+        if (L.ausente && V.ausente && !esPlayoff) {
+            ev.avisos.push({ tipo: 'info', texto: 'No se presentó ninguno de los dos: el partido queda como no jugado y sin puntos. El que no abone el 50% pierde 2 puntos.' });
+        } else if (L.ausente && V.ausente) {
+            ev.avisos.push({ tipo: 'alerta', texto: 'Ambos equipos figuran como ausentes en Play-Offs: resolvelo a mano.' });
         }
 
         [L, V].filter(t => t.ausente).forEach(t => {
             if (esPlayoff) {
                 ev.avisos.push({ tipo: 'alerta', texto: `${t.nombre} queda ELIMINADO por no presentarse (Art. 17 Bis).` });
+                return;
+            }
+            // Exento en este partido (por ejemplo, no se pudo presentar por una falla de la organización): no debe el 50%
+            // y NUNCA recibe la quita de puntos (decisión de Joaquín, 18/10/2026). El rival igual puede ganar 3-0.
+            if (t.exento) {
+                ev.avisos.push({ tipo: 'info', texto: `${t.nombre} está exento en este partido: no debe el 50% ni recibe la quita de puntos.` });
                 return;
             }
             const motivoAusencia = t.asistencia === 'con_aviso' ? 'avisó que no asistía' : 'no se presentó';
@@ -6318,30 +6380,21 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 motivo: `Fecha ${p.fecha} (vs ${rivalDe(t).nombre}): ${motivoAusencia} y no abonó el 50% del derecho de partido (Art. 17 Bis).`
             });
             ev.avisos.push(activa
-                ? { tipo: 'alerta', texto: `${t.nombre}: -${PUNTOS_QUITA_AUSENCIA} PTS en la tabla hasta que abone el 50% (faltan ${dinero(Math.max(0, t.arancelBase * 0.5 - t.cubierto))}).` }
+                ? { tipo: 'alerta', texto: `${t.nombre}: -${PUNTOS_QUITA_AUSENCIA} PTS en la tabla hasta que abone el 50% (faltan ${dinero(Math.max(0, t.arancelNeto * 0.5 - t.cubierto))}).` }
                 : { tipo: 'ok', texto: `${t.nombre}: abonó el 50%, pierde el partido pero conserva sus puntos.` });
         });
 
         if (L.ausente !== V.ausente && !esPlayoff) {
             const A = L.ausente ? L : V;
             const P = rivalDe(A);
+            // El que se presentó gana 3-0 siempre, pague o no: lo que no abonó le queda como deuda (decisión de Joaquín,
+            // 18/10/2026; antes tenía que abonar el 100%, con el 50% el partido quedaba suspendido y con menos perdía 2 puntos).
             if (P.asistencia !== 'presente') {
-                ev.avisos.push({ tipo: 'info', texto: `Marcá "Se presentó" en ${P.nombre} (con sus pagos ya cargados) para resolver el partido.` });
-            } else if (P.porcentaje >= 1) {
-                ev.ganadorAuto = P.lado;
-                ev.avisos.push({ tipo: 'ok', texto: `Resultado automático: 3-0 para ${P.nombre}, que abonó el 100%. Corresponde asignarle un amistoso (Art. 17).` });
-            } else if (P.porcentaje >= 0.5) {
-                ev.avisos.push({ tipo: 'info', texto: `Partido suspendido sin puntos para ninguno: ${P.nombre} abonó entre el 50% y el 100%.` });
+                ev.avisos.push({ tipo: 'info', texto: `Marcá "Se presentó" en ${P.nombre} para darle el 3-0. Mientras tanto, en la web el partido figura como "Resultado a definir".` });
             } else {
-                ev.avisos.push({ tipo: 'alerta', texto: `${P.nombre} abonó menos del 50%: queda como equipo no presentado, pierde los puntos del partido y -${PUNTOS_QUITA_AUSENCIA} PTS en la tabla.` });
-            }
-            if (P.asistencia === 'presente') {
-                const activaP = P.porcentaje < 0.5;
-                ev.sanciones.push({
-                    t: P,
-                    activa: activaP,
-                    motivo: `Fecha ${p.fecha} (vs ${A.nombre}): se presentó pero abonó menos del 50% del derecho de partido, por lo que queda como equipo no presentado (Art. 17 Bis).`
-                });
+                ev.ganadorAuto = P.lado;
+                ev.avisos.push({ tipo: 'ok', texto: `Resultado automático: 3-0 para ${P.nombre}. Corresponde asignarle un amistoso (Art. 17).`
+                    + (P.falta > 0 ? ` Le queda por abonar ${dinero(P.falta)} del derecho de partido.` : '') });
             }
         }
 
@@ -6362,6 +6415,15 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (!p || !p.local || !p.visitante) return;
             const ev = evaluarPartidoAusencias(p, calc);
             evaluaciones[p.id] = ev;
+
+            // Quién no se presentó, en el partido (que es público): así la web puede decir "no se presentó" y "Resultado a
+            // definir" en vez de mostrarlo como un partido sin jugar. La asistencia y los pagos siguen solo en Tesorería.
+            const ausencia = ev.L.ausente || ev.V.ausente ? { local: !!ev.L.ausente, visitante: !!ev.V.ausente } : null;
+            if (JSON.stringify(p.ausencia || null) !== JSON.stringify(ausencia)) {
+                if (ausencia) p.ausencia = ausencia;
+                else delete p.ausencia;
+                cambioPartidos = true;
+            }
 
             ev.sanciones.forEach(s => {
                 const clave = s.t.clave;
@@ -6464,6 +6526,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // como los goleadores) y de ahí salen los PJ de cada jugador. La ficha médica es un dato del jugador
     // (se comparte con Equipos y Planteles).
     const bfAbiertos = new Set();
+    // Desplegables de beneficio del derecho de partido abiertos: siguen abiertos al redibujar, como la lista de buena fe.
+    const benefPartidoAbiertos = new Set();
     // Fotos sacadas en cancha que todavía no subieron (clave: solo los dígitos del DNI). Ver "Fotos en cancha".
     const fotosCola = new Map();
     const MAX_JUGADORES_LISTA = 10;
@@ -7135,7 +7199,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }
 
         const notas = [];
-        if (t.ausente) notas.push(ev.esPlayoff ? 'Ausente en Play-Offs: queda eliminado y no abona derecho de partido.' : `Ausente: debe el 50% del derecho de partido (${dinero(t.exigidoBruto)}).`);
+        if (t.ausente) notas.push(ev.esPlayoff ? 'Ausente en Play-Offs: queda eliminado y no abona derecho de partido.'
+            : t.exento ? 'Ausente, pero exento en este partido: no debe el 50% ni recibe la quita de puntos.'
+            : `Ausente: debe el 50% del derecho de partido (${dinero(t.exigidoBruto)}).`);
+        if (t.bonificado > 0 && !t.exento) notas.push(`Con el descuento debe ${dinero(t.exigidoBruto)}.`);
+        if (t.bonificado > 0) notas.push(`Bonificado: ${dinero(t.bonificado)} (no suma a la caja).`);
         if (t.saldoAplicado > 0) notas.push(`Saldo a favor aplicado: -${dinero(t.saldoAplicado)}.`);
         if (t.saldoGenerado > 0) notas.push(`Le queda saldo a favor de ${dinero(t.saldoGenerado)} para su próxima fecha.`);
         const notasHtml = notas.map(n => `<div class="teso-nota">${n}</div>`).join('');
@@ -7146,15 +7214,19 @@ document.addEventListener('liga:datos-listos', (evento) => {
             : '';
         const deudaInsc = deudasInsc ? deudasInsc[equipoTeso(p, t.lado)] : 0;
         const chipInscripcion = deudaInsc > 0 ? `<div class="teso-chip teso-chip-inscripcion">Debe inscripción: ${dinero(deudaInsc)}</div>` : '';
+        const beneficio = (t.data && t.data.beneficio) || null;
+        const tipoBenef = beneficio ? beneficio.tipo : '';
+        const estado = t.exento && t.pagado === 0 ? 'EXENTO' : cancelado ? 'CANCELADO' : `FALTA: $${t.falta.toLocaleString()}`;
 
         return `
             <div class="teso-team-box">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
                     <span class="teso-team-name">${attrSeguro(t.nombre)}</span>
                     <span style="font-family:'Michroma',sans-serif; font-size:${cancelado ? '11px' : '15px'}; color:${cancelado ? '#4ade80' : '#f43f5e'};">
-                        ${cancelado ? 'CANCELADO' : `FALTA: $${t.falta.toLocaleString()}`}
+                        ${estado}
                     </span>
                 </div>
+                ${htmlEstadoBeneficio(beneficio)}
                 <div class="teso-inputs-row">
                     <label>Asistencia:</label>
                     <select class="select-asist-teso in-p-asist" data-key="${t.clave}">
@@ -7173,16 +7245,70 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     <input type="number" class="input-monto-teso in-p-ef" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}" value="${t.data.ef || 0}">
                 </div>
                 <div class="teso-inputs-row">
-                    <label>Pago Transf. ($):</label>
+                    <label>Pago Mercado Pago ($):</label>
                     <input type="number" class="input-monto-teso in-p-tr" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}" value="${t.data.tr || 0}">
                 </div>
                 ${notasHtml}
                 ${chip}
                 ${badgeDeuda}
                 ${chipInscripcion}
+                <details class="teso-insc-benef teso-p-benef" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}"${benefPartidoAbiertos.has(t.clave) ? ' open' : ''}>
+                    <summary>Beneficio en este partido (exento o descuento)</summary>
+                    <div class="teso-inputs-row">
+                        <label>Tipo:</label>
+                        <select class="select-asist-teso in-p-benef-tipo">
+                            <option value=""${tipoBenef === '' ? ' selected' : ''}>Sin beneficio</option>
+                            <option value="exento"${tipoBenef === 'exento' ? ' selected' : ''}>Exento (no paga)</option>
+                            <option value="descuento"${tipoBenef === 'descuento' ? ' selected' : ''}>Descuento (%)</option>
+                        </select>
+                    </div>
+                    <div class="teso-inputs-row teso-insc-fila-pct"${tipoBenef === 'descuento' ? '' : ' hidden'}>
+                        <label>Descuento (%):</label>
+                        <input type="number" min="1" max="100" class="input-monto-teso in-p-benef-pct" value="${tipoBenef === 'descuento' ? porcentajeBeneficio(beneficio) : ''}">
+                    </div>
+                    <div class="teso-insc-fila-motivo"${tipoBenef ? '' : ' hidden'}>
+                        <label>Motivo:</label>
+                        <input type="text" maxlength="60" class="input-monto-teso in-p-benef-motivo" placeholder="Ej: falla de la organización" value="${attrSeguro((beneficio && beneficio.motivo) || '')}">
+                    </div>
+                </details>
                 ${htmlListaBuenaFe(t, p)}
             </div>
         `;
+    }
+
+    // Beneficio de un equipo en un partido (pedido de Joaquín, 18/10/2026): igual que el de Inscripciones, pero de ese
+    // partido solo. Lo pueden cargar el Staff y el Coordinador. No mueve plata: no registra nada en la Caja.
+    function guardarBeneficioPartido(detalle) {
+        const key = detalle.dataset.key;
+        const tipo = detalle.querySelector('.in-p-benef-tipo').value;
+        const inputPct = detalle.querySelector('.in-p-benef-pct');
+        const motivo = detalle.querySelector('.in-p-benef-motivo').value.trim();
+        let beneficio = null;
+        if (tipo === 'exento') beneficio = { tipo, porcentaje: 100, motivo };
+        else if (tipo === 'descuento') {
+            let pct = Math.round(parseFloat(inputPct.value));
+            if (!(pct >= 1)) pct = 50;
+            beneficio = { tipo, porcentaje: Math.min(100, pct), motivo };
+        }
+        if (!beneficio && !(tesoreriaPartidos[key] && tesoreriaPartidos[key].beneficio)) {
+            renderizarTesoreriaPartidos();
+            return;
+        }
+        if (!tesoreriaPartidos[key]) tesoreriaPartidos[key] = { ef: 0, tr: 0 };
+        const anterior = JSON.stringify(tesoreriaPartidos[key].beneficio || null);
+        if (beneficio) tesoreriaPartidos[key].beneficio = beneficio;
+        else delete tesoreriaPartidos[key].beneficio;
+        guardarTesoreriaPartidos();
+        if (JSON.stringify(beneficio) !== anterior) {
+            const nombre = detalle.dataset.equipo;
+            const fase = detalle.dataset.fase;
+            const textoMotivo = beneficio && beneficio.motivo ? ` (motivo: ${beneficio.motivo})` : '';
+            registrarHistorial('beneficio', !beneficio ? `le sacó el beneficio del derecho de partido a ${nombre} en ${fase}`
+                : beneficio.tipo === 'exento' ? `marcó a ${nombre} como exento del derecho de partido en ${fase}${textoMotivo}`
+                : `le puso a ${nombre} un descuento del ${beneficio.porcentaje}% en el derecho de partido de ${fase}${textoMotivo}`);
+        }
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
     }
 
     function obtenerPartidosFiltradosTeso() {
@@ -7190,7 +7316,37 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const filtroCancha = filtroTesoreriaCancha ? filtroTesoreriaCancha.value : 'todas';
         let lista = filtroFecha === 'todas' ? [...partidos] : partidos.filter(p => p.fecha.toString() === filtroFecha.toString());
         if (filtroCancha !== 'todas') lista = lista.filter(p => (p.cancha || 'Cancha a confirmar') === filtroCancha);
+        const q = textoBuscadorEquipoTeso();
+        if (q) lista = lista.filter(p => p && [p.local, p.visitante].some(n => normalizarTextoBusqueda(n).includes(q)));
         return lista;
+    }
+
+    // Buscador de equipos de Aranceles por Partido (pedido de Joaquín, 18/10/2026): deja solo los partidos de ese equipo,
+    // dentro de la fecha y la cancha elegidas. No se recuerda al recargar, para que nunca queden partidos escondidos.
+    // Se buscan en el momento (y no en una constante) porque renderizarTesoreriaPartidos puede correr antes de llegar acá.
+    function textoBuscadorEquipoTeso() {
+        const buscador = document.getElementById('buscador-equipo-teso');
+        return buscador ? normalizarTextoBusqueda(buscador.value.trim()) : '';
+    }
+
+    const buscadorEquipoTeso = document.getElementById('buscador-equipo-teso');
+    if (buscadorEquipoTeso) {
+        let esperaBuscador = null;
+        buscadorEquipoTeso.addEventListener('input', () => {
+            clearTimeout(esperaBuscador);
+            esperaBuscador = setTimeout(renderizarTesoreriaPartidos, 200);
+        });
+    }
+
+    // Cartel fijo al bajar: qué fecha y cancha se están viendo, así no se carga un pago en otra fecha sin darse cuenta.
+    function actualizarMostrandoTeso(cantidad) {
+        const textoMostrandoTeso = document.getElementById('teso-mostrando');
+        const buscador = document.getElementById('buscador-equipo-teso');
+        if (!textoMostrandoTeso) return;
+        const fecha = filtroTesoreriaFecha && filtroTesoreriaFecha.value !== 'todas' ? nombreFaseTeso(filtroTesoreriaFecha.value) : 'TODAS LAS FECHAS';
+        const cancha = filtroTesoreriaCancha && filtroTesoreriaCancha.value !== 'todas' ? filtroTesoreriaCancha.value : 'Todas las canchas';
+        const busqueda = buscador && buscador.value.trim() ? ` · "${buscador.value.trim()}"` : '';
+        textoMostrandoTeso.textContent = `Mostrando: ${fecha} · ${cancha}${busqueda} (${cantidad} ${cantidad === 1 ? 'partido' : 'partidos'})`;
     }
 
     // Vista imprimible de la planilla de buena fe (respaldo en papel): una hoja A4 apaisada por partido,
@@ -7315,9 +7471,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const deudasInsc = deudasInscripcionParaMostrar();
 
         const partidosFiltrados = obtenerPartidosFiltradosTeso();
+        actualizarMostrandoTeso(partidosFiltrados.filter(p => p && p.local && p.visitante).length);
 
         if (partidosFiltrados.length === 0) {
-            contenedor.innerHTML = '<p style="color:#869bd8; text-align:center; font-size:11px; padding:20px;">No hay partidos cargados para este filtro.</p>';
+            contenedor.innerHTML = `<p style="color:#869bd8; text-align:center; font-size:11px; padding:20px;">${textoBuscadorEquipoTeso()
+                ? 'Ningún partido de ese equipo con esta fecha y cancha. Probá con "Todas las Fechas" o borrá la búsqueda.'
+                : 'No hay partidos cargados para este filtro.'}</p>`;
             return;
         }
 
@@ -7435,12 +7594,16 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (!e.target.classList) return;
             if (e.target.classList.contains('bf-chk-asist')) marcarAsistenciaBF(e.target);
             else if (e.target.classList.contains('bf-foto-input')) tomarFotoJugador(e.target);
+            else if (e.target.closest('.teso-p-benef')) guardarBeneficioPartido(e.target.closest('.teso-p-benef'));
         });
         contenedorTesoPartidos.addEventListener('toggle', (e) => {
-            if (!e.target.classList || !e.target.classList.contains('bf-detalle')) return;
+            if (!e.target.classList) return;
+            const abiertos = e.target.classList.contains('bf-detalle') ? bfAbiertos
+                : e.target.classList.contains('teso-p-benef') ? benefPartidoAbiertos : null;
+            if (!abiertos) return;
             const key = e.target.dataset.key;
-            if (e.target.open) bfAbiertos.add(key);
-            else bfAbiertos.delete(key);
+            if (e.target.open) abiertos.add(key);
+            else abiertos.delete(key);
         }, true);
     }
 
@@ -7486,6 +7649,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return eg.fecha ? nombreFaseTeso(eg.fecha) : 'GENERAL DEL TORNEO';
     }
 
+    // Todas las transferencias van a Mercado Pago (Joaquín, 18/10/2026).
+    function esEgresoMercadoPago(eg) {
+        return String(eg.medio || '').toLowerCase() === 'transferencia';
+    }
+
     const formEgreso = document.getElementById('form-egreso');
     if (formEgreso) {
         formEgreso.addEventListener('submit', (e) => {
@@ -7500,7 +7668,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
             };
             listaEgresos.push(nuevoEgreso);
             almacen.setItem('liga_egresos', JSON.stringify(listaEgresos));
-            formEgreso.reset();
+            // Concepto, medio y fecha quedan elegidos para el egreso siguiente (pedido de Joaquín, 18/10/2026).
+            document.getElementById('egreso-detalle').value = '';
+            document.getElementById('egreso-monto').value = '';
             renderizarEgresosAdmin();
             calcularBalanceGeneral();
             alert('Egreso registrado.');
@@ -7522,7 +7692,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(244,63,94,0.05); padding:8px 12px; margin-bottom:6px; border-radius:3px; border-left: 4px solid #f43f5e;">
                     <div style="text-align:left;">
                         <span style="font-size:11px; color:white; font-weight:bold;">${attrSeguro(eg.detalle)} (${attrSeguro(eg.concepto.toUpperCase())})</span>
-                        <span style="font-size:9px; color:#fca5a5; display:block;">Medio: ${attrSeguro(eg.medio.toUpperCase())} · ${textoFechaEgreso(eg)}</span>
+                        <span style="font-size:9px; color:#fca5a5; display:block;">Medio: ${esEgresoMercadoPago(eg) ? 'MERCADO PAGO' : attrSeguro(eg.medio.toUpperCase())} · ${textoFechaEgreso(eg)}</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <span style="font-size:13px; color:#f43f5e; font-weight:bold;">-$${eg.monto.toLocaleString()}</span>
@@ -7566,11 +7736,23 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
 
         let egresosTotal = 0;
+        let egresosEf = 0;
         listaEgresos.forEach(eg => {
             egresosTotal += (eg.monto || 0);
+            if (!esEgresoMercadoPago(eg)) egresosEf += (eg.monto || 0);
         });
 
         const neto = (efTotal + trTotal) - egresosTotal;
+        // Lo que tiene que haber en cada lugar (pedido de Joaquín, 18/10/2026): todas las transferencias van a Mercado Pago
+        // y no hay efectivo inicial.
+        const dineroConSigno = n => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString()}`;
+        if (document.getElementById('txt-saldo-efectivo')) document.getElementById('txt-saldo-efectivo').textContent = dineroConSigno(efTotal - egresosEf);
+        if (document.getElementById('txt-saldo-mp')) document.getElementById('txt-saldo-mp').textContent = dineroConSigno(trTotal - (egresosTotal - egresosEf));
+        const txtBonifPartidos = document.getElementById('txt-bonificado-partidos');
+        if (txtBonifPartidos) {
+            const bonifPartidos = Object.values(calcularTesoreriaPartidos().porClave).reduce((acc, t) => acc + (t.bonificado || 0), 0);
+            txtBonifPartidos.textContent = bonifPartidos > 0 ? `Bonificado: $${bonifPartidos.toLocaleString()} (no suma)` : '';
+        }
 
         if (document.getElementById('txt-total-inscripciones')) document.getElementById('txt-total-inscripciones').textContent = `$${totalInscripciones.toLocaleString()}`;
         if (document.getElementById('txt-total-partidos')) document.getElementById('txt-total-partidos').textContent = `$${totalPartidos.toLocaleString()}`;
@@ -7592,9 +7774,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const contenedor = document.getElementById('contenedor-recaudacion-fecha');
         if (!contenedor) return;
 
+        // Cada monto separado en efectivo y Mercado Pago (pedido de Joaquín, 18/10/2026): ef = efectivo, tr = transferencia,
+        // que siempre va a Mercado Pago.
         const porFecha = {};
-        const filaDe = f => porFecha[f] || (porFecha[f] = { partidos: 0, aranceles: 0, egresos: 0 });
+        const filaDe = f => porFecha[f] || (porFecha[f] = { partidos: 0, ef: 0, tr: 0, egEf: 0, egTr: 0, bonificado: 0 });
         const clavesContadas = new Set();
+        const calcTeso = calcularTesoreriaPartidos();
         partidos.forEach(p => {
             if (!p || !p.local || !p.visitante) return;
             const fila = filaDe(String(p.fecha));
@@ -7604,71 +7789,110 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 if (clavesContadas.has(clave)) return;
                 clavesContadas.add(clave);
                 const d = tesoreriaPartidos[clave] || {};
-                fila.aranceles += (d.ef || 0) + (d.tr || 0);
+                fila.ef += d.ef || 0;
+                fila.tr += d.tr || 0;
+                fila.bonificado += (calcTeso.porClave[clave] && calcTeso.porClave[clave].bonificado) || 0;
             });
         });
 
         // Pagos cargados en un partido que después se borró (o se le cambió la fecha o un equipo) antes del
         // 29/09/2026, cuando eso todavía se permitía: el Balance los sigue sumando, así que se listan aparte
         // para que el total cierre igual y se puedan rastrear.
-        let sinPartido = 0;
+        let sinPartido = 0, sinPartidoEf = 0;
         const sueltos = [];
         Object.keys(tesoreriaPartidos).forEach(clave => {
             if (clavesContadas.has(clave)) return;
             const monto = montoTeso(tesoreriaPartidos[clave]);
             if (!monto) return;
             sinPartido += monto;
+            sinPartidoEf += tesoreriaPartidos[clave].ef || 0;
             const partes = clave.match(/^F([^_]*)_[^_]*_(?:local|visita)_(.*)$/);
             const idEquipo = partes && /^eq/.test(partes[2]) ? partes[2].slice(2) : null;
             const equipo = idEquipo !== null ? [...(poolSuperior || []), ...(poolBasico || [])].find(e => String(e.id) === idEquipo) : null;
             sueltos.push({ equipo: equipo ? equipo.nombre : clave, fecha: partes ? nombreFaseTeso(partes[1]) : '', monto });
         });
 
-        let egresosGenerales = 0;
+        let egresosGenerales = 0, egresosGeneralesEf = 0;
         listaEgresos.forEach(eg => {
-            if (eg.fecha) filaDe(String(eg.fecha)).egresos += (eg.monto || 0);
-            else egresosGenerales += (eg.monto || 0);
+            const monto = eg.monto || 0;
+            const mp = esEgresoMercadoPago(eg);
+            if (eg.fecha) {
+                const fila = filaDe(String(eg.fecha));
+                if (mp) fila.egTr += monto;
+                else fila.egEf += monto;
+            } else {
+                egresosGenerales += monto;
+                if (!mp) egresosGeneralesEf += monto;
+            }
         });
 
         const fechas = Object.keys(porFecha).sort((a, b) => ordenCronologicoFecha(a) - ordenCronologicoFecha(b));
         const dinero = n => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString()}`;
         const filaMonto = (etiqueta, monto, clase) => `
             <div class="teso-recaud-fila"><span>${etiqueta}</span><strong class="${clase}">${dinero(monto)}</strong></div>`;
+        const filasMedio = (ef, mp) => `
+            <div class="teso-recaud-fila teso-recaud-medio"><span>Efectivo</span><span>${dinero(ef)}</span></div>
+            <div class="teso-recaud-fila teso-recaud-medio"><span>Mercado Pago</span><span>${dinero(mp)}</span></div>`;
+        const htmlQueda = (titulo, ef, mp) => `
+            <div class="teso-recaud-queda">
+                <span class="teso-recaud-queda-titulo">${titulo}</span>
+                <div class="teso-recaud-queda-montos">
+                    <span>Efectivo <strong class="${ef < 0 ? 'teso-recaud-egreso' : ''}">${dinero(ef)}</strong></span>
+                    <span>Mercado Pago <strong class="${mp < 0 ? 'teso-recaud-egreso' : ''}">${dinero(mp)}</strong></span>
+                </div>
+            </div>`;
 
         const tarjetas = fechas.map(f => {
             const r = porFecha[f];
-            const neto = r.aranceles - r.egresos;
+            const aranceles = r.ef + r.tr;
+            const egresos = r.egEf + r.egTr;
+            const neto = aranceles - egresos;
             return `
                 <div class="teso-team-box teso-recaud-card" data-fecha="${attrSeguro(f)}">
                     <div class="teso-recaud-titulo">
                         <span class="teso-team-name">${nombreFaseTeso(f)}</span>
                         <span class="teso-nota">${r.partidos} partido${r.partidos === 1 ? '' : 's'}</span>
                     </div>
-                    ${filaMonto('Aranceles cobrados', r.aranceles, 'teso-recaud-ingreso')}
-                    ${filaMonto('Egresos de la fecha', -r.egresos, 'teso-recaud-egreso')}
+                    ${filaMonto('Aranceles cobrados', aranceles, 'teso-recaud-ingreso')}
+                    ${aranceles ? filasMedio(r.ef, r.tr) : ''}
+                    ${filaMonto('Egresos de la fecha', -egresos, 'teso-recaud-egreso')}
+                    ${egresos ? filasMedio(-r.egEf, -r.egTr) : ''}
                     <div class="teso-recaud-fila teso-recaud-neto"><span>Neto de la fecha</span><strong class="${neto < 0 ? 'teso-recaud-egreso' : ''}">${dinero(neto)}</strong></div>
+                    ${htmlQueda('Tiene que quedar de esta fecha', r.ef - r.egEf, r.tr - r.egTr)}
+                    ${r.bonificado > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en aranceles (no suma)</span><span>${dinero(r.bonificado)}</span></div>` : ''}
                 </div>
             `;
         }).join('');
 
-        const arancelesTotal = fechas.reduce((acc, f) => acc + porFecha[f].aranceles, 0) + sinPartido;
-        const egresosPorFecha = fechas.reduce((acc, f) => acc + porFecha[f].egresos, 0);
+        const arancelesEf = fechas.reduce((acc, f) => acc + porFecha[f].ef, 0) + sinPartidoEf;
+        const arancelesTotal = fechas.reduce((acc, f) => acc + porFecha[f].ef + porFecha[f].tr, 0) + sinPartido;
+        const egresosPorFechaEf = fechas.reduce((acc, f) => acc + porFecha[f].egEf, 0);
+        const egresosPorFecha = fechas.reduce((acc, f) => acc + porFecha[f].egEf + porFecha[f].egTr, 0);
+        const bonificadoAranceles = fechas.reduce((acc, f) => acc + porFecha[f].bonificado, 0);
         const { cobrado: inscripciones, bonificado } = totalesInscripciones();
+        const inscripcionesEf = Object.values(tesoreriaInscripciones).reduce((acc, d) => acc + ((d && d.ef) || 0), 0);
         const netoTotal = arancelesTotal + inscripciones - egresosPorFecha - egresosGenerales;
+        const quedaEf = arancelesEf + inscripcionesEf - egresosPorFechaEf - egresosGeneralesEf;
 
         contenedor.innerHTML = `
             ${tarjetas ? `<div class="teso-recaud-grid">${tarjetas}</div>` : '<p class="teso-nota" style="text-align:center; padding:15px;">Todavía no hay partidos ni egresos con fecha.</p>'}
             <div class="teso-team-box teso-recaud-total">
                 <span class="teso-recaud-total-titulo">Total del torneo</span>
                 ${filaMonto('Aranceles de todas las fechas', arancelesTotal, 'teso-recaud-ingreso')}
+                ${arancelesTotal ? filasMedio(arancelesEf, arancelesTotal - arancelesEf) : ''}
                 ${sinPartido ? `<div class="teso-recaud-sueltos">
                     <p class="teso-nota">Incluye ${dinero(sinPartido)} cargados en partidos que ya no existen (se borraron o se les cambió la fecha o un equipo antes de que el panel lo impidiera). Detalle para rastrearlos:</p>
                     ${sueltos.map(s => `<div class="teso-recaud-fila teso-recaud-suelto"><span>${attrSeguro(s.equipo)}${s.fecha ? ' · ' + attrSeguro(s.fecha) : ''}</span><strong>${dinero(s.monto)}</strong></div>`).join('')}
                 </div>` : ''}
                 ${filaMonto('Inscripciones cobradas', inscripciones, 'teso-recaud-ingreso')}
+                ${inscripciones ? filasMedio(inscripcionesEf, inscripciones - inscripcionesEf) : ''}
                 ${filaMonto('Egresos por fecha', -egresosPorFecha, 'teso-recaud-egreso')}
+                ${egresosPorFecha ? filasMedio(-egresosPorFechaEf, -(egresosPorFecha - egresosPorFechaEf)) : ''}
                 ${filaMonto('Egresos generales del torneo', -egresosGenerales, 'teso-recaud-egreso')}
+                ${egresosGenerales ? filasMedio(-egresosGeneralesEf, -(egresosGenerales - egresosGeneralesEf)) : ''}
                 <div class="teso-recaud-fila teso-recaud-neto"><span>Neto total</span><strong id="txt-recaud-neto-total" class="${netoTotal < 0 ? 'teso-recaud-egreso' : ''}">${dinero(netoTotal)}</strong></div>
+                ${htmlQueda('Tiene que haber en total', quedaEf, netoTotal - quedaEf)}
+                ${bonificadoAranceles > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en aranceles (informativo, no suma)</span><span>${dinero(bonificadoAranceles)}</span></div>` : ''}
                 ${bonificado > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en inscripciones (informativo, no suma)</span><span>${dinero(bonificado)}</span></div>` : ''}
             </div>
         `;
@@ -8046,6 +8270,33 @@ document.addEventListener('liga:datos-listos', (evento) => {
     renderizarEgresosAdmin();
     actualizarFiltroFechasTesoreria();
     calcularBalanceGeneral();
+
+    // Última opción elegida en filtros y formularios (pedido de Joaquín, 18/10/2026): vuelve al recargar la página.
+    // Es una preferencia de cada dispositivo, no un dato del torneo, por eso va en localStorage y no en Firestore.
+    // En orden: el ciclo antes que la fecha y la fecha antes que el grupo, porque cada uno arma las opciones del siguiente.
+    // Lo que cambia de un partido al otro (equipos, MVP, jugador, tipo de sanción) no se recuerda.
+    const SELECCIONES_RECORDADAS = [
+        'partido-ciclo', 'partido-fecha', 'partido-grupo-select', 'partido-cancha', 'partido-horario', 'partido-arbitro-nombre',
+        'filtro-fecha-cronograma-admin', 'filtro-tesoreria-cancha', 'filtro-tesoreria-fecha', 'filtro-inscripciones-ciclo',
+        'egreso-concepto', 'egreso-medio', 'egreso-fecha', 'plantel-ciclo', 'sancion-ciclo'
+    ];
+    const PREFIJO_SELECCION = 'panel_seleccion_';
+
+    SELECCIONES_RECORDADAS.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        let guardado = null;
+        try { guardado = localStorage.getItem(PREFIJO_SELECCION + id); } catch (e) { /* sin almacenamiento: queda lo de siempre */ }
+        // El árbitro que se completó solo por la cancha de esa fecha manda sobre el de la última vez.
+        if (id === 'partido-arbitro-nombre' && arbitroAutocompletado) guardado = null;
+        if (guardado !== null && guardado !== select.value && [...select.options].some(o => o.value === guardado)) {
+            select.value = guardado;
+            select.dispatchEvent(new Event('change'));
+        }
+        select.addEventListener('change', () => {
+            try { localStorage.setItem(PREFIJO_SELECCION + id, select.value); } catch (e) { /* idem */ }
+        });
+    });
 
     // ============================================================
     // RESUMEN GENERAL (DASHBOARD DEL STAFF)

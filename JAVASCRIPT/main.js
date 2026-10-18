@@ -375,7 +375,7 @@ document.addEventListener('liga:datos-listos', () => {
                 contenedor.innerHTML += `
                     <div class="match-card">
                         <span class="team-name">${escaparHtml(partido.local)}</span>
-                        <span class="score" style="color: #2edae3; font-weight: bold;">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>
+                        <span class="score" style="color: #2edae3; font-weight: bold;">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}${etiquetaAusencia(partido)}</span>
                         <span class="team-name">${escaparHtml(partido.visitante)}</span>
                     </div>
                 `;
@@ -383,7 +383,7 @@ document.addEventListener('liga:datos-listos', () => {
                 contenedor.innerHTML += `
                     <div class="match-card" style="border-left-color: #e11d48; border-right-color: #e11d48;">
                         <span class="team-name">${escaparHtml(partido.local)}</span>
-                        <span class="score" style="color: #f43f5e; font-size: 13px;">VS<br>
+                        <span class="score" style="color: #f43f5e; font-size: 13px;">VS${etiquetaAusencia(partido)}<br>
                             ${partido.dia ? `<span class="match-meta-dia">${escaparHtml(partido.dia)}</span>` : ''}
                             <span style="font-size: 10px; color: #869bd8; display:block; margin-top:2px;">${escaparHtml(partido.horario || 'Horario a confirmar')}</span>
                             <span style="font-size: 9px; color: #2edae3; display:block; font-family:'Oswald',sans-serif; margin-top:1px;">${escaparHtml(partido.cancha || 'Cancha a confirmar')}</span>
@@ -1541,8 +1541,8 @@ document.addEventListener('liga:datos-listos', () => {
                         <!-- Columna 2: Resultado / Metas (Centro exacto) -->
                         <div class="col-center">
                             ${esJugado
-                                ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>`
-                                : `<span class="vs-badge">VS</span>`
+                                ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>${etiquetaAusencia(partido)}`
+                                : `<span class="vs-badge">VS</span>${etiquetaAusencia(partido)}`
                             }
                             ${diaTxt ? `<span class="match-meta-dia">${diaTxt}</span>` : ''}
                             <div class="match-meta-info">
@@ -1562,18 +1562,18 @@ document.addEventListener('liga:datos-listos', () => {
                     <div class="match-details-drawer seccion-oculta">
                         <div class="drawer-divider-top"></div>
                         
-                        ${esJugado ? `
+                        ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `
                             <div class="split-details-container">
                                 <div class="split-col col-left">${htmlLocal}</div>
                                 <div class="split-vertical-line"></div>
                                 <div class="split-col col-right">${htmlVisita}</div>
                             </div>
                             ${mvpTxt ? `<div class="mvp-banner">${mvpTxt}</div>` : ''}
-                        ` : `
+                        `) : (bannerAusencia(partido) || `
                             <div style="text-align: center; color: #869bd8; font-size: 11px; font-family: Oswald; padding: 5px 0;">
                                 Partido programado. Presentar DNI en mesa de control 15 min antes.
                             </div>
-                        `}
+                        `)}
                     </div>
 
                 </div>
@@ -2206,6 +2206,32 @@ document.addEventListener('liga:datos-listos', () => {
         return partido.mvp ? `<strong>MVP:</strong> ${escaparHtml(partido.mvp)}` : '';
     }
 
+    // Equipos que no se presentaron (Art. 17 Bis; pedido de Joaquín, 18/10/2026): que el partido no se vea como uno
+    // sin jugar. El panel guarda en el partido quién faltó (ausencia: {local, visitante}) y, si el otro se presentó,
+    // el 3-0 automático (resultadoAuto). Devuelve la etiqueta de debajo del marcador y el texto del desplegable.
+    function estadoAusencia(partido) {
+        if (partido.jugado && partido.resultadoAuto) {
+            const ganoLocal = Number(partido.golesLocal) > Number(partido.golesVisitante);
+            const ganador = ganoLocal ? partido.local : partido.visitante;
+            const perdedor = ganoLocal ? partido.visitante : partido.local;
+            return { etiqueta: '3-0 automático', texto: `${perdedor} no se presentó: se le dio ganado 3-0 a ${ganador} (Art. 17 Bis).` };
+        }
+        const a = partido.ausencia;
+        if (!a || partido.jugado || !(a.local || a.visitante)) return null;
+        if (a.local && a.visitante) return { etiqueta: 'No se presentaron', texto: 'No se presentó ninguno de los dos equipos: el partido queda como no jugado (Art. 17 Bis).' };
+        const ausente = a.local ? partido.local : partido.visitante;
+        if (Number(partido.fecha) >= 100) return { etiqueta: `No se presentó ${ausente}`, texto: `${ausente} no se presentó y queda eliminado (Art. 17 Bis).` };
+        return { etiqueta: 'Resultado a definir', texto: `${ausente} no se presentó. Resultado a definir (Art. 17 Bis).` };
+    }
+    function etiquetaAusencia(partido) {
+        const e = estadoAusencia(partido);
+        return e ? `<span class="match-meta-auto">${escaparHtml(e.etiqueta)}</span>` : '';
+    }
+    function bannerAusencia(partido) {
+        const e = estadoAusencia(partido);
+        return e ? `<div class="resultado-auto-banner">${escaparHtml(e.texto)}</div>` : '';
+    }
+
     const SILUETA_JUGADOR = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4.2"/><path d="M3.5 22c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg>';
 
     function abrirPerfilEquipo(nombreEquipo) {
@@ -2336,8 +2362,8 @@ document.addEventListener('liga:datos-listos', () => {
                             <div class="col-center">
                                 <span style="font-size: 9px; color: #869bd8; font-family: 'Oswald'; display: block;">${escaparHtml(nombreFasePublico(partido))}</span>
                                 ${esJugado
-                                    ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>`
-                                    : `<span class="vs-badge">VS</span>`
+                                    ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>${etiquetaAusencia(partido)}`
+                                    : `<span class="vs-badge">VS</span>${etiquetaAusencia(partido)}`
                                 }
                                 ${diaTxt ? `<span class="match-meta-dia">${diaTxt}</span>` : ''}
                                 <div class="match-meta-info">${canchaTxt} | ${horarioTxt}</div>
@@ -2353,18 +2379,18 @@ document.addEventListener('liga:datos-listos', () => {
                         <div class="match-details-drawer seccion-oculta">
                             <div class="drawer-divider-top"></div>
                             
-                            ${esJugado ? `
+                            ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `
                                 <div class="split-details-container">
                                     <div class="split-col col-left">${htmlLocal}</div>
                                     <div class="split-vertical-line"></div>
                                     <div class="split-col col-right">${htmlVisita}</div>
                                 </div>
                                 ${mvpTxt ? `<div class="mvp-banner">${mvpTxt}</div>` : ''}
-                            ` : `
+                            `) : (bannerAusencia(partido) || `
                                 <div style="text-align: center; color: #869bd8; font-size: 10px; font-family: Oswald; padding: 4px 0;">
                                     Partido programado
                                 </div>
-                            `}
+                            `)}
 
                             ${htmlSancion}
                         </div>

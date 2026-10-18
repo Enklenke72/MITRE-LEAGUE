@@ -136,6 +136,7 @@
                 <section class="admin-card-panel">
                     <h3 style="color:#2edae3; margin-top:0;">Registrar / Editar Partido</h3>
                     <form id="form-partido">
+                        <p id="partido-aviso-edicion" class="partido-aviso-edicion" hidden></p>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Fecha / Fase</label>
@@ -289,6 +290,7 @@
 
                         <button type="submit" id="btn-submit-partido" class="btn-submit-admin"
                             style="margin-top:10px;">GUARDAR Y COMPUTAR PARTIDO</button>
+                        <button type="button" id="btn-cancelar-edicion-partido" class="btn-cancelar-edicion-partido" hidden>Cancelar edición</button>
                     </form>
                 </section>
 
@@ -1282,6 +1284,7 @@
                         <span style="font-size: 9px; color: #869bd8; display: block;">RECAUDACIÓN PARTIDOS/FECHAS</span>
                         <span id="txt-total-partidos"
                             style="font-size: 15px; color: #4ade80; font-family: 'Michroma'; font-weight: bold; margin-top: 4px; display: block;">$0</span>
+                        <span id="txt-bonificado-partidos" class="teso-balance-bonif"></span>
                     </div>
                     <div
                         style="background: rgba(4, 12, 38,0.8); padding: 10px; border-radius: 4px; border: 1px solid #1a3274;">
@@ -1295,6 +1298,17 @@
                             NETO</span>
                         <span id="txt-saldo-neto"
                             style="font-size: 17px; color: #ffffff; font-family: 'Michroma'; font-weight: bold; margin-top: 4px; display: block;">$0</span>
+                    </div>
+                </div>
+                <!-- Dónde tiene que estar esa plata: lo cobrado en cada medio menos los egresos pagados con ese medio -->
+                <div class="teso-balance-medios">
+                    <div class="teso-balance-medio">
+                        <span class="teso-balance-medio-titulo">TIENE QUE HABER EN EFECTIVO</span>
+                        <span id="txt-saldo-efectivo" class="teso-balance-medio-monto">$0</span>
+                    </div>
+                    <div class="teso-balance-medio">
+                        <span class="teso-balance-medio-titulo">TIENE QUE HABER EN MERCADO PAGO</span>
+                        <span id="txt-saldo-mp" class="teso-balance-medio-monto">$0</span>
                     </div>
                 </div>
             </section>
@@ -1333,6 +1347,14 @@
                                 <option value="todas">Todas las Fechas</option>
                             </select>
                         </div>
+                    </div>
+
+                    <!-- Barra fija al bajar: qué se está mostrando y el buscador de equipos (los arma admin.js) -->
+                    <div class="teso-barra-fija">
+                        <div class="teso-buscador-equipo">
+                            <input type="search" id="buscador-equipo-teso" placeholder="Buscar equipo..." autocomplete="off" aria-label="Buscar equipo">
+                        </div>
+                        <p id="teso-mostrando" class="teso-mostrando"></p>
                     </div>
 
                     <!-- CONTENEDOR DE TARJETAS DE PARTIDOS -->
@@ -1514,7 +1536,7 @@
                             <label>Medio de Pago</label>
                             <select id="egreso-medio" required>
                                 <option value="efectivo">Efectivo</option>
-                                <option value="transferencia">Transferencia</option>
+                                <option value="transferencia">Mercado Pago (transferencia)</option>
                             </select>
                         </div>
                     </div>

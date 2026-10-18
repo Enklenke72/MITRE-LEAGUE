@@ -3027,6 +3027,31 @@ body.scrolled .dashboard-container section {
 }
 
 /* Banner de MVP Abajo */
+/* 3-0 automático del Art. 17 Bis: etiqueta debajo del resultado y explicación en el desplegable (18/10/2026) */
+.match-meta-auto {
+    display: block;
+    margin-top: 2px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 9px;
+    font-weight: normal;
+    letter-spacing: 0.5px;
+    color: #f2c00e;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.resultado-auto-banner {
+    margin-top: 4px;
+    padding: 6px 10px;
+    border: 1px solid rgba(242, 192, 14, 0.3);
+    border-radius: 3px;
+    background: rgba(242, 192, 14, 0.08);
+    color: #f2c00e;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-align: center;
+}
+
 .mvp-banner {
     margin-top: 12px !important;
     text-align: center !important;
@@ -4136,6 +4161,73 @@ body.rol-staff .solo-admin {
 .teso-recaud-total { border-color: #f2c00e !important; }
 .teso-recaud-total-titulo { font-family: 'Michroma', sans-serif; font-size: 13px; color: #f2c00e; text-transform: uppercase; }
 .teso-recaud-total .teso-recaud-neto strong { font-family: 'Michroma', sans-serif; font-size: 15px; }
+
+/* Efectivo y Mercado Pago por separado (18/10/2026) */
+.teso-recaud-medio { font-size: 11px; padding-left: 12px; }
+.teso-recaud-medio span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.teso-recaud-queda { margin-top: 8px; padding: 8px 10px; border: 1px solid rgba(46, 218, 227, 0.35); border-radius: 3px; background: rgba(46, 218, 227, 0.06); }
+.teso-recaud-queda-titulo { display: block; margin-bottom: 4px; font-family: 'Oswald', sans-serif; font-size: 11px; letter-spacing: 0.5px; color: #2edae3; text-transform: uppercase; }
+.teso-recaud-queda-montos { display: flex; flex-wrap: wrap; gap: 4px 16px; font-family: 'Oswald', sans-serif; font-size: 12px; color: #a9bce8; }
+.teso-recaud-queda-montos strong { margin-left: 4px; font-size: 14px; color: #ffffff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.teso-recaud-queda-montos strong.teso-recaud-egreso { color: #f43f5e; }
+.teso-balance-medios { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; text-align: center; }
+.teso-balance-medio { padding: 10px; border: 1px solid #2edae3; border-radius: 4px; background: rgba(4, 12, 38, 0.8); }
+.teso-balance-medio-titulo { display: block; font-size: 9px; font-weight: bold; color: #2edae3; }
+.teso-balance-medio-monto { display: block; margin-top: 4px; font-family: 'Michroma', sans-serif; font-size: 15px; font-weight: bold; color: #ffffff; }
+.teso-caja-medios { margin: -2px 0 8px; font-family: 'Oswald', sans-serif; font-size: 11px; color: #a9bce8; }
+
+/* Aranceles por Partido: barra fija al bajar con el buscador de equipos y qué se está mostrando (18/10/2026) */
+.teso-barra-fija {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    margin-bottom: 12px;
+    padding: 8px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #071334;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.teso-buscador-equipo { flex: 1 1 200px; min-width: 0; }
+.teso-buscador-equipo input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: 6px 10px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 16px; /* 16 px: con menos, el iPhone agranda la página al tocar el campo */
+}
+.teso-buscador-equipo input:focus { outline: none; border-color: #2edae3; }
+.teso-mostrando { flex: 1 1 220px; margin: 0; font-family: 'Oswald', sans-serif; font-size: 12px; color: #2edae3; overflow-wrap: anywhere; }
+
+/* En el panel, en celular, "clip" en vez del "hidden" de html/body: recorta igual, pero "hidden" convertía al body en
+   contenedor de scroll y ningún position: sticky quedaba fijo (esta barra y el aviso de cambios ajenos). Solo el panel:
+   en la web pública haría fija la barra de arriba en celular, que hoy se va con el scroll. Un navegador sin "clip" sigue
+   con "hidden", como antes. */
+@media (max-width: 768px) {
+    html:has(> body.staff-page),
+    body.staff-page {
+        overflow-x: clip !important;
+    }
+}
+
+/* Beneficio del derecho de partido: mismo formato que el de Inscripciones */
+.teso-insc-benef .in-p-benef-motivo { max-width: 100% !important; text-align: left !important; font-size: 13px !important; font-weight: normal !important; }
+.teso-p-benef { margin-top: 8px; }
+
+/* Carga de Partidos: aviso de qué partido se está editando y botón para cancelar (18/10/2026) */
+.partido-aviso-edicion { margin: 0 0 12px; padding: 8px 10px; border-left: 3px solid #d97706; border-radius: 3px; background: rgba(217, 119, 6, 0.12); color: #fbbf24; font-family: 'Oswald', sans-serif; font-size: 12px; }
+.btn-cancelar-edicion-partido { display: block; width: 100%; margin-top: 8px; padding: 10px; border: none; border-radius: 3px; background: #475569; color: #ffffff; font-family: 'Oswald', sans-serif; font-size: 13px; text-transform: uppercase; cursor: pointer; }
+.partido-aviso-edicion[hidden], .btn-cancelar-edicion-partido[hidden] { display: none; }
+.cronograma-ausencia { display: block; margin-top: 2px; font-family: 'Oswald', sans-serif; font-size: 10px; color: #f2c00e; }
 
 .teso-avisos-partido {
     display: flex;
