@@ -6217,9 +6217,16 @@ document.addEventListener('liga:datos-listos', (evento) => {
         plan.mudanzas.forEach((m, i) => {
             const previa = tesoreriaPartidos[m.nueva];
             // Un pago suelto de antes en la clave nueva es del mismo equipo en este mismo partido: se suma, es su plata.
-            tesoreriaPartidos[m.nueva] = previa
-                ? { ...entradas[i], ef: (previa.ef || 0) + (entradas[i].ef || 0), tr: (previa.tr || 0) + (entradas[i].tr || 0) }
-                : entradas[i];
+            if (previa && (Array.isArray(previa.pagos) || Array.isArray(entradas[i].pagos))) {
+                const ids = new Set(pagosDeEntrada(previa).map(p => String(p.id)));
+                const sumados = pagosDeEntrada(entradas[i]).map(p => (ids.has(String(p.id)) ? { ...p, id: p.id + '-m' } : p));
+                tesoreriaPartidos[m.nueva] = { ...entradas[i] };
+                fijarPagos(m.nueva, [...pagosDeEntrada(previa), ...sumados]);
+            } else {
+                tesoreriaPartidos[m.nueva] = previa
+                    ? { ...entradas[i], ef: (previa.ef || 0) + (entradas[i].ef || 0), tr: (previa.tr || 0) + (entradas[i].tr || 0) }
+                    : entradas[i];
+            }
         });
         let cambioSanciones = false;
         listaSanciones.forEach(s => {
@@ -6240,7 +6247,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     function textoBloqueoTesoreria(plan, motivo) {
         return motivo + '\n\n'
             + plan.bloqueos.map(b => '• ' + b).join('\n')
-            + '\n\nPrimero poné esos pagos en $0 en Tesorería > Aranceles por Partido (así queda registrada la devolución en la Caja) y después volvé a intentarlo.';
+            + '\n\nPrimero borrá esos pagos en Tesorería > Aranceles por Partido (así queda registrada la devolución en la Caja) y después volvé a intentarlo.';
     }
 
     function fechaHoyTexto() {
@@ -6528,6 +6535,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const bfAbiertos = new Set();
     // Desplegables de beneficio del derecho de partido abiertos: siguen abiertos al redibujar, como la lista de buena fe.
     const benefPartidoAbiertos = new Set();
+    // Medios de los pagos por partes (ver "Pagos por partes"): todas las transferencias van a Mercado Pago.
+    const MEDIOS_PAGO = { ef: 'Efectivo', mp: 'Mercado Pago' };
+    // Llegó algo en vivo mientras se cargaba un pago: Aranceles se redibuja cuando se termina (ver "En vivo").
+    let refrescoArancelesPendiente = false;
     // Fotos sacadas en cancha que todavía no subieron (clave: solo los dígitos del DNI). Ver "Fotos en cancha".
     const fotosCola = new Map();
     const MAX_JUGADORES_LISTA = 10;
@@ -7240,14 +7251,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     <label>Arancel Exigido ($):</label>
                     <input type="number" class="input-monto-teso in-p-arancel" data-key="${t.clave}" value="${t.arancelBase}">
                 </div>
-                <div class="teso-inputs-row">
-                    <label>Pago Efectivo ($):</label>
-                    <input type="number" class="input-monto-teso in-p-ef" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}" value="${t.data.ef || 0}">
-                </div>
-                <div class="teso-inputs-row">
-                    <label>Pago Mercado Pago ($):</label>
-                    <input type="number" class="input-monto-teso in-p-tr" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${faseLabel}" value="${t.data.tr || 0}">
-                </div>
+                ${htmlPagosEquipo(t, faseLabel)}
                 ${notasHtml}
                 ${chip}
                 ${badgeDeuda}
@@ -7274,6 +7278,136 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 ${htmlListaBuenaFe(t, p)}
             </div>
         `;
+    }
+
+    // ── Pagos por partes (pedido de Joaquín, 18/10/2026, Hecho #48) ──
+    // Cada pago de un equipo en un partido es un renglón (monto, medio, quién y a qué hora) en tesoreriaPartidos[clave].pagos;
+    // ef (efectivo) y tr (Mercado Pago) son la suma de esos renglones. En Firestore cada pago se agrega solo (arrayUnion,
+    // ver pagosAparte en datos-firestore.js): si dos personas cargan pagos del mismo equipo a la vez, quedan los dos.
+    // Lo cargado antes de los renglones (un número por medio) se muestra como un pago "Carga anterior" por medio. El id y
+    // los datos son fijos: si dos paneles lo pasan a renglón a la vez, arrayUnion lo deja una sola vez.
+    function pagosDeEntrada(d) {
+        if (d && Array.isArray(d.pagos)) return d.pagos;
+        const previos = [];
+        if (d && d.ef) previos.push({ id: 'previo-ef', monto: d.ef, medio: 'ef', autor: 'Carga anterior', email: '', hora: '' });
+        if (d && d.tr) previos.push({ id: 'previo-mp', monto: d.tr, medio: 'mp', autor: 'Carga anterior', email: '', hora: '' });
+        return previos;
+    }
+
+    function fijarPagos(key, pagos) {
+        const d = tesoreriaPartidos[key] || (tesoreriaPartidos[key] = { ef: 0, tr: 0 });
+        const suma = medio => pagos.reduce((acc, p) => acc + (p.medio === medio ? Number(p.monto) || 0 : 0), 0);
+        d.pagos = pagos;
+        d.ef = suma('ef');
+        d.tr = suma('mp');
+    }
+
+    function nuevoPago(monto, medio) {
+        return {
+            id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+            monto, medio,
+            autor: usuarioPanel.nombre || usuarioPanel.email || 'Staff',
+            email: usuarioPanel.email || '',
+            hora: new Date().toISOString()
+        };
+    }
+
+    function htmlPagosEquipo(t, faseLabel) {
+        const horaDe = iso => {
+            const d = iso ? new Date(iso) : null;
+            return d && !isNaN(d) ? d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '';
+        };
+        const filas = pagosDeEntrada(t.data).map(p => `
+            <div class="teso-pago-fila" data-pago="${attrSeguro(p.id)}">
+                <span class="teso-pago-monto">$${(Number(p.monto) || 0).toLocaleString()}</span>
+                <span class="teso-pago-medio-txt teso-pago-medio-${p.medio === 'mp' ? 'mp' : 'ef'}">${MEDIOS_PAGO[p.medio] || attrSeguro(p.medio)}</span>
+                <span class="teso-pago-quien">${attrSeguro(p.autor || '')}${horaDe(p.hora) ? ' · ' + horaDe(p.hora) : ''}${p.editado ? ' · corregido' : ''}</span>
+                <span class="teso-pago-botones">
+                    <button type="button" class="teso-pago-btn teso-pago-editar">Editar</button>
+                    <button type="button" class="teso-pago-btn teso-pago-borrar">Borrar</button>
+                </span>
+            </div>`).join('');
+        return `
+            <div class="teso-pagos" data-key="${t.clave}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${attrSeguro(faseLabel)}">
+                <div class="teso-pagos-titulo"><span>Pagos</span><strong>Total pagado: $${t.pagado.toLocaleString()}</strong></div>
+                <div class="teso-pagos-lista">${filas || '<p class="teso-pagos-vacio">Todavía no pagó nada.</p>'}</div>
+                <div class="teso-pago-alta">
+                    <input type="number" min="1" step="100" inputmode="numeric" class="input-monto-teso in-pago-monto" placeholder="Monto" aria-label="Monto del pago de ${attrSeguro(t.nombre)}">
+                    <div class="teso-pago-medios" role="group" aria-label="Medio de pago">
+                        <button type="button" class="teso-pago-medio activo" data-medio="ef" aria-pressed="true">Efectivo</button>
+                        <button type="button" class="teso-pago-medio" data-medio="mp" aria-pressed="false">Mercado Pago</button>
+                    </div>
+                    <button type="button" class="teso-btn-pago btn-confirmar-pago">Confirmar pago</button>
+                    ${t.falta > 0 ? `<button type="button" class="teso-btn-pago-falta" data-falta="${t.falta}">Paga lo que falta ($${t.falta.toLocaleString()})</button>` : ''}
+                </div>
+            </div>`;
+    }
+
+    function confirmarPago(cont) {
+        const key = cont.dataset.key;
+        const input = cont.querySelector('.in-pago-monto');
+        const monto = Math.round(parseFloat(input.value));
+        if (!(monto > 0)) { alert('Escribí el monto del pago, mayor a $0.'); return; }
+        const botonMedio = cont.querySelector('.teso-pago-medio.activo');
+        const medio = botonMedio ? botonMedio.dataset.medio : 'ef';
+        fijarPagos(key, [...pagosDeEntrada(tesoreriaPartidos[key]), nuevoPago(monto, medio)]);
+        input.value = '';
+        guardarTesoreriaPartidos();
+        registrarMovimientoCaja({ equipo: cont.dataset.equipo, concepto: 'Arancel de Partido', detalle: cont.dataset.fase, medio: MEDIOS_PAGO[medio], monto });
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
+    }
+
+    function abrirEdicionPago(fila) {
+        const cont = fila.closest('.teso-pagos');
+        const pago = pagosDeEntrada(tesoreriaPartidos[cont.dataset.key]).find(p => String(p.id) === fila.dataset.pago);
+        if (!pago) { renderizarTesoreriaPartidos(); return; }
+        fila.classList.add('teso-pago-editando');
+        fila.innerHTML = `
+            <input type="number" min="1" step="100" inputmode="numeric" class="input-monto-teso in-pago-editar-monto" value="${Number(pago.monto) || 0}" aria-label="Monto">
+            <select class="select-asist-teso in-pago-editar-medio" aria-label="Medio">
+                <option value="ef"${pago.medio === 'ef' ? ' selected' : ''}>Efectivo</option>
+                <option value="mp"${pago.medio === 'mp' ? ' selected' : ''}>Mercado Pago</option>
+            </select>
+            <span class="teso-pago-botones">
+                <button type="button" class="teso-pago-btn teso-pago-guardar">Guardar</button>
+                <button type="button" class="teso-pago-btn teso-pago-cancelar">Cancelar</button>
+            </span>`;
+    }
+
+    // Corregir o borrar un pago deja en la Caja la diferencia (o la devolución) con el medio que corresponde.
+    function guardarEdicionPago(fila) {
+        const cont = fila.closest('.teso-pagos');
+        const key = cont.dataset.key;
+        const pagos = pagosDeEntrada(tesoreriaPartidos[key]);
+        const pago = pagos.find(p => String(p.id) === fila.dataset.pago);
+        if (!pago) { alert('Ese pago ya no está: lo borró otra persona.'); renderizarTesoreriaPartidos(); return; }
+        const monto = Math.round(parseFloat(fila.querySelector('.in-pago-editar-monto').value));
+        const medio = fila.querySelector('.in-pago-editar-medio').value;
+        if (!(monto > 0)) { alert('El monto tiene que ser mayor a $0. Para sacarlo, usá "Borrar".'); return; }
+        if (monto === Number(pago.monto) && medio === pago.medio) { renderizarTesoreriaPartidos(); return; }
+        const corregido = { ...pago, monto, medio, editado: { autor: usuarioPanel.nombre || usuarioPanel.email || 'Staff', hora: new Date().toISOString() } };
+        fijarPagos(key, pagos.map(p => (p === pago ? corregido : p)));
+        guardarTesoreriaPartidos();
+        const mov = (m, monto) => registrarMovimientoCaja({ equipo: cont.dataset.equipo, concepto: 'Arancel de Partido', detalle: `${cont.dataset.fase} (corrección)`, medio: MEDIOS_PAGO[m], monto });
+        if (medio === pago.medio) mov(medio, monto - Number(pago.monto));
+        else { mov(pago.medio, -Number(pago.monto)); mov(medio, monto); }
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
+    }
+
+    function borrarPago(fila) {
+        const cont = fila.closest('.teso-pagos');
+        const key = cont.dataset.key;
+        const pagos = pagosDeEntrada(tesoreriaPartidos[key]);
+        const pago = pagos.find(p => String(p.id) === fila.dataset.pago);
+        if (!pago) { renderizarTesoreriaPartidos(); return; }
+        if (!confirm(`¿Borrar el pago de $${(Number(pago.monto) || 0).toLocaleString()} (${MEDIOS_PAGO[pago.medio] || pago.medio}) de ${cont.dataset.equipo}?`)) return;
+        fijarPagos(key, pagos.filter(p => p !== pago));
+        guardarTesoreriaPartidos();
+        registrarMovimientoCaja({ equipo: cont.dataset.equipo, concepto: 'Arancel de Partido', detalle: `${cont.dataset.fase} (pago borrado)`, medio: MEDIOS_PAGO[pago.medio], monto: -Number(pago.monto) });
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
     }
 
     // Beneficio de un equipo en un partido (pedido de Joaquín, 18/10/2026): igual que el de Inscripciones, pero de ese
@@ -7464,6 +7598,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     function renderizarTesoreriaPartidos() {
         const contenedor = document.getElementById('contenedor-tesoreria-partidos-cards');
         if (!contenedor) return;
+        refrescoArancelesPendiente = false;
 
         recargarPools();
         const { calc, evaluaciones } = sincronizarAusencias();
@@ -7542,33 +7677,6 @@ document.addEventListener('liga:datos-listos', (evento) => {
             });
         });
 
-        document.querySelectorAll('.in-p-ef').forEach(inpt => {
-            inpt.addEventListener('change', (e) => {
-                const key = e.target.getAttribute('data-key');
-                if (!tesoreriaPartidos[key]) tesoreriaPartidos[key] = { ef: 0, tr: 0 };
-                const valorAnterior = tesoreriaPartidos[key].ef || 0;
-                const valorNuevo = parseFloat(e.target.value) || 0;
-                tesoreriaPartidos[key].ef = valorNuevo;
-                guardarTesoreriaPartidos();
-                registrarMovimientoCaja({ equipo: e.target.dataset.equipo, concepto: 'Arancel de Partido', detalle: e.target.dataset.fase, medio: 'Efectivo', monto: valorNuevo - valorAnterior });
-                renderizarTesoreriaPartidos();
-                calcularBalanceGeneral();
-            });
-        });
-
-        document.querySelectorAll('.in-p-tr').forEach(inpt => {
-            inpt.addEventListener('change', (e) => {
-                const key = e.target.getAttribute('data-key');
-                if (!tesoreriaPartidos[key]) tesoreriaPartidos[key] = { ef: 0, tr: 0 };
-                const valorAnterior = tesoreriaPartidos[key].tr || 0;
-                const valorNuevo = parseFloat(e.target.value) || 0;
-                tesoreriaPartidos[key].tr = valorNuevo;
-                guardarTesoreriaPartidos();
-                registrarMovimientoCaja({ equipo: e.target.dataset.equipo, concepto: 'Arancel de Partido', detalle: e.target.dataset.fase, medio: 'Transferencia', monto: valorNuevo - valorAnterior });
-                renderizarTesoreriaPartidos();
-                calcularBalanceGeneral();
-            });
-        });
     }
 
     if (filtroTesoreriaFecha) filtroTesoreriaFecha.addEventListener('change', renderizarTesoreriaPartidos);
@@ -7585,10 +7693,36 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 imprimirPlanillas(partidos.filter(x => String(x.id) === btnImprimir.dataset.pid));
                 return;
             }
+            const btnMedio = e.target.closest('.teso-pago-medio');
+            if (btnMedio) {
+                btnMedio.parentElement.querySelectorAll('.teso-pago-medio').forEach(b => {
+                    b.classList.toggle('activo', b === btnMedio);
+                    b.setAttribute('aria-pressed', String(b === btnMedio));
+                });
+                return;
+            }
+            const btnFalta = e.target.closest('.teso-btn-pago-falta');
+            if (btnFalta) { btnFalta.closest('.teso-pagos').querySelector('.in-pago-monto').value = btnFalta.dataset.falta; return; }
+            if (e.target.closest('.btn-confirmar-pago')) { confirmarPago(e.target.closest('.teso-pagos')); return; }
+            const filaPago = e.target.closest('.teso-pago-fila');
+            if (filaPago && e.target.closest('.teso-pago-editar')) { abrirEdicionPago(filaPago); return; }
+            if (filaPago && e.target.closest('.teso-pago-guardar')) { guardarEdicionPago(filaPago); return; }
+            if (filaPago && e.target.closest('.teso-pago-cancelar')) { renderizarTesoreriaPartidos(); return; }
+            if (filaPago && e.target.closest('.teso-pago-borrar')) { borrarPago(filaPago); return; }
             const btn = e.target.closest('.bf-btn');
             if (!btn) return;
             if (btn.classList.contains('bf-btn-ficha')) alternarFichaBF(btn);
             else if (btn.classList.contains('bf-alta-guardar')) agregarJugadorEnCancha(btn);
+        });
+        // Enter en el monto confirma el pago (o la corrección).
+        contenedorTesoPartidos.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            if (e.target.classList.contains('in-pago-monto')) { e.preventDefault(); confirmarPago(e.target.closest('.teso-pagos')); }
+            else if (e.target.classList.contains('in-pago-editar-monto')) { e.preventDefault(); guardarEdicionPago(e.target.closest('.teso-pago-fila')); }
+        });
+        // Lo que llegó en vivo mientras se cargaba un pago se dibuja cuando se deja de cargar.
+        contenedorTesoPartidos.addEventListener('focusout', () => {
+            setTimeout(() => { if (refrescoArancelesPendiente && !cargandoEnAranceles()) renderizarTesoreriaPartidos(); }, 300);
         });
         contenedorTesoPartidos.addEventListener('change', (e) => {
             if (!e.target.classList) return;
@@ -8296,6 +8430,47 @@ document.addEventListener('liga:datos-listos', (evento) => {
         select.addEventListener('change', () => {
             try { localStorage.setItem(PREFIJO_SELECCION + id, select.value); } catch (e) { /* idem */ }
         });
+    });
+
+    // ── En vivo (pedido de Joaquín, 18/10/2026, Hecho #48): en la jornada, lo que carga otro (pagos, asistencia, lista de
+    // buena fe, y lo que eso genera solo: 3-0, sanciones, Caja e Historial) se ve sin recargar. datos-firestore.js ya
+    // actualizó el almacén; acá se recarga la copia de admin.js en el momento (antes de que se pueda guardar otra cosa
+    // sobre una copia vieja) y se redibuja un rato después. Si alguien está escribiendo un pago, Aranceles espera.
+    const RECARGAS_EN_VIVO = {
+        liga_tesoreria_partidos_v2: () => { tesoreriaPartidos = JSON.parse(almacen.getItem('liga_tesoreria_partidos_v2')) || {}; },
+        liga_partidos: () => { partidos = JSON.parse(almacen.getItem('liga_partidos')) || []; },
+        liga_sanciones: () => { listaSanciones = JSON.parse(almacen.getItem('liga_sanciones')) || []; },
+        liga_caja_movimientos: () => { cajaMovimientos = JSON.parse(almacen.getItem('liga_caja_movimientos')) || []; },
+        liga_historial_cambios: () => { historialCambios = JSON.parse(almacen.getItem('liga_historial_cambios')) || []; },
+        liga_deudas_inscripcion: () => {}
+    };
+
+    function cargandoEnAranceles() {
+        const contenedor = document.getElementById('contenedor-tesoreria-partidos-cards');
+        if (!contenedor) return false;
+        const activo = document.activeElement;
+        if (activo && contenedor.contains(activo) && /^(INPUT|SELECT|TEXTAREA)$/.test(activo.tagName)) return true;
+        if (contenedor.querySelector('.teso-pago-editando')) return true;
+        return [...contenedor.querySelectorAll('.in-pago-monto')].some(i => i.value.trim() !== '');
+    }
+
+    let esperaEnVivo = null;
+    function refrescarEnVivo() {
+        if (cargandoEnAranceles()) refrescoArancelesPendiente = true;
+        else renderizarTesoreriaPartidos();
+        actualizarListaAdmin();
+        actualizarListaSancionesAdmin();
+        actualizarListaHistorial();
+        renderizarCajaPorFecha();
+        calcularBalanceGeneral();
+    }
+
+    document.addEventListener('liga:dato-en-vivo', (e) => {
+        const recargar = RECARGAS_EN_VIVO[e.detail && e.detail.clave];
+        if (!recargar) return;
+        recargar();
+        clearTimeout(esperaEnVivo);
+        esperaEnVivo = setTimeout(refrescarEnVivo, 150);
     });
 
     // ============================================================

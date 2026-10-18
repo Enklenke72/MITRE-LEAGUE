@@ -4219,6 +4219,34 @@ body.rol-staff .solo-admin {
     }
 }
 
+/* Pagos por partes en Aranceles por Partido (Hecho #48): un renglón por pago y el alta de uno nuevo. Botones de 40 px
+   o más de alto para tocarlos con el dedo en la cancha. */
+.teso-pagos { margin: 10px 0 6px; padding: 8px; border: 1px solid #1a3274; border-radius: 3px; background: rgba(4, 12, 38, 0.5); }
+.teso-pagos-titulo { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 6px; font-family: 'Oswald', sans-serif; font-size: 12px; color: #a9bce8; text-transform: uppercase; }
+.teso-pagos-titulo strong { font-size: 13px; color: #ffffff; text-transform: none; font-variant-numeric: tabular-nums; }
+.teso-pagos-vacio { margin: 0 0 6px; font-family: 'Oswald', sans-serif; font-size: 11px; color: #869bd8; }
+.teso-pago-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 0; border-top: 1px dashed rgba(255, 255, 255, 0.08); font-family: 'Oswald', sans-serif; font-size: 12px; color: #a9bce8; }
+.teso-pago-monto { min-width: 70px; font-size: 14px; font-weight: 600; color: #ffffff; font-variant-numeric: tabular-nums; }
+.teso-pago-medio-txt { padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+.teso-pago-medio-ef { background: rgba(74, 222, 128, 0.12); color: #4ade80; }
+.teso-pago-medio-mp { background: rgba(46, 218, 227, 0.12); color: #2edae3; }
+.teso-pago-quien { flex: 1 1 120px; min-width: 0; font-size: 11px; color: #869bd8; overflow-wrap: anywhere; }
+.teso-pago-botones { display: flex; gap: 6px; margin-left: auto; }
+.teso-pago-btn { min-height: 32px; padding: 0 10px; border: 1px solid #1a3274; border-radius: 3px; background: #0a1d54; color: #ffffff; font-family: 'Oswald', sans-serif; font-size: 12px; cursor: pointer; touch-action: manipulation; }
+.teso-pago-borrar { border-color: rgba(244, 63, 94, 0.5); color: #fca5a5; }
+.teso-pago-guardar { border-color: #2edae3; background: #0a3a5c; }
+.teso-pago-editando .input-monto-teso { flex: 1 1 90px; max-width: 120px !important; }
+.teso-pago-editando .select-asist-teso { flex: 1 1 120px; width: auto; }
+.teso-pago-alta { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(46, 218, 227, 0.2); }
+.teso-pago-alta .in-pago-monto { flex: 1 1 110px; max-width: none !important; min-height: 40px; font-size: 16px !important; }
+.teso-pago-medios { display: flex; flex: 1 1 200px; border: 1px solid #1a3274; border-radius: 3px; overflow: hidden; }
+.teso-pago-medio { flex: 1 1 0; min-height: 40px; padding: 0 8px; border: none; background: #040c26; color: #869bd8; font-family: 'Oswald', sans-serif; font-size: 13px; cursor: pointer; touch-action: manipulation; }
+.teso-pago-medio + .teso-pago-medio { border-left: 1px solid #1a3274; }
+.teso-pago-medio.activo { background: #0a3a5c; color: #ffffff; box-shadow: inset 0 -3px 0 #2edae3; }
+.teso-btn-pago { flex: 1 1 100%; min-height: 44px; border: 2px solid #4ade80; border-radius: 4px; background: rgba(74, 222, 128, 0.15); color: #ffffff; font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 0.5px; text-transform: uppercase; cursor: pointer; touch-action: manipulation; }
+.teso-btn-pago-falta { flex: 1 1 100%; min-height: 36px; border: 1px dashed #f2c00e; border-radius: 4px; background: transparent; color: #f2c00e; font-family: 'Oswald', sans-serif; font-size: 12px; cursor: pointer; touch-action: manipulation; }
+.teso-pago-btn:focus-visible, .teso-pago-medio:focus-visible, .teso-btn-pago:focus-visible, .teso-btn-pago-falta:focus-visible { outline: 2px solid #f2c00e; outline-offset: 2px; }
+
 /* Beneficio del derecho de partido: mismo formato que el de Inscripciones */
 .teso-insc-benef .in-p-benef-motivo { max-width: 100% !important; text-align: left !important; font-size: 13px !important; font-weight: normal !important; }
 .teso-p-benef { margin-top: 8px; }

@@ -35,8 +35,11 @@ const PATRON_CODIGO = /^j[A-Za-z0-9_-]{16}$/;
 const ESQUEMA = [
     { clave: 'liga_cicloSuperior', tipo: 'equipos', ciclo: 'superior', nivel: 'publico' },
     { clave: 'liga_cicloBasico', tipo: 'equipos', ciclo: 'basico', nivel: 'publico' },
-    { clave: 'liga_partidos', tipo: 'lista', col: 'partidos', nivel: 'publico', dnis: CAMPOS_DNI_PARTIDO, conjuntos: ['asistentesLocal', 'asistentesVisitante'] },
-    { clave: 'liga_sanciones', tipo: 'lista', col: 'sanciones', nivel: 'publico', dnis: ['jugadorId'] },
+    // enVivo en partidos, sanciones, Tesorería de partidos, Caja e Historial (Hecho #48): lo que carga otro en la jornada
+    // (pagos, asistencia, lista de buena fe y lo que eso genera solo) se ve sin recargar. admin.js recarga su copia
+    // con el evento 'liga:dato-en-vivo' antes de cualquier otro guardado.
+    { clave: 'liga_partidos', tipo: 'lista', col: 'partidos', nivel: 'publico', dnis: CAMPOS_DNI_PARTIDO, conjuntos: ['asistentesLocal', 'asistentesVisitante'], enVivo: true },
+    { clave: 'liga_sanciones', tipo: 'lista', col: 'sanciones', nivel: 'publico', dnis: ['jugadorId'], enVivo: true },
     { clave: 'liga_noticias', tipo: 'lista', col: 'noticias', nivel: 'publico' },
     { clave: 'liga_fotos_albumes', tipo: 'lista', col: 'albumes', nivel: 'publico' },
     { clave: 'liga_sponsors', tipo: 'lista', col: 'sponsors', nivel: 'publico' },
@@ -62,13 +65,16 @@ const ESQUEMA = [
     // la consola, el panel carga igual, sin este dato. enVivo: lo que escribe el Coordinador se aplica solo, sin el
     // aviso de cambios ajenos (el Staff nunca lo escribe, así que no hay copia que se pueda pisar).
     { clave: 'liga_deudas_inscripcion', tipo: 'config', col: 'deudasInscripcion', id: 'actual', nivel: 'staff', escribeCoordinador: true, opcional: true, enVivo: true },
-    { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff' },
+    // pagosAparte: los pagos de cada equipo en cada partido van en el campo "pagos" del documento (no dentro de "valor")
+    // y se suman con arrayUnion: dos personas cargando pagos del mismo equipo a la vez no se pisan. ef y tr se calculan
+    // de esa lista al leer (Hecho #48).
+    { clave: 'liga_tesoreria_partidos_v2', tipo: 'mapa', col: 'tesoreriaPartidos', nivel: 'staff', enVivo: true, pagosAparte: true },
     { clave: 'liga_tesoreria_inscripciones', tipo: 'mapa', col: 'tesoreriaInscripciones', nivel: 'coordinador' },
     { clave: 'liga_valor_inscripcion', tipo: 'config', col: 'configCoordinador', id: 'valorInscripcion', nivel: 'coordinador' },
     { clave: 'liga_egresos', tipo: 'lista', col: 'egresos', nivel: 'coordinador' },
-    { clave: 'liga_caja_movimientos', tipo: 'lista', col: 'cajaMovimientos', nivel: 'coordinador', escribeStaff: true },
+    { clave: 'liga_caja_movimientos', tipo: 'lista', col: 'cajaMovimientos', nivel: 'coordinador', escribeStaff: true, enVivo: true },
     { clave: 'liga_calculadora_arancel', tipo: 'config', col: 'configCoordinador', id: 'calculadoraArancel', nivel: 'coordinador' },
-    { clave: 'liga_historial_cambios', tipo: 'lista', col: 'historialCambios', nivel: 'coordinador', escribeStaff: true, ordenPor: 'timestamp' }
+    { clave: 'liga_historial_cambios', tipo: 'lista', col: 'historialCambios', nivel: 'coordinador', escribeStaff: true, ordenPor: 'timestamp', enVivo: true }
 ];
 
 // El plan gratuito de Firebase corta a las 50.000 lecturas por día y cada documento leído cuenta:
@@ -303,14 +309,27 @@ function aplicarLista(def, snap) {
     almacen.cargar(def.clave, JSON.stringify(lista));
 }
 
+// Con pagosAparte, una entrada con pagos queda en el almacén como {...valor, pagos, ef, tr}: ef (efectivo) y tr (Mercado
+// Pago) salen de sumar los pagos, así un ef viejo guardado en "valor" nunca contradice la lista.
+function valorDeMapa(def, datos) {
+    if (!def.pagosAparte || !Array.isArray(datos.pagos)) return datos.valor;
+    const pagos = [...datos.pagos].sort((a, b) => String(a.hora || '').localeCompare(String(b.hora || '')) || String(a.id).localeCompare(String(b.id)));
+    const suma = medio => pagos.reduce((acc, p) => acc + (p.medio === medio ? Number(p.monto) || 0 : 0), 0);
+    return { ...(datos.valor || {}), pagos, ef: suma('ef'), tr: suma('mp') };
+}
+
 function aplicarMapa(def, snap) {
     const mem = new Map();
     cache.set(def.col, mem);
+    const memPagos = new Map();
+    if (def.pagosAparte) cache.set(def.col + '#pagos', memPagos);
     const obj = {};
     snap.docs.forEach(d => {
-        const valor = d.data().valor;
+        const datos = d.data();
+        const valor = valorDeMapa(def, datos);
         obj[decodeURIComponent(d.id)] = valor;
         mem.set(d.id, textoEstable(valor));
+        if (Array.isArray(datos.pagos)) memPagos.set(d.id, { valor: textoEstable(datos.valor), pagos: datos.pagos });
     });
     almacen.cargar(def.clave, JSON.stringify(obj));
 }
@@ -337,11 +356,30 @@ function difiereDeLoConocido(nombre, def, snap) {
     const mem = memoria(nombre);
     const esTexto = nombre === 'equiposPrivado' || (def && def.tipo === 'mapa');
     const textoDoc = nombre === 'equiposPrivado' ? d => textoEstable({ jugadores: d.data().jugadores || {} })
-        : esTexto ? d => textoEstable(d.data().valor)
+        : esTexto ? d => textoEstable(valorDeMapa(def, d.data()))
         : d => textoEstable(d.data());
     const textoConocido = esTexto ? v => v : v => textoEstable({ ...v.datos, _pos: v.pos });
     if (snap.docs.length !== mem.size) return true;
     return snap.docs.some(d => !mem.has(d.id) || textoConocido(mem.get(d.id)) !== textoDoc(d));
+}
+
+// enVivo en el panel: lo que llega se aplica al almacén y admin.js recarga su copia ('liga:dato-en-vivo', sincrónico,
+// antes de que pueda guardar otra cosa). Mientras el panel tiene una escritura de esa clave en preparación, lo que llega
+// espera a que termine: si se aplicara en el medio, la escritura compararía contra datos que el panel todavía no tenía
+// y podría deshacer lo del otro. Solo se avisa si el contenido cambió (no por los ecos de lo propio).
+const escriturasEnPreparacion = new Map();
+const llegadasEnEspera = new Set();
+function aplicarEnVivo(def) {
+    if (escriturasEnPreparacion.get(def.clave)) { llegadasEnEspera.add(def.clave); return; }
+    llegadasEnEspera.delete(def.clave);
+    const snap = vigente[def.clave];
+    if (!snap) return;
+    const antes = almacen.getItem(def.clave);
+    aplicar(def, snap);
+    const despues = almacen.getItem(def.clave);
+    if (antes === despues || (antes && despues && textoEstable(JSON.parse(antes)) === textoEstable(JSON.parse(despues)))) return;
+    document.dispatchEvent(new CustomEvent('liga:dato-en-vivo', { detail: { clave: def.clave } }));
+    avisarActualizacion([def.clave]);
 }
 
 let clavesActualizadas = new Set();
@@ -379,8 +417,8 @@ export async function cargarDatosLiga(rol, alCambiarAjeno) {
         vigente[clave] = snap;
         if (!cargaHecha) return;
         if (esPanel && def && def.enVivo) {
-            aplicar(def, snap);
-            avisarActualizacion([def.clave]);
+            programarResumen();
+            aplicarEnVivo(def);
         } else if (esPanel) {
             programarResumen();
             if (alCambiarAjeno && difiereDeLoConocido(col, def, snap)) alCambiarAjeno();
@@ -692,14 +730,41 @@ function planMapa(def, obj, ops) {
         vigentes.add(id);
         const texto = textoEstable(v);
         if (mem.get(id) === texto) return;
-        ops.push({ tipo: 'set', col: def.col, id, datos: { valor: v } });
+        if (def.pagosAparte && v && Array.isArray(v.pagos)) planEntradaConPagos(def, id, v, mem.has(id), ops);
+        else ops.push({ tipo: 'set', col: def.col, id, datos: { valor: v } });
         mem.set(id, texto);
     });
     [...mem.keys()].forEach(id => {
         if (vigentes.has(id)) return;
         ops.push({ tipo: 'delete', col: def.col, id });
         mem.delete(id);
+        if (def.pagosAparte) memoria(def.col + '#pagos').delete(id);
     });
+}
+
+// Los pagos se agregan y se sacan de a uno (arrayUnion / arrayRemove), nunca se reescribe la lista entera: si otro
+// panel agregó un pago al mismo equipo, queda. "valor" (asistencia, arancel, beneficio…) va sin ef ni tr, que salen
+// de los pagos, así cargar un pago no lo reescribe. Editar un pago es sacar el viejo y poner el nuevo.
+function planEntradaConPagos(def, id, v, existe, ops) {
+    const { fsSdk } = fs;
+    const memPagos = memoria(def.col + '#pagos');
+    const { pagos, ef, tr, ...valor } = v;
+    const textoValor = textoEstable(valor);
+    if (!existe) {
+        // Con merge y arrayUnion: si otro panel creó la entrada en el mismo momento (los dos cargaron el primer pago de
+        // ese equipo a la vez), se suman los pagos en vez de pisarse.
+        ops.push({ tipo: 'merge', col: def.col, id, datos: { valor, pagos: fsSdk.arrayUnion(...pagos) } });
+    } else {
+        const antes = memPagos.get(id) || { valor: null, pagos: [] };
+        const nuevos = new Set(pagos.map(textoEstable));
+        const viejos = new Set(antes.pagos.map(textoEstable));
+        const sacados = antes.pagos.filter(p => !nuevos.has(textoEstable(p)));
+        const puestos = pagos.filter(p => !viejos.has(textoEstable(p)));
+        if (antes.valor !== textoValor) ops.push({ tipo: 'update', col: def.col, id, datos: { valor } });
+        if (sacados.length) ops.push({ tipo: 'update', col: def.col, id, datos: { pagos: fsSdk.arrayRemove(...sacados) } });
+        if (puestos.length) ops.push({ tipo: 'update', col: def.col, id, datos: { pagos: fsSdk.arrayUnion(...puestos) } });
+    }
+    memPagos.set(id, { valor: textoValor, pagos });
 }
 
 function planConfig(def, valor, ops) {
@@ -726,6 +791,7 @@ function enviar(ops, opcional) {
     ops.forEach(op => {
         const ref = fsSdk.doc(db, op.col, op.id);
         const promesa = op.tipo === 'set' ? fsSdk.setDoc(ref, op.datos)
+            : op.tipo === 'merge' ? fsSdk.setDoc(ref, op.datos, { merge: true })
             : op.tipo === 'update' ? fsSdk.updateDoc(ref, op.datos)
             : fsSdk.deleteDoc(ref);
         // Un dato opcional (regla quizás sin pegar) no interrumpe con el cartel de "Recargá la página".
@@ -741,6 +807,7 @@ async function guardar(def, valor) {
     else planConfig(def, valor, ops);
     enviar(ops, !!def.opcional);
     new Set(ops.map(op => seccionDe(op.col)).filter(Boolean)).forEach(programarResumen);
+    return ops.length;
 }
 
 export function activarGuardado() {
@@ -753,7 +820,18 @@ export function activarGuardado() {
         }
         if (!puedeEscribir(def)) return;
         enPreparacion++;
-        colaEscritura = colaEscritura.then(() => guardar(def, valor)).catch(avisarError).finally(() => { enPreparacion--; });
+        escriturasEnPreparacion.set(clave, (escriturasEnPreparacion.get(clave) || 0) + 1);
+        let mandoAlgo = false;
+        colaEscritura = colaEscritura.then(() => guardar(def, valor)).then(n => { mandoAlgo = n > 0; }).catch(avisarError).finally(() => {
+            enPreparacion--;
+            const quedan = escriturasEnPreparacion.get(clave) - 1;
+            escriturasEnPreparacion.set(clave, quedan);
+            if (quedan || !llegadasEnEspera.has(clave)) return;
+            // Si se mandó algo, lo que esperaba puede ser anterior a esta escritura: se aplica con el eco que trae las
+            // dos cosas (llega enseguida). Por las dudas, igual se aplica al segundo y medio.
+            if (!mandoAlgo) aplicarEnVivo(def);
+            else setTimeout(() => { if (llegadasEnEspera.has(clave) && !escriturasEnPreparacion.get(clave)) aplicarEnVivo(def); }, 1500);
+        });
     });
     // Antes localStorage guardaba al instante; ahora preparar un cambio lleva unos milisegundos.
     window.addEventListener('beforeunload', (evento) => {
