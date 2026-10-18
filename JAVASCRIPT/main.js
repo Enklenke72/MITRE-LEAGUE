@@ -2221,6 +2221,8 @@ document.addEventListener('liga:datos-listos', () => {
         if (a.local && a.visitante) return { etiqueta: 'No se presentaron', texto: 'No se presentó ninguno de los dos equipos: el partido queda como no jugado (Art. 17 Bis).' };
         const ausente = a.local ? partido.local : partido.visitante;
         if (Number(partido.fecha) >= 100) return { etiqueta: `No se presentó ${ausente}`, texto: `${ausente} no se presentó y queda eliminado (Art. 17 Bis).` };
+        // El rival se presentó pero no abonó el 100%: el reglamento lo deja suspendido, sin puntos.
+        if (a.suspendido) return { etiqueta: 'Suspendido', texto: `${ausente} no se presentó. Partido suspendido, sin puntos para ninguno (Art. 17 Bis).` };
         return { etiqueta: 'Resultado a definir', texto: `${ausente} no se presentó. Resultado a definir (Art. 17 Bis).` };
     }
     function etiquetaAusencia(partido) {

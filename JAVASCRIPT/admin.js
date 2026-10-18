@@ -2429,7 +2429,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             // Marcado en Aranceles por Partido: no hay que cargarle resultado acá (el 3-0 lo pone el panel solo).
             const ausentes = p.ausencia ? [p.ausencia.local && p.local, p.ausencia.visitante && p.visitante].filter(Boolean) : [];
             const marcaAusencia = ausentes.length === 2 ? 'No se presentó ninguno'
-                : ausentes.length ? `No se presentó ${ausentes[0]}${p.resultadoAuto ? ' · 3-0 automático' : ''}` : '';
+                : ausentes.length ? `No se presentó ${ausentes[0]}${p.resultadoAuto ? ' · 3-0 automático' : p.ausencia.suspendido ? ' · suspendido' : ''}` : '';
 
             if (horarioActual !== ultimoHorario) {
                 ultimoHorario = horarioActual;
@@ -6394,14 +6394,26 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (L.ausente !== V.ausente && !esPlayoff) {
             const A = L.ausente ? L : V;
             const P = rivalDe(A);
-            // El que se presentó gana 3-0 siempre, pague o no: lo que no abonó le queda como deuda (decisión de Joaquín,
-            // 18/10/2026; antes tenía que abonar el 100%, con el 50% el partido quedaba suspendido y con menos perdía 2 puntos).
+            // Como dice el reglamento (Joaquín lo confirmó el 18/10/2026): el que se presentó gana 3-0 si abonó el 100%; con
+            // entre el 50% y el 100% el partido queda suspendido sin puntos; con menos queda como no presentado (-2 PTS).
             if (P.asistencia !== 'presente') {
-                ev.avisos.push({ tipo: 'info', texto: `Marcá "Se presentó" en ${P.nombre} para darle el 3-0. Mientras tanto, en la web el partido figura como "Resultado a definir".` });
-            } else {
+                ev.avisos.push({ tipo: 'info', texto: `Marcá "Se presentó" en ${P.nombre} (con sus pagos cargados) para resolver el partido. Mientras tanto, en la web figura como "Resultado a definir".` });
+            } else if (P.porcentaje >= 1) {
                 ev.ganadorAuto = P.lado;
-                ev.avisos.push({ tipo: 'ok', texto: `Resultado automático: 3-0 para ${P.nombre}. Corresponde asignarle un amistoso (Art. 17).`
-                    + (P.falta > 0 ? ` Le queda por abonar ${dinero(P.falta)} del derecho de partido.` : '') });
+                ev.avisos.push({ tipo: 'ok', texto: `Resultado automático: 3-0 para ${P.nombre}, que abonó el 100%. Corresponde asignarle un amistoso (Art. 17).` });
+            } else if (P.porcentaje >= 0.5) {
+                ev.suspendido = true;
+                ev.avisos.push({ tipo: 'info', texto: `Partido suspendido sin puntos para ninguno: ${P.nombre} abonó entre el 50% y el 100%. Con el 100% pasa a 3-0.` });
+            } else {
+                ev.suspendido = true;
+                ev.avisos.push({ tipo: 'alerta', texto: `${P.nombre} abonó menos del 50%: queda como equipo no presentado, pierde los puntos del partido y -${PUNTOS_QUITA_AUSENCIA} PTS en la tabla.` });
+            }
+            if (P.asistencia === 'presente' && !P.exento) {
+                ev.sanciones.push({
+                    t: P,
+                    activa: P.porcentaje < 0.5,
+                    motivo: `Fecha ${p.fecha} (vs ${A.nombre}): se presentó pero abonó menos del 50% del derecho de partido, por lo que queda como equipo no presentado (Art. 17 Bis).`
+                });
             }
         }
 
@@ -6425,7 +6437,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
             // Quién no se presentó, en el partido (que es público): así la web puede decir "no se presentó" y "Resultado a
             // definir" en vez de mostrarlo como un partido sin jugar. La asistencia y los pagos siguen solo en Tesorería.
-            const ausencia = ev.L.ausente || ev.V.ausente ? { local: !!ev.L.ausente, visitante: !!ev.V.ausente } : null;
+            const ausencia = ev.L.ausente || ev.V.ausente
+                ? Object.assign({ local: !!ev.L.ausente, visitante: !!ev.V.ausente }, ev.suspendido ? { suspendido: true } : {}) : null;
             if (JSON.stringify(p.ausencia || null) !== JSON.stringify(ausencia)) {
                 if (ausencia) p.ausencia = ausencia;
                 else delete p.ausencia;
