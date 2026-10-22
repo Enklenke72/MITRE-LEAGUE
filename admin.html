@@ -428,11 +428,21 @@
                     </div>
 
                     <button type="button" id="btn-fixture-auto" class="btn-submit-admin">Armar fixture</button>
+
+                    <h4 class="calendario-titulo">Fixture ya guardado</h4>
+                    <p class="calendario-ayuda">
+                        Muestra todas las fechas del ciclo elegido arriba con los partidos que ya están cargados. Podés pasar un partido sin jugar a otra fecha: los que haga falta para que nadie juegue dos veces se acomodan solos. Los partidos que se mueven quedan con horario, cancha y árbitro a confirmar.
+                    </p>
+                    <button type="button" id="btn-fixture-guardado" class="btn-submit-admin">Ver y corregir el fixture guardado</button>
                 </section>
 
                 <!-- VISTA PREVIA DEL FIXTURE AUTOMÁTICO (la arma admin.js) -->
                 <section id="fixture-auto-vista-previa" class="admin-card-panel fixture-auto-panel seccion-oculta-staff"
                     aria-label="Vista previa del fixture"></section>
+
+                <!-- FIXTURE YA GUARDADO, PARA PASAR PARTIDOS DE FECHA (lo arma admin.js) -->
+                <section id="fixture-guardado-panel" class="admin-card-panel fixture-auto-panel seccion-oculta-staff"
+                    aria-label="Fixture guardado"></section>
 
                 <!-- ARMADOR DE HORARIOS (vista previa abajo, en #horarios-auto-vista-previa) -->
                 <section class="admin-card-panel fixture-auto-bloque">
@@ -965,6 +975,58 @@
                         style="background:#0284c7; border-color:#23b1f0; color:white;">
                         GUARDAR CAMBIO DE GRUPO
                     </button>
+                </section>
+
+                <!-- REEMPLAZAR UN EQUIPO Y CAMBIAR SU NOMBRE (solo Coordinador; Art. 9 Bis del reglamento) -->
+                <section class="admin-card-panel solo-admin reemplazo-bloque" style="border-color: #f2c00e;">
+                    <h3 class="reemplazo-encabezado">Reemplazar un Equipo</h3>
+                    <p class="calendario-ayuda">
+                        Para un curso que sale del torneo (por ejemplo, descalificado). El curso nuevo entra en el mismo grupo y hereda sus puntos y estadísticas (Art. 9° Bis). No hereda su deuda ni sus quitas de puntos. Los partidos ya resueltos del equipo que sale siguen a su nombre.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ciclo</label>
+                            <select id="reemplazo-ciclo">
+                                <option value="superior">Superior</option>
+                                <option value="basico">Básico</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Equipo que sale</label>
+                            <select id="reemplazo-equipo"></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre del curso que entra</label>
+                        <input type="text" id="reemplazo-nombre" maxlength="40" placeholder="Ej: 4to 7ma" autocomplete="off">
+                    </div>
+                    <button type="button" id="btn-reemplazo-ver" class="btn-submit-admin turnos-btn-guardar">Ver qué va a pasar</button>
+                    <div id="reemplazo-vista-previa" class="reemplazo-vista-previa seccion-oculta-staff"></div>
+                </section>
+
+                <section class="admin-card-panel solo-admin reemplazo-bloque" style="border-color: #f2c00e;">
+                    <h3 class="reemplazo-encabezado">Cambiar el Nombre de un Equipo</h3>
+                    <p class="calendario-ayuda">
+                        Corrige el curso de un equipo. Conserva su plantel, sus pagos y su inscripción, y cambia el nombre en todos sus partidos (también los jugados), sanciones, cruces y pedidos.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ciclo</label>
+                            <select id="renombrar-ciclo">
+                                <option value="superior">Superior</option>
+                                <option value="basico">Básico</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Equipo</label>
+                            <select id="renombrar-equipo"></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre nuevo</label>
+                        <input type="text" id="renombrar-nombre" maxlength="40" autocomplete="off">
+                    </div>
+                    <button type="button" id="btn-renombrar-equipo" class="btn-submit-admin turnos-btn-guardar">Cambiar nombre</button>
                 </section>
 
                 <!-- BLOQUE EQUIPOS CARGADOS (listado por ciclo, con baja directa) -->

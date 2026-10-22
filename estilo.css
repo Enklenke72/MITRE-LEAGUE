@@ -3034,10 +3034,7 @@ body.scrolled .dashboard-container section {
     font-family: 'Oswald', sans-serif;
     font-size: 9px;
     font-weight: normal;
-    letter-spacing: 0.5px;
-    color: #f2c00e;
-    text-transform: uppercase;
-    white-space: nowrap;
+    color: rgba(134, 155, 216, 0.75);
 }
 
 .resultado-auto-banner {
@@ -3049,6 +3046,15 @@ body.scrolled .dashboard-container section {
     color: #f2c00e;
     font-family: 'Oswald', sans-serif;
     font-size: 11px;
+    text-align: center;
+}
+
+/* Un equipo reemplazado por otro (Art. 9 Bis): nota chica bajo el partido que jugó el reemplazado */
+.reemplazo-banner {
+    margin: 4px 0 0;
+    color: #869bd8;
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
     text-align: center;
 }
 
@@ -6200,6 +6206,43 @@ body.auth-pendiente .auth-gate {
 .capitanes-faltan { margin: 0; padding-left: 18px; line-height: 1.5; color: #fda4af; }
 .capitanes-faltan strong { color: #f43f5e; }
 #btn-exportar-capitanes:disabled { opacity: 0.6; cursor: wait; }
+
+/* Reemplazar un equipo y cambiar su nombre (Planteles → Gestión de Equipos; solo Coordinador) */
+.reemplazo-bloque { min-width: 0; align-self: start; text-align: left; }
+.reemplazo-jugador select,
+.mover-jugador-caja select {
+    padding: 6px 8px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background-color: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+}
+.reemplazo-encabezado { margin-top: 0; color: #f2c00e; }
+.reemplazo-vista-previa { margin-top: 14px; min-width: 0; font-size: 12px; color: #cbd5e1; overflow-wrap: anywhere; }
+.reemplazo-vista-previa h4 { margin: 14px 0 6px; font-size: 12px; color: #2edae3; }
+.reemplazo-vista-previa ul { margin: 0 0 6px; padding-left: 18px; line-height: 1.5; }
+.reemplazo-bloqueo { margin: 0 0 8px; color: #f43f5e; }
+.reemplazo-aviso { margin: 0 0 8px; color: #f2c00e; }
+.reemplazo-problemas:empty { display: none; }
+.reemplazo-jugador {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    border-left: 3px solid #2edae3;
+    border-radius: 3px;
+    background: rgba(4, 12, 38, 0.55);
+}
+.reemplazo-jugador > span { flex: 1 1 140px; min-width: 0; }
+.reemplazo-jugador select { flex: 1 1 160px; min-width: 0; min-height: 36px; }
+.reemplazo-botones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.reemplazo-botones .btn-submit-admin { width: auto; min-height: 44px; }
+.fila-mover-jugador td { padding: 8px; background: rgba(4, 12, 38, 0.55); }
+.mover-jugador-caja { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: center; }
+.mover-jugador-caja select { flex: 1 1 180px; min-width: 0; min-height: 40px; }
 
 @media (max-width: 800px) {
     .calendario-input { min-height: 44px; font-size: 16px; }

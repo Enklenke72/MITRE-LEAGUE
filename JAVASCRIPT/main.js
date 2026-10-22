@@ -378,6 +378,7 @@ document.addEventListener('liga:datos-listos', () => {
                         <span class="score" style="color: #2edae3; font-weight: bold;">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}${etiquetaAusencia(partido)}</span>
                         <span class="team-name">${escaparHtml(partido.visitante)}</span>
                     </div>
+                    ${bannerReemplazo(partido)}
                 `;
             } else {
                 contenedor.innerHTML += `
@@ -390,6 +391,7 @@ document.addEventListener('liga:datos-listos', () => {
                         </span>
                         <span class="team-name">${escaparHtml(partido.visitante)}</span>
                     </div>
+                    ${bannerReemplazo(partido)}
                 `;
             }
         });
@@ -1574,6 +1576,7 @@ document.addEventListener('liga:datos-listos', () => {
                                 Partido programado. Presentar DNI en mesa de control 15 min antes.
                             </div>
                         `)}
+                        ${bannerReemplazo(partido)}
                     </div>
 
                 </div>
@@ -1812,10 +1815,12 @@ document.addEventListener('liga:datos-listos', () => {
                     const partidosCrudos = almacen.getItem('liga_partidos');
                     const partidos = partidosCrudos ? JSON.parse(partidosCrudos) : (ligaData.partidos || []);
 
-                    // 2. Filtramos los partidos del equipo buscado
+                    // 2. Filtramos los partidos del equipo buscado, y los de los equipos que reemplazó (Art. 9 Bis)
+                    const equipoBuscado = [...ligaData.cicloSuperior, ...ligaData.cicloBasico].find(eq => eq.nombre.trim().toLowerCase() === nombreEquipo.trim().toLowerCase());
+                    const nombresBuscados = [nombreEquipo, ...((equipoBuscado && equipoBuscado.reemplazaA) || []).map(r => r.nombre)].map(n => String(n).trim().toLowerCase());
                     const partidosDelEquipo = partidos.filter(p =>
-                        p.local.trim().toLowerCase() === nombreEquipo.trim().toLowerCase() ||
-                        p.visitante.trim().toLowerCase() === nombreEquipo.trim().toLowerCase()
+                        nombresBuscados.includes(p.local.trim().toLowerCase()) ||
+                        nombresBuscados.includes(p.visitante.trim().toLowerCase())
                     );
 
                     // 3. Si no tiene partidos cargados, mostramos aviso
@@ -1854,7 +1859,8 @@ document.addEventListener('liga:datos-listos', () => {
                             let tarjetaTarget = null;
 
                             tarjetas.forEach(card => {
-                                if (card.textContent.toLowerCase().includes(nombreEquipo.toLowerCase())) {
+                                const equiposDeLaTarjeta = [...card.querySelectorAll('.team-name')].map(s => s.textContent.trim().toLowerCase());
+                                if (nombresBuscados.some(n => equiposDeLaTarjeta.includes(n))) {
                                     tarjetaTarget = card;
                                 }
                             });
@@ -2214,7 +2220,7 @@ document.addEventListener('liga:datos-listos', () => {
             const ganoLocal = Number(partido.golesLocal) > Number(partido.golesVisitante);
             const ganador = ganoLocal ? partido.local : partido.visitante;
             const perdedor = ganoLocal ? partido.visitante : partido.local;
-            return { etiqueta: '3-0 automático', texto: `${perdedor} no se presentó: se le dio ganado 3-0 a ${ganador} (Art. 17 Bis).` };
+            return { etiqueta: `No se presentó ${perdedor}`, texto: `${perdedor} no se presentó: se le dio ganado 3-0 a ${ganador} (Art. 17 Bis).` };
         }
         const a = partido.ausencia;
         if (!a || partido.jugado || !(a.local || a.visitante)) return null;
@@ -2224,6 +2230,27 @@ document.addEventListener('liga:datos-listos', () => {
         // El rival se presentó pero no abonó el 100%: el reglamento lo deja suspendido, sin puntos.
         if (a.suspendido) return { etiqueta: 'Suspendido', texto: `${ausente} no se presentó. Partido suspendido, sin puntos para ninguno (Art. 17 Bis).` };
         return { etiqueta: 'Resultado a definir', texto: `${ausente} no se presentó. Resultado a definir (Art. 17 Bis).` };
+    }
+    // Reemplazo de un equipo (Art. 9 Bis; Hecho #49): el que fue descalificado ya no está en los planteles, pero sus
+    // partidos ya resueltos siguen a su nombre y suman al equipo que entró en su lugar (campo "reemplazaA").
+    // Devuelve los equipos de este partido que fueron reemplazados, con el que los reemplazó.
+    function reemplazosDelPartido(partido) {
+        const pool = partido.ciclo === 'basico' ? ligaData.cicloBasico : ligaData.cicloSuperior;
+        const reemplazos = [];
+        [partido.local, partido.visitante].forEach(nombre => {
+            const buscado = String(nombre || '').trim();
+            if (pool.some(e => e.nombre.trim() === buscado)) return;
+            const nuevo = pool.find(e => (e.reemplazaA || []).some(r => String(r.nombre || '').trim() === buscado));
+            if (nuevo) reemplazos.push({ viejo: buscado, nuevo });
+        });
+        return reemplazos;
+    }
+    // Con el perfil del que reemplazó abierto, el partido se cuenta como suyo: "Lo jugó D, antes del reemplazo".
+    function bannerReemplazo(partido, equipoPerfil) {
+        return reemplazosDelPartido(partido).map(({ viejo, nuevo }) => `<div class="reemplazo-banner">${escaparHtml(
+            equipoPerfil && equipoPerfil.id === nuevo.id
+                ? `Lo jugó ${viejo}, antes del reemplazo (Art. 9 Bis).`
+                : `${viejo} fue reemplazado por ${nuevo.nombre} (Art. 9 Bis).`)}</div>`).join('');
     }
     function etiquetaAusencia(partido) {
         const e = estadoAusencia(partido);
@@ -2305,10 +2332,12 @@ document.addEventListener('liga:datos-listos', () => {
         const partidosDinamicos = JSON.parse(almacen.getItem('liga_partidos')) || ligaData.partidos;
         const sancionesDinamicas = JSON.parse(almacen.getItem('liga_sanciones')) || [];
 
+        // También los partidos de los equipos que este reemplazó (Art. 9 Bis): los jugaron ellos, pero cuentan en su tabla.
+        const nombresPropios = [equipo.nombre, ...(equipo.reemplazaA || []).map(r => r.nombre)].map(n => String(n).trim().toLowerCase());
         let misPartidos = partidosDinamicos.filter(p =>
             p.localId === equipo.id || p.visitanteId === equipo.id || // ID estable primero (sobrevive a un cambio de nombre)
-            p.local.trim().toLowerCase() === equipo.nombre.trim().toLowerCase() ||
-            p.visitante.trim().toLowerCase() === equipo.nombre.trim().toLowerCase()
+            nombresPropios.includes(p.local.trim().toLowerCase()) ||
+            nombresPropios.includes(p.visitante.trim().toLowerCase())
         );
 
         if (misPartidos.length === 0) {
@@ -2394,6 +2423,7 @@ document.addEventListener('liga:datos-listos', () => {
                                 </div>
                             `)}
 
+                            ${bannerReemplazo(partido, equipo)}
                             ${htmlSancion}
                         </div>
 

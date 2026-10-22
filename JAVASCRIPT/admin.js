@@ -1592,6 +1592,209 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
+    // ── Fixture ya guardado (pedido de Joaquín, 22/10/2026): la vista previa del fixture se cierra al confirmarlo, y
+    // después un equipo pidió cambiar de fecha. Muestra los partidos de fase de grupos guardados del ciclo y deja pasar
+    // uno sin jugar a otra fecha con la misma lógica de la vista previa (planMoverPartido: se mueven también los que
+    // hagan falta para que nadie juegue dos veces). Un partido jugado o con un ausente marcado no se mueve. Los que se
+    // mueven quedan con horario, cancha y árbitro a confirmar y el día del calendario de su fecha nueva (Joaquín).
+    const btnFixtureGuardado = document.getElementById('btn-fixture-guardado');
+    const panelFixtureGuardado = document.getElementById('fixture-guardado-panel');
+    let fixtureGuardado = null;
+
+    const partidoFijoEnFixture = p => !!(p.jugado || p.ausencia);
+
+    function armarFixtureGuardado(ciclo) {
+        recargarPools();
+        const pool = ciclo === 'basico' ? poolBasico : poolSuperior;
+        const gruposCiclo = gruposTorneo[ciclo] || [];
+        const deFase = partidos.filter(p => p && p.local && p.visitante && (p.ciclo || 'superior') === ciclo && !p.esPlayoff && Number(p.fecha) < 100);
+        if (!deFase.length) {
+            return { bloqueo: `El ciclo ${nombreCicloHistorial(ciclo)} todavía no tiene partidos de fase de grupos guardados.` };
+        }
+        const nuevos = deFase.map(p => ({
+            id: p.id, fecha: Number(p.fecha), fechaOriginal: Number(p.fecha), grupo: p.grupo,
+            local: p.local, visitante: p.visitante, localId: p.localId, visitanteId: p.visitanteId,
+            horario: p.horario || '', cancha: p.cancha || '', fijo: partidoFijoEnFixture(p)
+        })).sort((a, b) => a.fecha - b.fecha);
+        return {
+            ciclo, nuevos, pedidos: [],
+            configuradas: Math.max(obtenerFechasGrupos()[ciclo] || 0, ...nuevos.map(p => p.fecha)),
+            equiposPorGrupo: Object.fromEntries(gruposCiclo.map(g => [g, pool.filter(e => e.grupo === g)
+                .map(e => ({ id: e.id !== undefined ? e.id : null, nombre: e.nombre }))]))
+        };
+    }
+
+    function renderizarFixtureGuardado() {
+        if (!panelFixtureGuardado || !fixtureGuardado) return;
+        const f = fixtureGuardado;
+        const problemas = problemasFixture(f);
+        const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+        const movidos = f.nuevos.filter(p => p.fecha !== p.fechaOriginal);
+        const opcionesFecha = elegida => Array.from({ length: f.configuradas }, (_, n) => n + 1)
+            .map(n => `<option value="${n}"${n === elegida ? ' selected' : ''}>Fecha ${n}</option>`).join('');
+        const htmlCruce = (p, i) => {
+            const avisos = problemas.porPartido[i];
+            const donde = p.fecha !== p.fechaOriginal ? 'a confirmar' : [p.horario ? p.horario + ' hs' : '', p.cancha].filter(Boolean).join(' · ');
+            return `<li class="fixture-auto-cruce${avisos.length ? ' fixture-auto-con-problema' : ''}">
+                <span class="fixture-auto-grupo">${p.grupo === 'Interzonal' ? 'Interzonal' : `Grupo ${attrSeguro(p.grupo)}`}${p.fecha !== p.fechaOriginal ? ` · <span class="fixture-auto-corregido">movido (era Fecha ${p.fechaOriginal})</span>` : ''}</span>
+                <span class="fixture-auto-equipos">${attrSeguro(p.local)} <span class="fixture-auto-vs">vs</span> ${attrSeguro(p.visitante)}${donde ? ` <span class="fixture-auto-sin-dia">(${attrSeguro(donde)})</span>` : ''}</span>
+                ${p.fijo
+                    ? '<span class="fixture-auto-mover">Ya jugado: no se mueve</span>'
+                    : `<label class="fixture-auto-mover">Pasar a
+                        <select class="fixture-auto-sel fixture-auto-sel-fecha" data-i="${i}" aria-label="Pasar a otra fecha">${opcionesFecha(p.fecha)}</select>
+                    </label>`}
+                ${avisos.map(a => `<span class="fixture-auto-problema">${attrSeguro(a)}</span>`).join('')}
+            </li>`;
+        };
+        const numerosFecha = [...new Set(f.nuevos.map(p => p.fecha))].sort((a, b) => a - b);
+        const porFecha = numerosFecha.map(fecha => {
+            const dia = diaDeCalendario(f.ciclo, fecha);
+            const cruces = f.nuevos.map((p, i) => (p.fecha === fecha ? htmlCruce(p, i) : '')).filter(Boolean);
+            const libres = libresDeFecha(f, fecha).map(l =>
+                `<li class="fixture-auto-cruce fixture-auto-libre"><span class="fixture-auto-grupo">Grupo ${attrSeguro(l.grupo)} — </span>Libre: ${attrSeguro(l.nombre)}</li>`);
+            return `<div class="fixture-auto-fecha" data-fecha="${fecha}">
+                <h4 class="fixture-auto-fecha-titulo">Fecha ${fecha} · ${dia ? attrSeguro(dia) : '<span class="fixture-auto-sin-dia">sin día en el calendario</span>'}</h4>
+                <ul class="fixture-auto-cruces">${[...cruces, ...libres].join('')}</ul>
+            </div>`;
+        }).join('');
+        const avisosArriba = problemas.cantidad
+            ? `<div class="fixture-auto-problemas">
+                <strong>${plural(problemas.cantidad, 'aviso', 'avisos')} para revisar.</strong>
+                ${problemas.generales.length ? `<ul>${problemas.generales.map(g => `<li>${attrSeguro(g)}</li>`).join('')}</ul>` : ''}
+            </div>`
+            : '';
+        panelFixtureGuardado.innerHTML = `
+            <h3 class="fixture-auto-titulo">Fixture guardado — Ciclo ${nombreCicloHistorial(f.ciclo)}</h3>
+            <p class="fixture-auto-texto"><strong>${plural(f.nuevos.length, 'partido', 'partidos')} de fase de grupos en ${plural(numerosFecha.length, 'fecha', 'fechas')}.</strong></p>
+            <p class="fixture-auto-nota">${movidos.length
+                ? `Hay ${plural(movidos.length, 'partido movido', 'partidos movidos')} sin guardar. Al guardar quedan con horario, cancha y árbitro a confirmar: después acomodalos con el Armador de Horarios.`
+                : 'Elegí en "Pasar a" la fecha nueva de un partido. Antes de mover te dice qué otros partidos se mueven para que nadie juegue dos veces. No se guarda nada hasta tocar "Guardar cambios".'}</p>
+            ${avisosArriba}
+            <div class="fixture-auto-fechas">${porFecha}</div>
+            <div class="fixture-auto-botones">
+                <button type="button" class="importar-btn-cancelar" data-accion="cancelar">${movidos.length ? 'Descartar cambios' : 'Cerrar'}</button>
+                ${movidos.length ? `<button type="button" class="btn-submit-admin" data-accion="guardar">Guardar cambios (${plural(movidos.length, 'partido', 'partidos')})</button>` : ''}
+            </div>`;
+        panelFixtureGuardado.classList.remove('seccion-oculta-staff');
+    }
+
+    function cerrarFixtureGuardado() {
+        fixtureGuardado = null;
+        if (panelFixtureGuardado) {
+            panelFixtureGuardado.innerHTML = '';
+            panelFixtureGuardado.classList.add('seccion-oculta-staff');
+        }
+    }
+
+    function guardarFixtureGuardado() {
+        const f = fixtureGuardado;
+        const movidos = f.nuevos.filter(p => p.fecha !== p.fechaOriginal);
+        if (!movidos.length) return;
+        // Mientras el panel estaba abierto otro pudo cargar un resultado o mover un partido (los partidos llegan en vivo).
+        const cambiados = movidos.filter(m => {
+            const p = partidos.find(x => x && x.id === m.id);
+            return !p || Number(p.fecha) !== m.fechaOriginal || partidoFijoEnFixture(p);
+        });
+        if (cambiados.length) {
+            fixtureGuardado = armarFixtureGuardado(f.ciclo);
+            if (fixtureGuardado.bloqueo) cerrarFixtureGuardado();
+            else renderizarFixtureGuardado();
+            alert('Mientras tanto alguien cambió alguno de esos partidos (se jugó, se borró o ya cambió de fecha). Se volvió a cargar el fixture: hacé el cambio de nuevo. No se guardó nada.');
+            return;
+        }
+        const problemas = problemasFixture(f);
+        if (problemas.cantidad && !confirm(`El fixture queda con ${problemas.cantidad} ${problemas.cantidad === 1 ? 'aviso' : 'avisos'} (marcados en rojo). ¿Guardar igual?`)) return;
+
+        const planes = [];
+        const textos = [];
+        movidos.forEach(m => {
+            const p = partidos.find(x => x && x.id === m.id);
+            const nuevo = { ...p, fecha: m.fecha, dia: diaDeCalendario(f.ciclo, m.fecha) || '', horario: '', cancha: '', arbitro: 'Por asignar' };
+            planes.push(planTesoreriaPartido(p, nuevo));
+            textos.push(`${p.local} vs ${p.visitante} (Fecha ${m.fechaOriginal} → Fecha ${m.fecha})`);
+            Object.assign(p, { fecha: nuevo.fecha, dia: nuevo.dia, horario: '', cancha: '', arbitro: 'Por asignar' });
+        });
+        almacen.setItem('liga_partidos', JSON.stringify(partidos));
+        planes.forEach(aplicarPlanTesoreria);
+        registrarHistorial('partido', `pasó de fecha ${movidos.length} ${movidos.length === 1 ? 'partido' : 'partidos'} de FASE DE GRUPOS (${nombreCicloHistorial(f.ciclo)}), con horario y cancha a confirmar: ${textos.join(', ')}`);
+
+        actualizarListaAdmin();
+        actualizarSelectFechasCronograma();
+        armarOpcionesFechaHorarios();
+        if (typeof actualizarFiltroFechasTesoreria === 'function') actualizarFiltroFechasTesoreria();
+        fixtureGuardado = armarFixtureGuardado(f.ciclo);
+        renderizarFixtureGuardado();
+        alert(`Listo: ${movidos.length === 1 ? 'se pasó 1 partido' : `se pasaron ${movidos.length} partidos`} de fecha. Quedan con horario, cancha y árbitro a confirmar: acomodalos con el Armador de Horarios.`);
+    }
+
+    if (btnFixtureGuardado && panelFixtureGuardado) {
+        btnFixtureGuardado.addEventListener('click', () => {
+            if (fixtureGuardado && fixtureGuardado.nuevos.some(p => p.fecha !== p.fechaOriginal)
+                && !confirm('Hay partidos movidos sin guardar. ¿Descartarlos y volver a cargar el fixture?')) return;
+            const resultado = armarFixtureGuardado(selectCicloFixture ? selectCicloFixture.value : 'superior');
+            if (resultado.bloqueo) {
+                cerrarFixtureGuardado();
+                alert(resultado.bloqueo);
+                return;
+            }
+            fixtureGuardado = resultado;
+            renderizarFixtureGuardado();
+            panelFixtureGuardado.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        panelFixtureGuardado.addEventListener('click', (e) => {
+            const boton = e.target.closest('[data-accion]');
+            if (!boton || !fixtureGuardado) return;
+            if (boton.dataset.accion === 'cancelar') cerrarFixtureGuardado();
+            else if (boton.dataset.accion === 'guardar') guardarFixtureGuardado();
+        });
+
+        panelFixtureGuardado.addEventListener('change', (e) => {
+            const sel = e.target.closest('select.fixture-auto-sel-fecha');
+            if (!sel || !fixtureGuardado) return;
+            const f = fixtureGuardado;
+            const indice = Number(sel.dataset.i);
+            const p = f.nuevos[indice];
+            if (!p) return;
+            const plan = planMoverPartido(f, indice, Number(sel.value));
+            if (plan.destino === plan.origen) return;
+            const todos = [...plan.aDestino, ...plan.aOrigen];
+            const fijos = todos.filter(k => f.nuevos[k].fijo);
+            if (fijos.length) {
+                alert(`No se puede pasar ${p.local} vs ${p.visitante} a la Fecha ${plan.destino}: para que nadie juegue dos veces también habría que mover partidos que ya se jugaron:\n\n`
+                    + fijos.map(k => `• ${f.nuevos[k].local} vs ${f.nuevos[k].visitante} (Fecha ${f.nuevos[k].fecha})`).join('\n'));
+                renderizarFixtureGuardado();
+                return;
+            }
+            const textoMovido = (k, de, a) => `• ${f.nuevos[k].local} vs ${f.nuevos[k].visitante} (Fecha ${de} → Fecha ${a})`;
+            const otros = [
+                ...plan.aDestino.filter(k => k !== indice).map(k => textoMovido(k, plan.origen, plan.destino)),
+                ...plan.aOrigen.map(k => textoMovido(k, plan.destino, plan.origen))
+            ];
+            if (otros.length && !confirm(`Para que nadie juegue dos veces en la misma fecha, al pasar ${p.local} vs ${p.visitante} a la Fecha ${plan.destino} también se mueven:\n\n${otros.join('\n')}\n\n¿Hacer el cambio? (Todavía no se guarda.)`)) {
+                renderizarFixtureGuardado();
+                return;
+            }
+            [[plan.aDestino, plan.destino], [plan.aOrigen, plan.origen]].forEach(([indices, fecha]) => indices.forEach(k => {
+                f.nuevos[k].fecha = fecha;
+            }));
+            renderizarFixtureGuardado();
+        });
+
+        if (selectCicloFixture) {
+            selectCicloFixture.addEventListener('change', () => {
+                if (!fixtureGuardado || fixtureGuardado.ciclo === selectCicloFixture.value) return;
+                if (fixtureGuardado.nuevos.some(p => p.fecha !== p.fechaOriginal)) {
+                    alert(`Hay partidos movidos sin guardar en el fixture de ${nombreCicloHistorial(fixtureGuardado.ciclo)}: guardalos o descartalos antes de cambiar de ciclo.`);
+                    selectCicloFixture.value = fixtureGuardado.ciclo;
+                    selectCicloFixture.dispatchEvent(new Event('change')); // los pedidos y el resto vuelven al ciclo del panel
+                    return;
+                }
+                cerrarFixtureGuardado();
+            });
+        }
+    }
+
     // ── Armador de horarios (pedido de Joaquín, 16/10/2026): acomoda en los turnos y las canchas los partidos de una
     // fecha que tienen horario o cancha a confirmar, como mucho 3 por turno (uno por cancha). Lo que ya está acomodado a
     // mano queda fijo. Los dos ciclos juntos, como la hoja de horarios. El árbitro sale de la cancha: cada fecha tiene
@@ -3513,6 +3716,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             actualizarChecksCiclosActivos();
             renderizarEquiposCargados();
             renderizarCapitanes();
+            armarOpcionesReemplazo();
         });
     }
 
@@ -3841,6 +4045,450 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
+    // ── Reemplazar un equipo y cambiarle el nombre (Hecho #49, solo Coordinador) ──
+    // Art. 9 Bis: el curso que entra ocupa el lugar del que sale en su mismo grupo y hereda sus puntos y estadísticas.
+    // No se borra el equipo que sale de la historia: sus partidos ya resueltos (jugados, con ausencia o con asistencia
+    // marcada en Tesorería) quedan a su nombre y su id, así la web sigue diciendo que el que no se presentó fue él y sus
+    // pagos y su quita siguen donde estaban. El nuevo guarda "reemplazaA" y la tabla le suma esos partidos
+    // (equipoDeNombre, playoffs.js). Los partidos que todavía no se jugaron pasan al equipo nuevo.
+    const reemplazoCiclo = document.getElementById('reemplazo-ciclo');
+    const reemplazoEquipo = document.getElementById('reemplazo-equipo');
+    const reemplazoNombre = document.getElementById('reemplazo-nombre');
+    const btnReemplazoVer = document.getElementById('btn-reemplazo-ver');
+    const reemplazoPanel = document.getElementById('reemplazo-vista-previa');
+    const renombrarCiclo = document.getElementById('renombrar-ciclo');
+    const renombrarEquipo = document.getElementById('renombrar-equipo');
+    const renombrarNombre = document.getElementById('renombrar-nombre');
+    const btnRenombrarEquipo = document.getElementById('btn-renombrar-equipo');
+    let reemplazo = null; // vista previa abierta: {ciclo, idEquipo, nombre, destinos: {indice del jugador: 'baja' | 'ciclo|id'}, firma}
+
+    const esCoordinadorPanel = () => usuarioPanel.rol === 'coordinador';
+    const minusculas = texto => String(texto || '').trim().toLowerCase();
+    const poolDeCiclo = ciclo => (ciclo === 'basico' ? poolBasico : poolSuperior);
+
+    function armarOpcionesReemplazo() {
+        if (!esCoordinadorPanel()) return;
+        recargarPools();
+        [[reemplazoCiclo, reemplazoEquipo], [renombrarCiclo, renombrarEquipo]].forEach(([selCiclo, selEquipo]) => {
+            if (!selCiclo || !selEquipo) return;
+            const elegido = selEquipo.value;
+            const pool = poolDeCiclo(selCiclo.value).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+            selEquipo.innerHTML = pool.length === 0
+                ? '<option value="">Sin equipos cargados</option>'
+                : pool.map(eq => `<option value="${attrSeguro(eq.id)}">${attrSeguro(eq.nombre)} (${attrSeguro(textoGrupoHistorial(eq.grupo || 'A'))})</option>`).join('');
+            if ([...selEquipo.options].some(o => o.value === elegido)) selEquipo.value = elegido;
+        });
+    }
+
+    function releerDatosDeEquipos() {
+        recargarPools();
+        partidos = JSON.parse(almacen.getItem('liga_partidos')) || [];
+        tesoreriaPartidos = JSON.parse(almacen.getItem('liga_tesoreria_partidos_v2')) || {};
+        listaSanciones = JSON.parse(almacen.getItem('liga_sanciones')) || [];
+        crucesPlayoffs = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
+    }
+
+    // En qué lados de un partido juega el equipo: por id si el partido lo trae, y por nombre solo en los viejos.
+    function ladosDeEquipoEnPartido(p, eq) {
+        const es = (id, nombre) => (id != null ? id === eq.id : minusculas(nombre) === minusculas(eq.nombre));
+        return { local: es(p.localId, p.local), visita: es(p.visitanteId, p.visitante) };
+    }
+
+    function partidosDeEquipo(ciclo, eq) {
+        return partidos
+            .filter(p => p && p.local && p.visitante && (p.ciclo || 'superior') === ciclo)
+            .map(p => ({ p, lados: ladosDeEquipoEnPartido(p, eq) }))
+            .filter(x => x.lados.local || x.lados.visita);
+    }
+
+    // Un nombre de curso sirve si no está vacío ni lo tiene otro equipo del ciclo, ni lo tuvo uno ya reemplazado
+    // (la tabla busca los partidos viejos por ese nombre). "ignorarId" es el equipo que se está renombrando.
+    function problemaDeNombreDeEquipo(ciclo, nombre, ignorarId) {
+        const buscado = minusculas(nombre);
+        if (!buscado) return 'Escribí el nombre del curso.';
+        const pool = poolDeCiclo(ciclo);
+        if (pool.some(e => e.id !== ignorarId && minusculas(e.nombre) === buscado)) return `Ya hay un equipo "${nombre.trim()}" en este ciclo.`;
+        if (pool.some(e => (e.reemplazaA || []).some(r => minusculas(r.nombre) === buscado))) {
+            return `"${nombre.trim()}" es el nombre de un equipo que ya fue reemplazado en este ciclo: usá otro.`;
+        }
+        return '';
+    }
+
+    const clavesFixtureDe = eq => [claveEquipoFixture(eq.id, eq.nombre), claveEquipoFixture(null, eq.nombre)];
+
+    function obtenerDesempatesDeSorteo() {
+        try { return JSON.parse(almacen.getItem('liga_desempates_sorteo')) || {}; } catch (e) { return {}; }
+    }
+
+    // Qué pasaría al reemplazar a un equipo (no escribe nada). Relee los datos: se usa en la vista previa y de nuevo al confirmar.
+    function planReemplazo(ciclo, idEquipo, nombreNuevo, destinos) {
+        releerDatosDeEquipos();
+        const D = poolDeCiclo(ciclo).find(e => String(e.id) === String(idEquipo));
+        const plan = { ciclo, D, nombre: String(nombreNuevo || '').trim().replace(/\s+/g, ' '), errores: [], avisos: [], quedan: [], pasan: [], bloqueosTeso: [], jugadores: [], pedidosFixture: 0, pedidosHorario: 0, desempate: false };
+        if (!D) { plan.errores.push('No encontré el equipo que sale: recargá la página.'); return plan; }
+
+        const errorNombre = problemaDeNombreDeEquipo(ciclo, plan.nombre);
+        if (errorNombre) plan.errores.push(errorNombre);
+
+        const delEquipo = partidosDeEquipo(ciclo, D);
+        const nombreD = minusculas(D.nombre);
+        const enCruces = crucesPlayoffs.some(c => c.ciclo === ciclo && (minusculas(c.local) === nombreD || minusculas(c.visitante) === nombreD));
+        if (enCruces || delEquipo.some(x => x.p.esPlayoff)) {
+            plan.errores.push(`${D.nombre} ya está en los playoffs: el reemplazo todavía no lo resuelve.`);
+        }
+
+        // Los de D que ya se resolvieron (jugados, con ausencia o con asistencia marcada) quedan a su nombre; el resto pasa al nuevo.
+        delEquipo.forEach(({ p, lados }) => {
+            const ladoD = lados.local ? 'local' : 'visita';
+            const rival = ladoD === 'local' ? p.visitante : p.local;
+            const previo = { ...p };
+            if (lados.local && previo.localId == null) previo.localId = D.id;
+            if (lados.visita && previo.visitanteId == null) previo.visitanteId = D.id;
+            const datosD = tesoreriaPartidos[claveTesoreria(previo, ladoD)] || {};
+            const tildados = (ladoD === 'local' ? p.asistentesLocal : p.asistentesVisitante) || [];
+            const resuelto = p.jugado || p.resultadoAuto || (p.ausencia && (p.ausencia.local || p.ausencia.visitante)) || datosD.asistencia || tildados.length > 0;
+            const descripcion = { id: p.id, texto: `${nombreFasePartido(p)}: contra ${rival}${p.jugado ? ` (${p.golesLocal}-${p.golesVisitante})` : ''}` };
+            if (resuelto) { plan.quedan.push(descripcion); return; }
+            const nuevo = { ...previo };
+            if (ladoD === 'local') { nuevo.local = plan.nombre; nuevo.localId = 'nuevo'; } else { nuevo.visitante = plan.nombre; nuevo.visitanteId = 'nuevo'; }
+            const planTeso = planTesoreriaPartido(previo, nuevo);
+            plan.bloqueosTeso.push(...planTeso.bloqueos);
+            plan.pasan.push({ ...descripcion, ladoD });
+        });
+
+        // Los jugadores de D: baja (por defecto) o pasar a otro equipo, sin pasar por la regla de "jugó con su equipo".
+        const dorsalesDelDestino = new Map();
+        const cuenta = new Map();
+        const destinoDe = (cicloDestino, idDestino) => poolDeCiclo(cicloDestino).find(e => String(e.id) === String(idDestino) && e !== D);
+        (D.jugadores || []).forEach((j, idx) => {
+            const elegido = (destinos && destinos[idx]) || 'baja';
+            const item = { idx, j, destino: elegido, eqDestino: null };
+            plan.jugadores.push(item);
+            if (elegido === 'baja') return;
+            const [cicloDestino, idDestino] = elegido.split('|');
+            const eq = destinoDe(cicloDestino, idDestino);
+            if (!eq) { plan.errores.push(`No encontré el equipo al que pasa ${j.nombre}: elegí otro destino.`); return; }
+            item.eqDestino = eq;
+            const clave = cicloDestino + '|' + eq.id;
+            if (!dorsalesDelDestino.has(clave)) {
+                dorsalesDelDestino.set(clave, new Map((eq.jugadores || []).filter(x => x.dorsal !== undefined && x.dorsal !== null && String(x.dorsal).trim() !== '').map(x => [Number(x.dorsal), x.nombre])));
+                cuenta.set(clave, (eq.jugadores || []).length);
+            }
+            const tomados = dorsalesDelDestino.get(clave);
+            if (j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '') {
+                if (tomados.has(Number(j.dorsal))) {
+                    plan.errores.push(`El número ${j.dorsal} de ${j.nombre} ya lo tiene ${tomados.get(Number(j.dorsal))} en ${eq.nombre}: cambiale el número con Editar en el plantel de ${D.nombre}, o elegí otro destino.`);
+                } else {
+                    tomados.set(Number(j.dorsal), j.nombre);
+                }
+            }
+            cuenta.set(clave, cuenta.get(clave) + 1);
+            if (cuenta.get(clave) === MAX_JUGADORES_LISTA + 1) plan.avisos.push(`${eq.nombre} va a quedar con más de ${MAX_JUGADORES_LISTA} jugadores (el reglamento permite ${MAX_JUGADORES_LISTA} en la lista).`);
+        });
+
+        const clavesD = clavesFixtureDe(D);
+        plan.pedidosFixture = obtenerPedidosFixture().filter(pd => pd.ciclo === ciclo && (clavesD.includes(pd.a) || clavesD.includes(pd.b))).length;
+        plan.pedidosHorario = obtenerPedidosHorario().filter(pd => pd.ciclo === ciclo && clavesD.includes(pd.equipo)).length;
+        plan.desempate = (obtenerDesempatesDeSorteo()[ciclo] || {})[String(D.id)] !== undefined;
+        return plan;
+    }
+
+    const firmaDeReemplazo = plan => JSON.stringify([plan.D ? plan.D.id : null, plan.quedan.map(x => x.id), plan.pasan.map(x => x.id), plan.jugadores.map(x => x.j.dni)]);
+
+    function textoBloqueoReemplazo(plan) {
+        return `${plan.D.nombre} tiene plata cargada en partidos que pasarían a ${plan.nombre}.\n\n`
+            + plan.bloqueosTeso.map(b => '• ' + b).join('\n')
+            + '\n\nPrimero borrá esos pagos en Tesorería > Aranceles por Partido (así queda registrada la devolución en la Caja) y después volvé a intentarlo.';
+    }
+
+    // La parte de la vista previa que cambia al elegir destinos: errores, avisos y si se puede confirmar.
+    function revisarReemplazo() {
+        const caja = document.getElementById('reemplazo-problemas');
+        const boton = document.getElementById('btn-reemplazo-confirmar');
+        if (!reemplazo || !caja || !boton) return null;
+        const plan = planReemplazo(reemplazo.ciclo, reemplazo.idEquipo, reemplazo.nombre, reemplazo.destinos);
+        const lineas = [
+            ...plan.errores.map(t => `<p class="reemplazo-bloqueo">${attrSeguro(t)}</p>`),
+            ...(plan.bloqueosTeso.length ? [`<p class="reemplazo-bloqueo">${attrSeguro(textoBloqueoReemplazo(plan)).replace(/\n/g, '<br>')}</p>`] : []),
+            ...plan.avisos.map(t => `<p class="reemplazo-aviso">${attrSeguro(t)}</p>`)
+        ];
+        caja.innerHTML = lineas.join('');
+        boton.disabled = plan.errores.length > 0 || plan.bloqueosTeso.length > 0;
+        return plan;
+    }
+
+    function dibujarReemplazo() {
+        if (!reemplazoPanel) return;
+        if (!reemplazo) {
+            reemplazoPanel.innerHTML = '';
+            reemplazoPanel.classList.add('seccion-oculta-staff');
+            return;
+        }
+        const plan = planReemplazo(reemplazo.ciclo, reemplazo.idEquipo, reemplazo.nombre, reemplazo.destinos);
+        if (!plan.D) { reemplazo = null; dibujarReemplazo(); return; }
+        reemplazo.firma = firmaDeReemplazo(plan);
+        const D = plan.D;
+        const lista = items => (items.length ? `<ul>${items.map(x => `<li>${attrSeguro(x.texto)}</li>`).join('')}</ul>` : '<p>Ninguno.</p>');
+        const opcionesDestino = ['superior', 'basico'].map(cic => {
+            const equipos = poolDeCiclo(cic).filter(e => e !== D).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+            return equipos.length ? `<optgroup label="${nombreCicloHistorial(cic)}">${equipos.map(e => `<option value="${cic}|${attrSeguro(e.id)}">${attrSeguro(e.nombre)}</option>`).join('')}</optgroup>` : '';
+        }).join('');
+        const filasJugadores = plan.jugadores.map(x => `
+            <div class="reemplazo-jugador">
+                <span>${attrSeguro(textoJugadorHistorial(x.j))}</span>
+                <select class="reemplazo-destino" data-idx="${x.idx}" aria-label="Qué hacer con ${attrSeguro(x.j.nombre)}">
+                    <option value="baja">Dar de baja</option>${opcionesDestino}
+                </select>
+            </div>`).join('');
+        const pedidos = plan.pedidosFixture + plan.pedidosHorario;
+        reemplazoPanel.innerHTML = `
+            <h4>${attrSeguro(D.nombre)} sale y entra ${attrSeguro(plan.nombre || '…')} en ${attrSeguro(textoGrupoHistorial(D.grupo || 'A'))} (${nombreCicloHistorial(plan.ciclo)})</h4>
+            <p>${attrSeguro(plan.nombre || 'El curso nuevo')} hereda los puntos y las estadísticas de ${attrSeguro(D.nombre)}, sin su deuda ni sus quitas de puntos.</p>
+            <div id="reemplazo-problemas" class="reemplazo-problemas"></div>
+            <h4>Quedan a nombre de ${attrSeguro(D.nombre)} (${plan.quedan.length})</h4>
+            ${lista(plan.quedan)}
+            <h4>Pasan a ${attrSeguro(plan.nombre || 'el curso nuevo')} (${plan.pasan.length})</h4>
+            ${lista(plan.pasan)}
+            <h4>Jugadores de ${attrSeguro(D.nombre)} (${plan.jugadores.length})</h4>
+            ${filasJugadores || '<p>No tiene jugadores cargados.</p>'}
+            <h4>Pedidos y desempate</h4>
+            <p>${pedidos ? `Se borran ${plan.pedidosFixture} pedido(s) de fixture y ${plan.pedidosHorario} de horario de ${attrSeguro(D.nombre)}: eran de ese curso.` : `${attrSeguro(D.nombre)} no tiene pedidos de fixture ni de horario.`}${plan.desempate ? ' Su desempate por sorteo pasa al curso nuevo.' : ''}</p>
+            <p>Queda a nombre de ${attrSeguro(D.nombre)}, a propósito: lo que pagó de inscripción, sus partidos de Aranceles con su deuda y sus quitas en el Tribunal.</p>
+            <div class="reemplazo-botones">
+                <button type="button" id="btn-reemplazo-cancelar" class="btn-submit-admin" style="background:#334155; border-color:#64748b;">Cancelar</button>
+                <button type="button" id="btn-reemplazo-confirmar" class="btn-submit-admin" style="background:#854d0e; border-color:#f2c00e;">Confirmar reemplazo</button>
+            </div>`;
+        reemplazoPanel.querySelectorAll('.reemplazo-destino').forEach(sel => {
+            sel.value = reemplazo.destinos[sel.dataset.idx] || 'baja';
+        });
+        reemplazoPanel.classList.remove('seccion-oculta-staff');
+        revisarReemplazo();
+    }
+
+    function refrescarPantallasDeEquipos() {
+        armarOpcionesReemplazo();
+        actualizarComboEquiposPlantel();
+        actualizarOpcionesMoverEquipo();
+        actualizarOpcionesGrupo();
+        renderizarEquiposCargados();
+        renderizarCapitanes();
+        filtrarEquiposPorGrupo();
+        actualizarListaAdmin();
+        actualizarListaSancionesAdmin();
+        renderizarTesoreriaPartidos();
+        renderizarTesoreriaInscripciones();
+        renderizarResumenStaff();
+        armarOpcionesPedidos();
+        renderizarPedidosFixture();
+        armarOpcionesPedidosHorario();
+        renderizarPedidosHorario();
+    }
+
+    function aplicarReemplazo(plan) {
+        const { ciclo, D } = plan;
+        const pool = poolDeCiclo(ciclo);
+        const todosLosIds = new Set([...poolSuperior, ...poolBasico].map(e => e.id));
+        let idNuevo = Date.now();
+        while (todosLosIds.has(idNuevo)) idNuevo++;
+        const N = {
+            id: idNuevo, nombre: plan.nombre, grupo: D.grupo,
+            pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, dif: 0, pts: 0,
+            jugadores: [],
+            reemplazaA: [...(D.reemplazaA || []), { id: D.id, nombre: D.nombre }]
+        };
+
+        // Primero lo que puede frenar todo: la Tesorería de los partidos que pasan, calculada sobre copias.
+        const planTeso = { mudanzas: [], descartes: [], bloqueos: [] };
+        const pasan = plan.pasan.map(x => {
+            const p = partidos.find(q => q.id === x.id);
+            const previo = { ...p };
+            if (ladosDeEquipoEnPartido(p, D).local && previo.localId == null) previo.localId = D.id;
+            if (ladosDeEquipoEnPartido(p, D).visita && previo.visitanteId == null) previo.visitanteId = D.id;
+            const nuevo = { ...previo };
+            if (x.ladoD === 'local') { nuevo.local = N.nombre; nuevo.localId = N.id; } else { nuevo.visitante = N.nombre; nuevo.visitanteId = N.id; }
+            const unPlan = planTesoreriaPartido(previo, nuevo);
+            planTeso.mudanzas.push(...unPlan.mudanzas);
+            planTeso.descartes.push(...unPlan.descartes);
+            planTeso.bloqueos.push(...unPlan.bloqueos);
+            return { p, ladoD: x.ladoD };
+        });
+        if (planTeso.bloqueos.length) { alert(textoBloqueoReemplazo({ ...plan, bloqueosTeso: planTeso.bloqueos })); return false; }
+
+        // Los partidos viejos del equipo que sale sin id lo reciben, así siguen a su nombre y a sus claves de Tesorería.
+        partidosDeEquipo(ciclo, D).forEach(({ p, lados }) => {
+            if (lados.local && p.localId == null) p.localId = D.id;
+            if (lados.visita && p.visitanteId == null) p.visitanteId = D.id;
+        });
+        pasan.forEach(({ p, ladoD }) => {
+            const local = ladoD === 'local';
+            p[local ? 'local' : 'visitante'] = N.nombre;
+            p[local ? 'localId' : 'visitanteId'] = N.id;
+            ['asistentes', 'goleadores', 'amarillas', 'rojas'].forEach(campo => {
+                const clave = campo + (local ? 'Local' : 'Visitante');
+                if (clave in p) p[clave] = [];
+            });
+            if (p.mvpId != null && (D.jugadores || []).some(j => String(j.dni) === String(p.mvpId))) p.mvpId = null;
+        });
+        aplicarPlanTesoreria(planTeso);
+
+        plan.jugadores.forEach(x => { if (x.eqDestino) x.eqDestino.jugadores.push(x.j); });
+        pool.splice(pool.indexOf(D), 1, N);
+
+        const clavesD = clavesFixtureDe(D);
+        const pedidosFixture = obtenerPedidosFixture();
+        const quedanFixture = pedidosFixture.filter(pd => !(pd.ciclo === ciclo && (clavesD.includes(pd.a) || clavesD.includes(pd.b))));
+        if (quedanFixture.length !== pedidosFixture.length) almacen.setItem('liga_pedidos_fixture', JSON.stringify(quedanFixture));
+        const pedidosHorario = obtenerPedidosHorario();
+        const quedanHorario = pedidosHorario.filter(pd => !(pd.ciclo === ciclo && clavesD.includes(pd.equipo)));
+        if (quedanHorario.length !== pedidosHorario.length) almacen.setItem('liga_pedidos_horario', JSON.stringify(quedanHorario));
+        const desempates = obtenerDesempatesDeSorteo();
+        if (desempates[ciclo] && desempates[ciclo][String(D.id)] !== undefined) {
+            desempates[ciclo][String(N.id)] = desempates[ciclo][String(D.id)];
+            delete desempates[ciclo][String(D.id)];
+            almacen.setItem('liga_desempates_sorteo', JSON.stringify(desempates));
+        }
+
+        guardarEquiposEnStorage();
+        almacen.setItem('liga_partidos', JSON.stringify(partidos));
+
+        const borrados = (pedidosFixture.length - quedanFixture.length) + (pedidosHorario.length - quedanHorario.length);
+        registrarHistorial('jugador', `reemplazó a ${D.nombre} por ${N.nombre} en ${textoGrupoHistorial(D.grupo || 'A')} (${nombreCicloHistorial(ciclo)}), Art. 9 Bis: ${pasan.length} ${pasan.length === 1 ? 'partido pasa' : 'partidos pasan'} a ${N.nombre}, ${plan.quedan.length} ${plan.quedan.length === 1 ? 'queda' : 'quedan'} a nombre de ${D.nombre}`
+            + (borrados ? `; se borraron ${borrados} ${borrados === 1 ? 'pedido' : 'pedidos'} de ${D.nombre}` : ''));
+        plan.jugadores.forEach(x => {
+            registrarHistorial('jugador', x.eqDestino
+                ? `pasó a ${textoJugadorHistorial(x.j)} de ${D.nombre} a ${x.eqDestino.nombre} (reemplazo de equipo)`
+                : `dio de baja a ${textoJugadorHistorial(x.j)} de ${D.nombre} (reemplazo de equipo)`);
+        });
+        return true;
+    }
+
+    if (btnReemplazoVer) {
+        btnReemplazoVer.addEventListener('click', () => {
+            if (!esCoordinadorPanel()) return;
+            if (!reemplazoEquipo.value) { alert('Elegí el equipo que sale.'); return; }
+            reemplazo = { ciclo: reemplazoCiclo.value, idEquipo: reemplazoEquipo.value, nombre: reemplazoNombre.value, destinos: {} };
+            dibujarReemplazo();
+        });
+    }
+    // Cambiar el ciclo, el equipo o el nombre con la vista previa abierta la cierra: ya no corresponde a lo elegido.
+    [reemplazoCiclo, reemplazoEquipo, reemplazoNombre].forEach(campo => {
+        if (campo) campo.addEventListener('input', () => { reemplazo = null; dibujarReemplazo(); });
+    });
+    if (reemplazoCiclo) reemplazoCiclo.addEventListener('change', armarOpcionesReemplazo);
+    if (renombrarCiclo) renombrarCiclo.addEventListener('change', armarOpcionesReemplazo);
+
+    if (reemplazoPanel) {
+        reemplazoPanel.addEventListener('change', e => {
+            const sel = e.target.closest('.reemplazo-destino');
+            if (!sel || !reemplazo) return;
+            reemplazo.destinos[sel.dataset.idx] = sel.value;
+            revisarReemplazo();
+        });
+        reemplazoPanel.addEventListener('click', e => {
+            const boton = e.target.closest('button');
+            if (!boton || !reemplazo || !esCoordinadorPanel()) return;
+            if (boton.id === 'btn-reemplazo-cancelar') { reemplazo = null; dibujarReemplazo(); return; }
+            if (boton.id !== 'btn-reemplazo-confirmar') return;
+
+            const plan = planReemplazo(reemplazo.ciclo, reemplazo.idEquipo, reemplazo.nombre, reemplazo.destinos);
+            if (!plan.D) { alert('No encontré el equipo que sale: recargá la página.'); reemplazo = null; dibujarReemplazo(); return; }
+            if (firmaDeReemplazo(plan) !== reemplazo.firma) {
+                dibujarReemplazo();
+                alert('Mientras mirabas esto cambió algo (partidos o jugadores de ' + plan.D.nombre + '). Revisá la vista previa de nuevo antes de confirmar.');
+                return;
+            }
+            if (plan.errores.length) { alert(plan.errores.join('\n')); revisarReemplazo(); return; }
+            if (plan.bloqueosTeso.length) { alert(textoBloqueoReemplazo(plan)); revisarReemplazo(); return; }
+            const pasanJug = plan.jugadores.filter(x => x.eqDestino).length;
+            const borrados = plan.pedidosFixture + plan.pedidosHorario;
+            if (!confirm(`¿Reemplazar a ${plan.D.nombre} por ${plan.nombre} en ${textoGrupoHistorial(plan.D.grupo || 'A')} (${nombreCicloHistorial(plan.ciclo)})?\n\n`
+                + `• ${plan.pasan.length} partidos pasan a ${plan.nombre}.\n`
+                + `• ${plan.quedan.length} quedan a nombre de ${plan.D.nombre}.\n`
+                + `• ${pasanJug} jugadores pasan a otros equipos y ${plan.jugadores.length - pasanJug} se dan de baja.\n`
+                + `• Se borran ${borrados} pedidos de ${plan.D.nombre}.\n\nNo se puede deshacer.`)) return;
+            const nombreD = plan.D.nombre, nombreN = plan.nombre;
+            if (!aplicarReemplazo(plan)) return;
+            reemplazo = null;
+            if (reemplazoNombre) reemplazoNombre.value = '';
+            cerrarFixtureAuto();
+            cerrarHorariosAuto();
+            dibujarReemplazo();
+            sincronizarAusencias();
+            refrescarPantallasDeEquipos();
+            alert(`Listo: ${nombreN} reemplaza a ${nombreD}. Ahora cargá los jugadores de ${nombreN} (Importar planilla o a mano).`);
+        });
+    }
+
+    // ── Cambiar el nombre de un equipo (solo Coordinador): conserva el id, así sus pagos y su inscripción se quedan ──
+    function aplicarRenombrado(ciclo, idEquipo, nombreNuevo) {
+        releerDatosDeEquipos();
+        const eq = poolDeCiclo(ciclo).find(e => String(e.id) === String(idEquipo));
+        if (!eq) { alert('No encontré el equipo: recargá la página.'); return; }
+        const nombre = String(nombreNuevo || '').trim().replace(/\s+/g, ' ');
+        const viejo = eq.nombre;
+        if (nombre === viejo.trim()) { alert('Ese ya es el nombre del equipo.'); return; }
+        const error = problemaDeNombreDeEquipo(ciclo, nombre, eq.id);
+        if (error) { alert(error); return; }
+
+        const susPartidos = partidosDeEquipo(ciclo, eq);
+        const sancionesDeEq = listaSanciones.filter(s => s.ciclo === ciclo && (s.equipoId != null ? s.equipoId === eq.id : minusculas(s.equipo) === minusculas(viejo)));
+        const crucesDeEq = crucesPlayoffs.filter(c => c.ciclo === ciclo && (minusculas(c.local) === minusculas(viejo) || minusculas(c.visitante) === minusculas(viejo)));
+        const clavesEq = clavesFixtureDe(eq);
+        const pedidosFixture = obtenerPedidosFixture();
+        const pedidosHorario = obtenerPedidosHorario();
+        const susPedidos = pedidosFixture.filter(pd => pd.ciclo === ciclo && (clavesEq.includes(pd.a) || clavesEq.includes(pd.b))).length
+            + pedidosHorario.filter(pd => pd.ciclo === ciclo && clavesEq.includes(pd.equipo)).length;
+        const jugados = susPartidos.filter(x => x.p.jugado).length;
+        if (!confirm(`¿Cambiar "${viejo}" por "${nombre}" en ${nombreCicloHistorial(ciclo)}?\n\n`
+            + `• ${susPartidos.length} partidos (${jugados} ya jugados)\n`
+            + `• ${sancionesDeEq.length} sanciones\n`
+            + `• ${crucesDeEq.length} cruces de playoffs\n`
+            + `• ${susPedidos} pedidos\n\nSe conservan el plantel, los pagos y la inscripción. Los movimientos viejos de la Caja quedan con el nombre de entonces.`)) return;
+
+        susPartidos.forEach(({ p, lados }) => {
+            if (lados.local) { p.local = nombre; p.localId = eq.id; }
+            if (lados.visita) { p.visitante = nombre; p.visitanteId = eq.id; }
+        });
+        sancionesDeEq.forEach(s => { s.equipo = nombre; });
+        crucesDeEq.forEach(c => {
+            if (minusculas(c.local) === minusculas(viejo)) c.local = nombre;
+            if (minusculas(c.visitante) === minusculas(viejo)) c.visitante = nombre;
+        });
+        let cambioPedidos = false;
+        pedidosFixture.forEach(pd => {
+            if (pd.ciclo !== ciclo) return;
+            if (clavesEq.includes(pd.a)) { pd.nombreA = nombre; cambioPedidos = true; }
+            if (clavesEq.includes(pd.b)) { pd.nombreB = nombre; cambioPedidos = true; }
+        });
+        if (cambioPedidos) almacen.setItem('liga_pedidos_fixture', JSON.stringify(pedidosFixture));
+        let cambioPedidosHorario = false;
+        pedidosHorario.forEach(pd => {
+            if (pd.ciclo === ciclo && clavesEq.includes(pd.equipo)) { pd.nombre = nombre; cambioPedidosHorario = true; }
+        });
+        if (cambioPedidosHorario) almacen.setItem('liga_pedidos_horario', JSON.stringify(pedidosHorario));
+
+        eq.nombre = nombre;
+        guardarEquiposEnStorage();
+        if (susPartidos.length) almacen.setItem('liga_partidos', JSON.stringify(partidos));
+        if (sancionesDeEq.length) almacen.setItem('liga_sanciones', JSON.stringify(listaSanciones));
+        if (crucesDeEq.length) almacen.setItem('liga_cruces_playoffs', JSON.stringify(crucesPlayoffs));
+        registrarHistorial('jugador', `cambió el nombre de ${viejo} a ${nombre} (${nombreCicloHistorial(ciclo)})`);
+        cerrarFixtureAuto();
+        cerrarHorariosAuto();
+        sincronizarAusencias();
+        refrescarPantallasDeEquipos();
+        if (renombrarNombre) renombrarNombre.value = '';
+        alert(`Listo: "${viejo}" ahora se llama "${nombre}".`);
+    }
+
+    if (btnRenombrarEquipo) {
+        btnRenombrarEquipo.addEventListener('click', () => {
+            if (!esCoordinadorPanel()) return;
+            if (!renombrarEquipo.value) { alert('Elegí el equipo.'); return; }
+            aplicarRenombrado(renombrarCiclo.value, renombrarEquipo.value, renombrarNombre.value);
+        });
+    }
+
     // Equipos Cargados: listado de Superior y Básico por separado, con baja directa (sin tener que
     // ir hasta Planteles y Jugadores a buscar el equipo en el formulario). Comparte la baja con el
     // botón viejo de ahí (eliminarEquipoCompleto).
@@ -4029,6 +4677,63 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (cambioDni) cambiarDniFotoPendiente(antes.dni, despues.dni);
     }
 
+    // Botón "Mover" de cada jugador (Staff y Coordinador): pasa al jugador a otro equipo con la misma regla de siempre
+    // (solo si todavía no jugó con el suyo). Debajo de la fila aparece el renglón para elegir el equipo.
+    function abrirMoverJugador(boton, ciclo, equipoNombre) {
+        const fila = boton.closest('tr');
+        if (fila.nextElementSibling && fila.nextElementSibling.classList.contains('fila-mover-jugador')) {
+            fila.nextElementSibling.remove();
+            return;
+        }
+        document.querySelectorAll('.fila-mover-jugador').forEach(f => f.remove());
+        const { equipo } = buscarJugadorPlantel(ciclo, equipoNombre, boton.getAttribute('data-dni'));
+        const opciones = ['superior', 'basico'].map(cic => {
+            const equipos = poolDeCiclo(cic).filter(e => e !== equipo).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+            return equipos.length ? `<optgroup label="${nombreCicloHistorial(cic)}">${equipos.map(e => `<option value="${cic}|${attrSeguro(e.id)}">${attrSeguro(e.nombre)}</option>`).join('')}</optgroup>` : '';
+        }).join('');
+        const renglon = document.createElement('tr');
+        renglon.className = 'fila-mover-jugador';
+        renglon.innerHTML = `<td colspan="6"><div class="mover-jugador-caja">
+            <span style="color:#869bd8; font-size:11px;">Pasar a:</span>
+            <select class="mover-jugador-destino" aria-label="Equipo al que pasa">${opciones}</select>
+            <button type="button" class="btn-accion-plantel mover-jugador-ok" style="background:#854d0e; border:1px solid #f2c00e; color:#fff; padding:6px 10px; border-radius:2px; font-size:11px; font-family:'Oswald'; cursor:pointer;">Mover</button>
+            <button type="button" class="btn-accion-plantel mover-jugador-cancelar" style="background:transparent; border:1px solid #64748b; color:#cbd5e1; padding:6px 10px; border-radius:2px; font-size:11px; font-family:'Oswald'; cursor:pointer;">Cancelar</button>
+        </div></td>`;
+        fila.after(renglon);
+        renglon.querySelector('.mover-jugador-cancelar').addEventListener('click', () => renglon.remove());
+        renglon.querySelector('.mover-jugador-ok').addEventListener('click', () => {
+            moverJugadorDePlantel(ciclo, equipoNombre, boton.getAttribute('data-dni'), renglon.querySelector('.mover-jugador-destino').value);
+        });
+    }
+
+    function moverJugadorDePlantel(cicloOrigen, equipoNombre, dni, destinoElegido) {
+        // El equipo y el jugador se buscan ahora: los objetos con los que se dibujó la tabla pueden estar viejos.
+        const { equipo, jugador } = buscarJugadorPlantel(cicloOrigen, equipoNombre, dni);
+        if (!equipo || !jugador) { alert('No encontré al jugador: recargá la página.'); return; }
+        const [cicloDestino, idDestino] = (destinoElegido || '').split('|');
+        const destino = poolDeCiclo(cicloDestino).find(e => String(e.id) === idDestino);
+        if (!destino || destino === equipo) { alert('Elegí el equipo al que pasa.'); return; }
+        if (jugoConSuEquipo({ jugador, equipo, ciclo: cicloOrigen })) {
+            alert(`Ese DNI ya está inscripto en ${equipo.nombre} y ya jugó con ese equipo, por eso no puede jugar en otro.`);
+            return;
+        }
+        const dorsalVacio = jugador.dorsal === undefined || jugador.dorsal === null || String(jugador.dorsal).trim() === '';
+        if (!dorsalVacio && (destino.jugadores || []).some(j => j.dorsal !== undefined && j.dorsal !== null && String(j.dorsal).trim() !== '' && Number(j.dorsal) === Number(jugador.dorsal))) {
+            alert(`El número ${jugador.dorsal} ya lo tiene otro jugador de ${destino.nombre}: cambiale el número con Editar antes de moverlo.`);
+            return;
+        }
+        if (!destino.jugadores) destino.jugadores = [];
+        if (destino.jugadores.length >= MAX_JUGADORES_LISTA && !confirm(`${destino.nombre} ya tiene ${destino.jugadores.length} jugadores y el reglamento permite un máximo de ${MAX_JUGADORES_LISTA} en la lista. ¿Pasarlo igual?`)) return;
+        equipo.jugadores = equipo.jugadores.filter(j => j !== jugador);
+        destino.jugadores.push(jugador);
+        guardarEquiposEnStorage();
+        registrarHistorial('jugador', `pasó a ${textoJugadorHistorial(jugador)} de ${equipo.nombre} a ${destino.nombre}`);
+        if (jugadorEnEdicionDNI === dni) cancelarEdicionJugador();
+        renderizarTablaJugadores();
+        if (typeof renderizarCapitanes === 'function') renderizarCapitanes();
+        alert(`${jugador.nombre} pasó a ${destino.nombre}.`);
+    }
+
     function renderizarTablaJugadores() {
         if (!tablaJugadoresBody || !plantelEquipoSelect) return;
         recargarPools();
@@ -4068,8 +4773,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
                         </button>
                     </td>
                     <td>
-                        <div style="display:flex; gap:3px; justify-content:center;">
+                        <div style="display:flex; gap:3px; justify-content:center; flex-wrap:wrap;">
                             <button type="button" class="btn-accion-plantel btn-editar-jugador" data-dni="${attrSeguro(j.dni)}" style="background:#0284c7; color:white; border:none; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Editar">Editar</button>
+                            <button type="button" class="btn-accion-plantel btn-mover-jugador" data-dni="${attrSeguro(j.dni)}" style="background:#854d0e; border:1px solid #f2c00e; color:#fff; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Pasar a otro equipo">Mover</button>
                             <button type="button" class="btn-accion-plantel btn-ver-emergencia" data-dni="${attrSeguro(j.dni)}" style="background:#1a3274; border:1px solid #2edae3; color:#2edae3; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Emergencia">SOS</button>
                             <button type="button" class="btn-accion-plantel btn-borrar-jugador" data-dni="${attrSeguro(j.dni)}" data-nombre="${attrSeguro(j.nombre)}" style="background:#991b1b; color:white; border:none; padding:4px 6px; border-radius:2px; font-size:9px; font-family:'Oswald'; cursor:pointer;" title="Eliminar">Baja</button>
                         </div>
@@ -4130,6 +4836,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     if (btnCancelarEdicionJugador) btnCancelarEdicionJugador.classList.remove('seccion-oculta-staff');
                 }
             });
+        });
+
+        document.querySelectorAll('.btn-mover-jugador').forEach(btn => {
+            btn.addEventListener('click', () => abrirMoverJugador(btn, ciclo, equipoNombre));
         });
 
         document.querySelectorAll('.btn-ver-emergencia').forEach(btn => {

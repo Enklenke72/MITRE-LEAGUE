@@ -134,9 +134,19 @@ function ordenarTabla(equipos, desempates) {
     return [...equipos].sort((a, b) => compararEquipos(a, b, desempates));
 }
 
+// Equipo de un partido por el nombre con que figura en él: el que lo tiene hoy o, si ese equipo fue reemplazado
+// (Art. 9 Bis, campo "reemplazaA"), el que entró en su lugar.
+function equipoDeNombre(equiposCiclo, nombre) {
+    const buscado = String(nombre || '').trim();
+    return equiposCiclo.find(e => e.nombre.trim() === buscado)
+        || equiposCiclo.find(e => (e.reemplazaA || []).some(r => String(r.nombre || '').trim() === buscado));
+}
+
 /**
  * Recalcula PJ, G, E, P, GF, GC, DIF y PTS de los equipos de un ciclo (los modifica en el lugar) desde los
  * partidos jugados de fase de grupos y las Quitas de Puntos. Los interzonales suman como cualquier partido.
+ * Los partidos de un equipo reemplazado suman al que entró en su lugar; las sanciones se buscan solo por nombre,
+ * así la quita del reemplazado no se le resta al nuevo.
  */
 function calcularEstadisticas(equiposCiclo, partidos, sanciones, ciclo) {
     const esDelCiclo = valor => (valor === 'superior') === (ciclo === 'superior');
@@ -146,8 +156,8 @@ function calcularEstadisticas(equiposCiclo, partidos, sanciones, ciclo) {
 
     (partidos || []).forEach(partido => {
         if (!partido.jugado || partido.esPlayoff || !esDelCiclo(partido.ciclo)) return; // Los partidos de playoff no suman a la fase de grupos
-        const local = equiposCiclo.find(e => e.nombre.trim() === partido.local.trim());
-        const visitante = equiposCiclo.find(e => e.nombre.trim() === partido.visitante.trim());
+        const local = equipoDeNombre(equiposCiclo, partido.local);
+        const visitante = equipoDeNombre(equiposCiclo, partido.visitante);
         if (!local || !visitante) return;
 
         local.pj++; visitante.pj++;
