@@ -234,6 +234,17 @@
                             </select>
                         </div>
 
+                        <!-- PERDIDO POR DECISIÓN DEL TRIBUNAL: queda 0-3 y no cuentan los goles (los nombres de las opciones los pone admin.js) -->
+                        <div class="form-group">
+                            <label style="color:#f43f5e;">Partido dado por perdido por el Tribunal (opcional)</label>
+                            <select id="partido-perdido-tribunal">
+                                <option value="">No</option>
+                                <option value="local">Lo pierde el local</option>
+                                <option value="visitante">Lo pierde el visitante</option>
+                            </select>
+                            <p class="calendario-ayuda">El resultado queda 0-3 y no cuentan los goles de ese partido (las tarjetas sí). Publicá el motivo en el Tribunal.</p>
+                        </div>
+
                         <!-- PENALES (En Playoffs) -->
                         <div class="form-row" id="row-penales-partido"
                             style="display: none; background: rgba(244,63,94,0.08); padding: 8px; border-radius: 3px; border: 1px dashed rgba(244,63,94,0.3); margin-bottom: 12px;">

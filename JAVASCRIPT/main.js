@@ -1564,7 +1564,7 @@ document.addEventListener('liga:datos-listos', () => {
                     <div class="match-details-drawer seccion-oculta">
                         <div class="drawer-divider-top"></div>
                         
-                        ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `
+                        ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `${bannerAusencia(partido)}
                             <div class="split-details-container">
                                 <div class="split-col col-left">${htmlLocal}</div>
                                 <div class="split-vertical-line"></div>
@@ -2216,6 +2216,11 @@ document.addEventListener('liga:datos-listos', () => {
     // sin jugar. El panel guarda en el partido quién faltó (ausencia: {local, visitante}) y, si el otro se presentó,
     // el 3-0 automático (resultadoAuto). Devuelve la etiqueta de debajo del marcador y el texto del desplegable.
     function estadoAusencia(partido) {
+        // Dado por perdido 0-3 por el Tribunal (por ejemplo, un equipo descalificado; pedido de Joaquín, 22/10/2026).
+        if (partido.jugado && (partido.perdidoTribunal === 'local' || partido.perdidoTribunal === 'visitante')) {
+            const perdedor = partido[partido.perdidoTribunal];
+            return { etiqueta: `${perdedor}: perdido por decisión del Tribunal`, texto: `${perdedor} pierde el partido 0-3 por decisión del Tribunal de Disciplina (el motivo está en el Tribunal). Los goles de este partido no cuentan.` };
+        }
         if (partido.jugado && partido.resultadoAuto) {
             const ganoLocal = Number(partido.golesLocal) > Number(partido.golesVisitante);
             const ganador = ganoLocal ? partido.local : partido.visitante;
@@ -2410,7 +2415,7 @@ document.addEventListener('liga:datos-listos', () => {
                         <div class="match-details-drawer seccion-oculta">
                             <div class="drawer-divider-top"></div>
                             
-                            ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `
+                            ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `${bannerAusencia(partido)}
                                 <div class="split-details-container">
                                     <div class="split-col col-left">${htmlLocal}</div>
                                     <div class="split-vertical-line"></div>

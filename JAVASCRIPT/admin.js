@@ -73,7 +73,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     function marcadorHistorial(p) {
         const penales = p.esPlayoff && p.golesLocal === p.golesVisitante && p.penalesLocal != null
             ? ` (penales ${p.penalesLocal}-${p.penalesVisitante})` : '';
-        return `${p.local} ${p.golesLocal}-${p.golesVisitante} ${p.visitante}${penales}`;
+        const tribunal = p.perdidoTribunal ? `, lo pierde ${p[p.perdidoTribunal]} por decisión del Tribunal` : '';
+        return `${p.local} ${p.golesLocal}-${p.golesVisitante} ${p.visitante}${penales}${tribunal}`;
     }
 
     function textoHistorialPartido(previo, nuevo) {
@@ -2346,7 +2347,39 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 .map(j => `<option value="${attrSeguro(idJugadorBF(j))}">${dorsalBF(j)} ${attrSeguro(j.nombre)}</option>`).join('')
             + '</optgroup>').join('');
         selectMvp.value = [...selectMvp.options].some(o => o.value === elegido) ? elegido : '';
+        nombrarOpcionesPerdidoTribunal();
     }
+
+    // Partido dado por perdido por el Tribunal (pedido de Joaquín, 22/10/2026: un equipo que ganó en la cancha y después
+    // fue descalificado). Queda 0-3 para el otro, los goles no cuentan y las tarjetas sí. Se guarda en el partido
+    // (perdidoTribunal: 'local' | 'visitante') y la web lo explica debajo del marcador.
+    // Funciones y no constantes: armarOpcionesMvp (que nombra sus opciones) puede correr antes de llegar a esta línea.
+    function selectPerdidoTribunal() { return document.getElementById('partido-perdido-tribunal'); }
+
+    function nombrarOpcionesPerdidoTribunal() {
+        if (!selectPerdidoTribunal()) return;
+        [['local', document.getElementById('partido-local')], ['visitante', document.getElementById('partido-visitante')]].forEach(([lado, select]) => {
+            const opcion = selectPerdidoTribunal().querySelector(`option[value="${lado}"]`);
+            const nombre = select && select.value ? select.value : (lado === 'local' ? 'el local' : 'el visitante');
+            if (opcion) opcion.textContent = `Lo pierde ${nombre}`;
+        });
+    }
+
+    // Con un perdedor elegido, el marcador y los goleadores los pone el panel: 0-3 y sin goles.
+    function aplicarPerdidoTribunal() {
+        if (!selectPerdidoTribunal()) return;
+        const perdedor = selectPerdidoTribunal().value;
+        ['goles-local', 'goles-visitante', 'dorsales-goles-local', 'dorsales-goles-visitante'].forEach(id => {
+            const campo = document.getElementById(id);
+            if (campo) campo.disabled = !!perdedor;
+        });
+        if (!perdedor) return;
+        document.getElementById('goles-local').value = perdedor === 'local' ? 0 : 3;
+        document.getElementById('goles-visitante').value = perdedor === 'local' ? 3 : 0;
+        document.getElementById('dorsales-goles-local').value = '';
+        document.getElementById('dorsales-goles-visitante').value = '';
+    }
+    if (selectPerdidoTribunal()) selectPerdidoTribunal().addEventListener('change', aplicarPerdidoTribunal);
 
     // Al rearmar Local/Visitante (cambio de fecha, grupo o ciclo) se conservan los equipos elegidos si
     // siguen disponibles. Si no: en un partido nuevo, los primeros de la lista como siempre; editando uno,
@@ -2393,6 +2426,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const a = document.getElementById(idA), b = document.getElementById(idB);
             if (a && b) [a.value, b.value] = [b.value, a.value];
         });
+        if (selectPerdidoTribunal() && selectPerdidoTribunal().value) selectPerdidoTribunal().value = selectPerdidoTribunal().value === 'local' ? 'visitante' : 'local';
         equiposDeLosCampos = { local: localSelect.value, visitante: visitanteSelect.value };
     }
 
@@ -2631,7 +2665,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (copaDelPartido) faseLabel += ` · ${copaDelPartido}`;
             // Marcado en Aranceles por Partido: no hay que cargarle resultado acá (el 3-0 lo pone el panel solo).
             const ausentes = p.ausencia ? [p.ausencia.local && p.local, p.ausencia.visitante && p.visitante].filter(Boolean) : [];
-            const marcaAusencia = ausentes.length === 2 ? 'No se presentó ninguno'
+            const marcaAusencia = p.jugado && p.perdidoTribunal ? `Lo pierde ${p[p.perdidoTribunal]} por decisión del Tribunal`
+                : ausentes.length === 2 ? 'No se presentó ninguno'
                 : ausentes.length ? `No se presentó ${ausentes[0]}${p.resultadoAuto ? ' · 3-0 automático' : p.ausencia.suspendido ? ' · suspendido' : ''}` : '';
 
             if (horarioActual !== ultimoHorario) {
@@ -2736,6 +2771,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     document.getElementById('dorsales-rojas-visitante').value = dorsalesDeIds(p.rojasVisitante, equipoEdVisita);
                     equiposDeLosCampos = { local: p.local, visitante: p.visitante };
                     armarOpcionesMvp(p.mvpId || '');
+                    if (selectPerdidoTribunal()) selectPerdidoTribunal().value = p.perdidoTribunal || '';
+                    aplicarPerdidoTribunal();
 
                     if (submitBtnPartido) {
                         submitBtnPartido.textContent = 'Actualizar Partido';
@@ -2831,6 +2868,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const contexto = contextoForzado || contextoFormularioPartido();
 
         if (formPartido) formPartido.reset();
+        aplicarPerdidoTribunal(); // reset() vuelve a "No" pero no rehabilita los campos de goles
         if (contextoForzado && cicloSelect) {
             cicloSelect.value = contexto.ciclo;
             armarOpcionesFechaPartido(contexto.fecha);
@@ -2881,6 +2919,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         formPartido.addEventListener('submit', (e) => {
             e.preventDefault();
             alinearCamposConEquipos();
+            aplicarPerdidoTribunal();
+            const perdidoTribunal = selectPerdidoTribunal() ? selectPerdidoTribunal().value : '';
 
             const localInput = localSelect.value;
             const visitanteInput = visitanteSelect ? visitanteSelect.value : "";
@@ -3014,7 +3054,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             };
             const ladoPrevioLocal = ladoPrevioDe(eqLocalObj), ladoPrevioVisitante = ladoPrevioDe(eqVisitanteObj);
             const invertido = ladoPrevioLocal === 'Visitante' && ladoPrevioVisitante === 'Local';
-            const conservaResultadoAuto = !!(partidoPrevio && partidoPrevio.resultadoAuto && esJugado
+            const conservaResultadoAuto = !!(partidoPrevio && partidoPrevio.resultadoAuto && esJugado && !perdidoTribunal
                 && parseInt(golesLocalInput) === partidoPrevio[invertido ? 'golesVisitante' : 'golesLocal']
                 && parseInt(golesVisitanteInput) === partidoPrevio[invertido ? 'golesLocal' : 'golesVisitante']);
 
@@ -3052,7 +3092,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 rojasVisitante: tarjetas.rojasVisitante,
                 mvpId: mvpElegido || null,
                 jugado: esJugado,
-                resultadoAuto: conservaResultadoAuto
+                resultadoAuto: conservaResultadoAuto,
+                perdidoTribunal: perdidoTribunal || null
             };
 
             // La lista de buena fe (y de ahí los PJ) es de cada equipo: se va con él si cambia de lado, y la de un
