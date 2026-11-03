@@ -6400,6 +6400,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const btnSubTesoCaja = document.getElementById('btn-sub-teso-caja');
     const btnSubTesoCalculadora = document.getElementById('btn-sub-teso-calculadora');
     const btnSubTesoRecaudacion = document.getElementById('btn-sub-teso-recaudacion');
+    const btnSubTesoDeudores = document.getElementById('btn-sub-teso-deudores');
+    const subVistaTesoDeudores = document.getElementById('sub-vista-teso-deudores');
     const subVistaTesoRecaudacion = document.getElementById('sub-vista-teso-recaudacion');
     const subVistaTesoPartidos = document.getElementById('sub-vista-teso-partidos');
     const subVistaTesoInscripciones = document.getElementById('sub-vista-teso-inscripciones');
@@ -6410,8 +6412,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const filtroInscripcionesCiclo = document.getElementById('filtro-inscripciones-ciclo');
 
     function ocultarTodasLasSubVistasTeso() {
-        [subVistaTesoPartidos, subVistaTesoInscripciones, subVistaTesoRecaudacion, subVistaTesoCaja, subVistaTesoCalculadora].forEach(v => { if (v) v.classList.add('seccion-oculta-staff'); });
-        [btnSubTesoPartidos, btnSubTesoInscripciones, btnSubTesoRecaudacion, btnSubTesoCaja, btnSubTesoCalculadora].forEach(b => { if (b) b.classList.remove('active'); });
+        [subVistaTesoPartidos, subVistaTesoDeudores, subVistaTesoInscripciones, subVistaTesoRecaudacion, subVistaTesoCaja, subVistaTesoCalculadora].forEach(v => { if (v) v.classList.add('seccion-oculta-staff'); });
+        [btnSubTesoPartidos, btnSubTesoDeudores, btnSubTesoInscripciones, btnSubTesoRecaudacion, btnSubTesoCaja, btnSubTesoCalculadora].forEach(b => { if (b) b.classList.remove('active'); });
     }
 
     if (btnSubTesoPartidos && btnSubTesoInscripciones) {
@@ -6455,6 +6457,155 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (subVistaTesoCalculadora) subVistaTesoCalculadora.classList.remove('seccion-oculta-staff');
             cargarConfigCalculadoraArancel();
             calcularArancelRecomendado();
+        });
+    }
+
+    // ── Equipos deudores (pedido de Joaquín, 03/11/2026): lo que debe cada equipo, partido por partido, sin buscar fecha por
+    // fecha. Usa el mismo cálculo que las tarjetas de Aranceles (calcularTesoreriaPartidos: saldo a favor y beneficios
+    // incluidos). Un partido cuenta cuando ya se jugó o el equipo figura como "Se presentó" / "Faltó": uno que todavía no
+    // se jugó no es deuda. La deuda de inscripción sale del mismo lugar que el chip "Debe inscripción" (el Coordinador la
+    // calcula, el Staff lee la que publicó el Coordinador). Lo ven Staff y Coordinador.
+    const deudoresAbiertos = new Set();
+    const ASISTENCIAS_REGISTRADAS = ['presente', 'sin_aviso', 'con_aviso'];
+
+    function deudoresDelTorneo() {
+        recargarPools();
+        const calc = calcularTesoreriaPartidos();
+        const deudaInscripcion = deudasInscripcionParaMostrar();
+        const equipos = new Map();
+        const entrada = (ciclo, clave, nombre) => {
+            const k = ciclo + '|' + clave;
+            if (!equipos.has(k)) equipos.set(k, { key: k, ciclo, clave, nombre, grupo: '', nota: '', partidos: [], faltaPartidos: 0, inscripcion: 0 });
+            return equipos.get(k);
+        };
+        const poolDe = ciclo => (ciclo === 'basico' ? poolBasico : poolSuperior) || [];
+
+        partidos.filter(p => p && p.local && p.visitante)
+            .sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha))
+            .forEach(p => ['local', 'visita'].forEach(lado => {
+                const t = calc.porClave[claveTesoreria(p, lado)];
+                if (!t || t.falta <= 0) return;
+                if (!p.jugado && !ASISTENCIAS_REGISTRADAS.includes(t.asistencia)) return;
+                const e = entrada(p.ciclo === 'basico' ? 'basico' : 'superior', equipoTeso(p, lado), t.nombre);
+                e.partidos.push({
+                    fecha: p.fecha, fase: nombreFasePartido(p), rival: lado === 'local' ? p.visitante : p.local,
+                    exigido: t.exigidoBruto, saldo: t.saldoAplicado, pagado: t.pagado, falta: t.falta, ausente: t.ausente
+                });
+                e.faltaPartidos += t.falta;
+            }));
+
+        ['superior', 'basico'].forEach(ciclo => poolDe(ciclo).forEach(eq => {
+            const falta = deudaInscripcion[claveInscripcion(eq)];
+            if (falta > 0) entrada(ciclo, claveInscripcion(eq), eq.nombre).inscripcion = falta;
+        }));
+
+        return [...equipos.values()].map(e => {
+            const actual = poolDe(e.ciclo).find(eq => claveInscripcion(eq) === e.clave);
+            if (actual) {
+                e.nombre = actual.nombre;
+                e.grupo = actual.grupo ? textoGrupoHistorial(actual.grupo) : '';
+            } else {
+                // Un equipo descalificado y reemplazado ya no está en los planteles, pero su deuda sigue a su nombre.
+                const nuevo = poolDe(e.ciclo).find(eq => (eq.reemplazaA || []).some(r => 'eq' + r.id === e.clave));
+                e.nota = nuevo ? `Reemplazado por ${nuevo.nombre}` : 'Ya no está en el torneo';
+            }
+            e.total = e.faltaPartidos + e.inscripcion;
+            return e;
+        }).filter(e => e.total > 0).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es'));
+    }
+
+    function renderizarDeudores() {
+        const contenedor = document.getElementById('contenedor-deudores');
+        const resumen = document.getElementById('deudores-resumen');
+        if (!contenedor || !resumen) return;
+        const dinero = n => `$${Math.round(n).toLocaleString()}`;
+        const ciclo = (document.getElementById('filtro-deudores-ciclo') || {}).value || 'todos';
+        const buscador = document.getElementById('buscador-deudores');
+        const q = buscador ? normalizarTextoBusqueda(buscador.value.trim()) : '';
+        const todos = deudoresDelTorneo();
+        const lista = todos.filter(e => (ciclo === 'todos' || e.ciclo === ciclo) && (!q || normalizarTextoBusqueda(e.nombre).includes(q)));
+
+        const totalPartidos = lista.reduce((acc, e) => acc + e.faltaPartidos, 0);
+        const totalInscripcion = lista.reduce((acc, e) => acc + e.inscripcion, 0);
+        resumen.innerHTML = lista.length === 0
+            ? `<span class="deudores-resumen-ok">${todos.length === 0 ? 'Ningún equipo debe nada por ahora.' : 'Ningún equipo coincide con el filtro.'}</span>`
+            : `<strong>${lista.length} ${lista.length === 1 ? 'equipo debe' : 'equipos deben'} ${dinero(totalPartidos + totalInscripcion)}</strong>`
+                + `<span>Partidos ${dinero(totalPartidos)}${totalInscripcion > 0 ? ` · Inscripción ${dinero(totalInscripcion)}` : ''}</span>`;
+
+        contenedor.innerHTML = lista.map(e => `
+            <details class="teso-team-box deudor-item" data-key="${attrSeguro(e.key)}"${deudoresAbiertos.has(e.key) ? ' open' : ''}>
+                <summary class="deudor-resumen-fila">
+                    <span class="deudor-nombre">${attrSeguro(e.nombre)}</span>
+                    <span class="deudor-meta">${nombreCicloHistorial(e.ciclo)}${e.grupo ? ' · ' + attrSeguro(e.grupo) : ''}${e.nota ? ' · ' + attrSeguro(e.nota) : ''}</span>
+                    <span class="teso-chip teso-chip-rojo">Debe ${dinero(e.total)}</span>
+                </summary>
+                <div class="deudor-detalle">
+                    ${e.partidos.map(m => `
+                        <div class="deudor-fila">
+                            <div class="deudor-fila-info">
+                                <strong>${attrSeguro(m.fase)}</strong> <span>vs ${attrSeguro(m.rival)}</span>
+                                <small>${m.ausente ? 'No se presentó: debe el 50% · ' : ''}Exigido ${dinero(m.exigido)}${m.saldo > 0 ? ` · Saldo a favor usado ${dinero(m.saldo)}` : ''} · Pagó ${dinero(m.pagado)}</small>
+                            </div>
+                            <span class="deudor-fila-monto">Falta ${dinero(m.falta)}</span>
+                            <button type="button" class="deudor-btn-pago" data-fecha="${attrSeguro(m.fecha)}" data-equipo="${attrSeguro(e.nombre)}">Cargar pago</button>
+                        </div>`).join('')}
+                    ${e.inscripcion > 0 ? `
+                        <div class="deudor-fila">
+                            <div class="deudor-fila-info"><strong>Inscripción</strong><small>Falta pagar de la inscripción de sus jugadores</small></div>
+                            <span class="deudor-fila-monto">Falta ${dinero(e.inscripcion)}</span>
+                        </div>` : ''}
+                </div>
+            </details>`).join('');
+    }
+
+    // "Cargar pago": deja Aranceles por Partido mostrando justo ese partido (esa fecha, todas las canchas y ese equipo).
+    function irAArancelesDe(fecha, nombreEquipo) {
+        if (filtroTesoreriaFecha) {
+            filtroTesoreriaFecha.value = String(fecha);
+            if (filtroTesoreriaFecha.value !== String(fecha)) filtroTesoreriaFecha.value = 'todas';
+            filtroTesoreriaFecha.dispatchEvent(new Event('change'));
+        }
+        if (filtroTesoreriaCancha) {
+            filtroTesoreriaCancha.value = 'todas';
+            filtroTesoreriaCancha.dispatchEvent(new Event('change'));
+        }
+        const buscadorTeso = document.getElementById('buscador-equipo-teso');
+        if (buscadorTeso) buscadorTeso.value = nombreEquipo;
+        if (btnSubTesoPartidos) btnSubTesoPartidos.click();
+        const tarjetas = document.getElementById('contenedor-tesoreria-partidos-cards');
+        if (tarjetas) tarjetas.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    if (btnSubTesoDeudores) {
+        btnSubTesoDeudores.addEventListener('click', () => {
+            ocultarTodasLasSubVistasTeso();
+            btnSubTesoDeudores.classList.add('active');
+            if (subVistaTesoDeudores) subVistaTesoDeudores.classList.remove('seccion-oculta-staff');
+            renderizarDeudores();
+        });
+    }
+    const contenedorDeudores = document.getElementById('contenedor-deudores');
+    if (contenedorDeudores) {
+        // "toggle" no burbujea: se escucha en la captura para recordar qué equipos están abiertos al redibujar.
+        contenedorDeudores.addEventListener('toggle', (e) => {
+            const item = e.target.closest ? e.target.closest('.deudor-item') : null;
+            if (!item) return;
+            if (item.open) deudoresAbiertos.add(item.dataset.key);
+            else deudoresAbiertos.delete(item.dataset.key);
+        }, true);
+        contenedorDeudores.addEventListener('click', (e) => {
+            const boton = e.target.closest('.deudor-btn-pago');
+            if (boton) irAArancelesDe(boton.dataset.fecha, boton.dataset.equipo);
+        });
+    }
+    const filtroDeudoresCiclo = document.getElementById('filtro-deudores-ciclo');
+    if (filtroDeudoresCiclo) filtroDeudoresCiclo.addEventListener('change', renderizarDeudores);
+    const buscadorDeudores = document.getElementById('buscador-deudores');
+    if (buscadorDeudores) {
+        let esperaBuscadorDeudores = null;
+        buscadorDeudores.addEventListener('input', () => {
+            clearTimeout(esperaBuscadorDeudores);
+            esperaBuscadorDeudores = setTimeout(renderizarDeudores, 150);
         });
     }
 
@@ -8663,6 +8814,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }
         renderizarRecaudacionPorFecha();
         sincronizarDeudasInscripcion();
+        // Si Deudores está abierto, se pone al día con cada pago (el propio o el de otro panel en vivo).
+        if (subVistaTesoDeudores && !subVistaTesoDeudores.classList.contains('seccion-oculta-staff')) renderizarDeudores();
     }
 
     // RECAUDACIÓN POR FECHA (EXCLUSIVO COORDINADOR): aranceles cobrados y egresos de cada fecha del torneo.

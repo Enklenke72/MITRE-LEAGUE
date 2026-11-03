@@ -4214,6 +4214,50 @@ body.rol-staff .solo-admin {
 .teso-buscador-equipo input:focus { outline: none; border-color: #2edae3; }
 .teso-mostrando { flex: 1 1 220px; margin: 0; font-family: 'Oswald', sans-serif; font-size: 12px; color: #2edae3; overflow-wrap: anywhere; }
 
+/* Equipos deudores (Tesorería > Deudores, 03/11/2026) */
+.deudores-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.deudores-filtros .form-group { margin: 0; min-width: 150px; }
+.deudores-filtros .deudores-buscador { flex: 1 1 220px; }
+.deudores-filtros input[type="search"] {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: 6px 10px;
+    border: 1px solid #1a3274;
+    border-radius: 3px;
+    background: #040c26;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 16px; /* 16 px: con menos, el iPhone agranda la página al tocar el campo */
+}
+.deudores-filtros input[type="search"]:focus { outline: none; border-color: #2edae3; }
+.deudores-resumen { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 12px; font-family: 'Oswald', sans-serif; color: #869bd8; font-size: 12px; }
+.deudores-resumen strong { color: #f43f5e; font-size: 15px; }
+.deudores-resumen-ok { color: #4ade80; font-size: 13px; }
+.deudor-item { padding: 0; margin-bottom: 8px; }
+.deudor-resumen-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.deudor-resumen-fila::-webkit-details-marker { display: none; }
+.deudor-nombre { flex: 1 1 150px; min-width: 0; font-family: 'Michroma', sans-serif; font-size: 12px; color: #ffffff; overflow-wrap: anywhere; }
+.deudor-meta { flex: 1 1 130px; font-family: 'Oswald', sans-serif; font-size: 11px; color: #869bd8; }
+.deudor-detalle { border-top: 1px dashed rgba(255, 255, 255, 0.12); padding: 4px 12px 10px; }
+.deudor-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.deudor-fila:last-child { border-bottom: none; }
+.deudor-fila-info { flex: 1 1 200px; min-width: 0; font-family: 'Oswald', sans-serif; font-size: 12px; color: #ffffff; overflow-wrap: anywhere; }
+.deudor-fila-info small { display: block; margin-top: 2px; font-size: 10px; color: #869bd8; }
+.deudor-fila-monto { font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: bold; color: #f43f5e; white-space: nowrap; }
+.deudor-btn-pago {
+    min-height: 34px;
+    padding: 4px 10px;
+    border: 1px solid #2edae3;
+    border-radius: 3px;
+    background: #1a3274;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+.deudor-btn-pago:hover { background: #2c68e7; }
+
 /* En el panel, en celular, "clip" en vez del "hidden" de html/body: recorta igual, pero "hidden" convertía al body en
    contenedor de scroll y ningún position: sticky quedaba fijo (esta barra y el aviso de cambios ajenos). Solo el panel:
    en la web pública haría fija la barra de arriba en celular, que hoy se va con el scroll. Un navegador sin "clip" sigue
