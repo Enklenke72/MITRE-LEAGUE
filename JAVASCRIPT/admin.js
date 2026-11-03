@@ -7188,12 +7188,17 @@ document.addEventListener('liga:datos-listos', (evento) => {
         guardarTesoreriaPartidos();
     }
 
-    // Cuánto debe cada equipo en cada partido, en orden cronológico, arrastrando el saldo a favor
-    // (todo pago por encima de lo exigido se descuenta del siguiente partido que dispute).
+    // Cuánto debe cada equipo en cada partido, en orden cronológico. Lo que un equipo paga por encima de lo exigido en un
+    // partido cancela primero sus deudas de partidos anteriores, de la más vieja a la más nueva (pedido de Joaquín,
+    // 03/11/2026); lo que sobre queda como saldo a favor y se descuenta del siguiente partido que dispute. Un partido
+    // anterior solo recibe de más si ya se jugó o el equipo figura como "Se presentó" / "Faltó". Todo se recalcula desde
+    // los pagos cada vez: editar o borrar un pago deshace el reparto solo. El dinero cobrado no cambia, solo a qué
+    // partido se le imputa (por eso el porcentaje del Art. 17 Bis de un partido viejo puede subir con un pago posterior).
     function calcularTesoreriaPartidos() {
         const porClave = {};
         const historial = {};
         const saldos = {};
+        const deudasPrevias = {};
         const ordenados = partidos
             .filter(p => p && p.local && p.visitante)
             .sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha));
@@ -7223,17 +7228,39 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const exigido = exigidoBruto - saldoAplicado;
                 const pagado = (data.ef || 0) + (data.tr || 0);
                 const falta = Math.max(0, exigido - pagado);
-                const saldoGenerado = Math.max(0, pagado - exigido);
+                let saldoGenerado = Math.max(0, pagado - exigido);
+
+                // Lo que sobra paga primero las deudas de partidos anteriores (de la más vieja a la más nueva).
+                const aDeudasPrevias = [];
+                (deudasPrevias[equipoKey] || []).forEach(d => {
+                    if (saldoGenerado <= 0 || d.t.falta <= 0) return;
+                    const aplica = Math.min(saldoGenerado, d.t.falta);
+                    d.t.falta -= aplica;
+                    d.t.cubierto += aplica;
+                    d.t.porcentaje = d.t.arancelNeto > 0 ? d.t.cubierto / d.t.arancelNeto : 1;
+                    d.t.cubiertoPorPosterior.push({ fecha: p.fecha, monto: aplica });
+                    d.h.falta = d.t.falta;
+                    aDeudasPrevias.push({ fecha: d.t.fecha, monto: aplica });
+                    saldoGenerado -= aplica;
+                });
                 saldos[equipoKey] = saldoPrevio - saldoAplicado + saldoGenerado;
 
                 const cubierto = pagado + saldoAplicado;
-                porClave[clave] = {
-                    clave, nombre, lado, data, arancelBase, arancelNeto, exento, bonificado, asistencia, ausente,
+                const entradaCalc = {
+                    clave, nombre, lado, fecha: p.fecha, data, arancelBase, arancelNeto, exento, bonificado, asistencia, ausente,
                     exigidoBruto, saldoAplicado, exigido, pagado, falta, saldoGenerado, cubierto,
-                    porcentaje: arancelNeto > 0 ? cubierto / arancelNeto : 1
+                    porcentaje: arancelNeto > 0 ? cubierto / arancelNeto : 1,
+                    aDeudasPrevias, cubiertoPorPosterior: []
                 };
+                porClave[clave] = entradaCalc;
+                const entradaHistorial = { orden: ordenCronologicoFecha(p.fecha), fecha: p.fecha, falta };
                 if (!historial[equipoKey]) historial[equipoKey] = [];
-                historial[equipoKey].push({ orden: ordenCronologicoFecha(p.fecha), fecha: p.fecha, falta });
+                historial[equipoKey].push(entradaHistorial);
+                const resuelto = !!p.jugado || ['presente', 'sin_aviso', 'con_aviso'].includes(asistencia);
+                if (falta > 0 && resuelto) {
+                    if (!deudasPrevias[equipoKey]) deudasPrevias[equipoKey] = [];
+                    deudasPrevias[equipoKey].push({ t: entradaCalc, h: entradaHistorial });
+                }
             });
         });
 
@@ -8131,6 +8158,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (t.bonificado > 0 && !t.exento) notas.push(`Con el descuento debe ${dinero(t.exigidoBruto)}.`);
         if (t.bonificado > 0) notas.push(`Bonificado: ${dinero(t.bonificado)} (no suma a la caja).`);
         if (t.saldoAplicado > 0) notas.push(`Saldo a favor aplicado: -${dinero(t.saldoAplicado)}.`);
+        // Un pago de más cancela primero las deudas viejas (calcularTesoreriaPartidos): se dice en las dos tarjetas.
+        t.aDeudasPrevias.forEach(a => notas.push(`Pagó de más: ${dinero(a.monto)} fueron a la deuda de ${nombreFaseTeso(a.fecha)}.`));
+        t.cubiertoPorPosterior.forEach(c => notas.push(`Se cubrieron ${dinero(c.monto)} con un pago de ${nombreFaseTeso(c.fecha)}.`));
         if (t.saldoGenerado > 0) notas.push(`Le queda saldo a favor de ${dinero(t.saldoGenerado)} para su próxima fecha.`);
         const notasHtml = notas.map(n => `<div class="teso-nota">${n}</div>`).join('');
 
