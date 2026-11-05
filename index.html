@@ -21,7 +21,8 @@
     <meta property="og:site_name" content="Mitre League">
     <meta property="og:locale" content="es_AR">
     <meta property="og:title" content="Mitre League · Clausura 2026">
-    <meta property="og:description" content="Tabla de posiciones, fixture, resultados y playoffs del torneo de fútbol 5 entre cursos.">
+    <meta property="og:description"
+        content="Tabla de posiciones, fixture, resultados y playoffs del torneo de fútbol 5 entre cursos.">
     <meta property="og:image" content="https://mitreleague.com/Recursos/og-imagen.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -192,8 +193,7 @@
                 <div id="hero-track-3d">
                     <!-- Tarjeta de espera: se ve mientras cargan los datos o si no hay noticias (main.js la reemplaza) -->
                     <div class="hero-card-3d">
-                        <div class="hero-card-bg"
-                            style="background-image: linear-gradient(135deg, #0a1d54, #040c26);">
+                        <div class="hero-card-bg" style="background-image: linear-gradient(135deg, #0a1d54, #040c26);">
                         </div>
                         <div class="hero-card-content">
                             <h2>Mitre League · Clausura 2026</h2>
@@ -470,7 +470,7 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                     <!-- VISTA PLAYOFFS CON SWITCH COMPACTO/EXTENDIDO -->
                     <div id="vista-playoffs" class="vista-carrusel-slide seccion-oculta">
                         <div id="playoffs-banner-espera" class="seccion-oculta"
-                            style="background: linear-gradient(135deg, rgba(26, 50, 116,0.4) 0%, rgba(10, 29, 84,0.8) 100%); border: 1px dashed #f2c00e; border-radius: 5px; padding: 30px 20px; text-align: center; margin: 20px auto; max-width: 600px;">
+                            style="background: linear-gradient(135deg, rgba(26, 50, 116,0.4) 0%, rgba(10, 29, 84,0.8) 100%); border-radius: 5px; padding: 30px 20px; text-align: center; margin: 20px auto; max-width: 600px;">
                             <h3
                                 style="font-family: 'Michroma', sans-serif; color: #f2c00e; font-size: 16px; margin: 0 0 8px 0;">
                                 PLAY-OFFS EN ESPERA</h3>
@@ -491,8 +491,10 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                                 </div>
                                 <!-- Solo para un ciclo con Copa Plata (el JS saca el hidden) -->
                                 <div class="tabs-copa-playoff" hidden>
-                                    <button class="tab-btn active btn-playoff-copa" data-copa-playoff="oro">Copa Oro</button>
-                                    <button class="tab-btn btn-playoff-copa" data-copa-playoff="plata">Copa Plata</button>
+                                    <button class="tab-btn active btn-playoff-copa" data-copa-playoff="oro">Copa
+                                        Oro</button>
+                                    <button class="tab-btn btn-playoff-copa" data-copa-playoff="plata">Copa
+                                        Plata</button>
                                 </div>
                             </div>
 
@@ -716,7 +718,8 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
                                     un amistoso). Si abona entre el 50% y el 100%, el partido queda suspendido y sin
                                     puntos para ninguno de los dos; si abona menos del 50%, queda como equipo no
                                     presentado: pierde los puntos del partido y se le restan 2 puntos de la tabla. Si no
-                                    se presenta ninguno de los dos, el partido queda como no jugado y sin puntos, y al que
+                                    se presenta ninguno de los dos, el partido queda como no jugado y sin puntos, y al
+                                    que
                                     no abone como mínimo el 50% se le restan 2 puntos hasta completarlo. En Play-Offs,
                                     el equipo que no se presenta queda eliminado y no abona el derecho de partido.</li>
                             </ul>
@@ -926,75 +929,77 @@ margin-top: 3px;"> Mitre League 2026</span></h2>
             <!-- VISTA DEL EQUIPO (la ficha de siempre) -->
             <div id="modal-vista-equipo">
 
-            <!-- Nombre y Categoría -->
-            <div class="equipo-modal-header">
-                <div>
-                    <h2 id="modal-equipo-nombre">6TO 2DA</h2>
-                    <span id="modal-equipo-categoria" class="badge-categoria">Ciclo Superior — Grupo A</span>
+                <!-- Nombre y Categoría -->
+                <div class="equipo-modal-header">
+                    <div>
+                        <h2 id="modal-equipo-nombre">6TO 2DA</h2>
+                        <span id="modal-equipo-categoria" class="badge-categoria">Ciclo Superior — Grupo A</span>
+                    </div>
                 </div>
-            </div>
-            <!-- Métrica Horizontal (Boceto) -->
-            <div class="equipo-stats-grid">
-                <div class="stat-box">
-                    <span class="stat-label">POSICIÓN</span>
-                    <span id="modal-equipo-pos" class="stat-val highlight">1°</span>
+                <!-- Métrica Horizontal (Boceto) -->
+                <div class="equipo-stats-grid">
+                    <div class="stat-box">
+                        <span class="stat-label">POSICIÓN</span>
+                        <span id="modal-equipo-pos" class="stat-val highlight">1°</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">GOLES</span>
+                        <span id="modal-equipo-gf" class="stat-val green">20</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">PUNTOS</span>
+                        <span id="modal-equipo-pts" class="stat-val gold">6</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">PJ</span>
+                        <span id="modal-equipo-pj" class="stat-val">2</span>
+                    </div>
                 </div>
-                <div class="stat-box">
-                    <span class="stat-label">GOLES</span>
-                    <span id="modal-equipo-gf" class="stat-val green">20</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-label">PUNTOS</span>
-                    <span id="modal-equipo-pts" class="stat-val gold">6</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-label">PJ</span>
-                    <span id="modal-equipo-pj" class="stat-val">2</span>
-                </div>
-            </div>
 
-            <!-- Selector de Pestañas (JUGADORES / PARTIDOS) -->
-            <div class="equipo-tabs-nav">
-                <button class="tab-btn active btn-tab-modal" data-modal-target="tab-modal-jugadores">JUGADORES</button>
-                <button class="tab-btn btn-tab-modal" data-modal-target="tab-modal-partidos">PARTIDOS</button>
-            </div>
-
-            <!-- VISTA 1: TABLA DE JUGADORES (Misma estética de Posiciones) -->
-            <div id="tab-modal-jugadores" class="tab-modal-content">
-                <p class="perfil-jugador-hint">Tocá un jugador para ver sus estadísticas.</p>
-                <div class="table-wrapper">
-                    <table class="table-style">
-                        <thead>
-                            <tr class="table-head-row">
-                                <th></th>
-                                <th>N°</th>
-                                <th style="text-align: left;">JUGADOR</th>
-                                <th>PJ</th>
-                                <th style="color: #2edae3;">GOLES</th>
-                                <th style="color: #f2c00e;">A</th>
-                                <th style="color: #f43f5e;">R</th>
-                                <th>INSTAGRAM</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modal-equipo-tbody-jugadores">
-                            <!-- Carga dinámica por JS -->
-                        </tbody>
-                    </table>
+                <!-- Selector de Pestañas (JUGADORES / PARTIDOS) -->
+                <div class="equipo-tabs-nav">
+                    <button class="tab-btn active btn-tab-modal"
+                        data-modal-target="tab-modal-jugadores">JUGADORES</button>
+                    <button class="tab-btn btn-tab-modal" data-modal-target="tab-modal-partidos">PARTIDOS</button>
                 </div>
-            </div>
 
-            <!-- VISTA 2: LISTA DE PARTIDOS -->
-            <div id="tab-modal-partidos" class="tab-modal-content seccion-oculta">
-                <div id="modal-equipo-lista-partidos" class="resultados-lista">
-                    <!-- Carga dinámica por JS -->
+                <!-- VISTA 1: TABLA DE JUGADORES (Misma estética de Posiciones) -->
+                <div id="tab-modal-jugadores" class="tab-modal-content">
+                    <p class="perfil-jugador-hint">Tocá un jugador para ver sus estadísticas.</p>
+                    <div class="table-wrapper">
+                        <table class="table-style">
+                            <thead>
+                                <tr class="table-head-row">
+                                    <th></th>
+                                    <th>N°</th>
+                                    <th style="text-align: left;">JUGADOR</th>
+                                    <th>PJ</th>
+                                    <th style="color: #2edae3;">GOLES</th>
+                                    <th style="color: #f2c00e;">A</th>
+                                    <th style="color: #f43f5e;">R</th>
+                                    <th>INSTAGRAM</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modal-equipo-tbody-jugadores">
+                                <!-- Carga dinámica por JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+
+                <!-- VISTA 2: LISTA DE PARTIDOS -->
+                <div id="tab-modal-partidos" class="tab-modal-content seccion-oculta">
+                    <div id="modal-equipo-lista-partidos" class="resultados-lista">
+                        <!-- Carga dinámica por JS -->
+                    </div>
+                </div>
 
             </div>
 
             <!-- VISTA DEL JUGADOR: se abre tocando un jugador del equipo o de la tabla de Goleadores (main.js) -->
             <div id="modal-vista-jugador" class="seccion-oculta">
-                <button type="button" class="perfil-jugador-volver" id="btn-volver-equipo">&larr; Volver a <span id="perfil-jugador-volver-equipo"></span></button>
+                <button type="button" class="perfil-jugador-volver" id="btn-volver-equipo">&larr; Volver a <span
+                        id="perfil-jugador-volver-equipo"></span></button>
 
                 <div class="perfil-jugador-header">
                     <div id="perfil-jugador-foto" class="perfil-jugador-foto"></div>
