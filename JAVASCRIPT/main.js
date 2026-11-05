@@ -1514,7 +1514,7 @@ document.addEventListener('liga:datos-listos', () => {
             // Goles y Tarjetas Local
             let htmlLocal = '';
             if (partido.goleadoresLocal && partido.goleadoresLocal.length > 0) {
-                htmlLocal += partido.goleadoresLocal.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                htmlLocal += htmlGoleadoresPartido(partido.goleadoresLocal, 'local');
             }
             htmlLocal += htmlTarjetasPartido(partido, 'local');
             if (!htmlLocal && esJugado) htmlLocal = '<div style="opacity: 0.4;">Sin incidencias</div>';
@@ -1522,7 +1522,7 @@ document.addEventListener('liga:datos-listos', () => {
             // Goles y Tarjetas Visitante
             let htmlVisita = '';
             if (partido.goleadoresVisitante && partido.goleadoresVisitante.length > 0) {
-                htmlVisita += partido.goleadoresVisitante.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                htmlVisita += htmlGoleadoresPartido(partido.goleadoresVisitante, 'visitante');
             }
             htmlVisita += htmlTarjetasPartido(partido, 'visitante');
             if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin incidencias</div>';
@@ -2169,7 +2169,25 @@ document.addEventListener('liga:datos-listos', () => {
         return (copaDe(a) === 'plata') - (copaDe(b) === 'plata');
     }
 
-    // Tarjetas de un lado del partido con el mismo formato que los goleadores ("Nombre (#N)", y "x2" si tiene más de una).
+    // Nombre del jugador con el dorsal tenue, sin # ni paréntesis. En la columna del local, alineada a la derecha, el
+    // número va después del nombre: así queda pegado a la línea del medio de los dos lados.
+    function htmlNombreConDorsal(nombre, dorsal, lado) {
+        const tieneDorsal = dorsal !== undefined && dorsal !== null && String(dorsal).trim() !== '';
+        const numero = tieneDorsal ? `<span class="dorsal-tenue">${escaparHtml(dorsal)}</span>` : '';
+        return lado === 'local' ? `${escaparHtml(nombre)} ${numero}` : `${numero} ${escaparHtml(nombre)}`;
+    }
+
+    // Goleadores de un lado del partido: un renglón por gol. El partido guarda la etiqueta "Nombre (#N)" y la cantidad;
+    // una etiqueta sin dorsal se muestra entera.
+    function htmlGoleadoresPartido(lista, lado) {
+        return lista.map(g => {
+            const partes = (g.nombre || '').match(/^(.*?)\s*\(#(\d+)\)\s*$/);
+            const renglon = `<div>${partes ? htmlNombreConDorsal(partes[1], partes[2], lado) : escaparHtml(g.nombre)}</div>`;
+            return renglon.repeat(Math.max(1, Number(g.cantidad) || 1));
+        }).join('');
+    }
+
+    // Tarjetas de un lado del partido con el mismo formato que los goleadores: dorsal tenue y un renglón por tarjeta.
     // En el partido se guarda el DNI de cada jugador: acá se busca el nombre y el dorsal en el plantel.
     function htmlTarjetasPartido(partido, lado) {
         const esLocal = lado === 'local';
@@ -2185,7 +2203,7 @@ document.addEventListener('liga:datos-listos', () => {
             return Object.keys(cantidades).map(id => {
                 const jugador = (equipo.jugadores || []).find(j => j.dni === id);
                 if (!jugador) return '';
-                return `<div><span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>${escaparHtml(jugador.nombre)} (#${escaparHtml(jugador.dorsal)}) ${cantidades[id] > 1 ? `x${cantidades[id]}` : ''}</div>`;
+                return `<div><span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>${htmlNombreConDorsal(jugador.nombre, jugador.dorsal, lado)}</div>`.repeat(cantidades[id]);
             }).join('');
         }).join('');
     }
@@ -2199,13 +2217,13 @@ document.addEventListener('liga:datos-listos', () => {
     }
 
     // MVP del partido: el panel guarda al jugador (mvpId, que en la web pública es el código de su DNI) y acá se arma
-    // "Nombre (#N)". Un partido viejo puede traer el MVP como texto suelto en "mvp".
+    // el nombre con su dorsal. Un partido viejo puede traer el MVP como texto suelto en "mvp".
     function htmlMvpPartido(partido) {
         if (partido.mvpId) {
             for (const esLocal of [true, false]) {
                 const equipo = equipoDelLadoPublico(partido, esLocal);
                 const jugador = equipo && (equipo.jugadores || []).find(j => j.dni === partido.mvpId);
-                if (jugador) return `<strong>MVP:</strong> ${escaparHtml(jugador.nombre)} (#${escaparHtml(jugador.dorsal)})`;
+                if (jugador) return `<strong>MVP:</strong> ${htmlNombreConDorsal(jugador.nombre, jugador.dorsal)}`;
             }
             return '';
         }
@@ -2360,7 +2378,7 @@ document.addEventListener('liga:datos-listos', () => {
                 // Incidencias Local
                 let htmlLocal = '';
                 if (partido.goleadoresLocal && partido.goleadoresLocal.length > 0) {
-                    htmlLocal += partido.goleadoresLocal.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                    htmlLocal += htmlGoleadoresPartido(partido.goleadoresLocal, 'local');
                 }
                 htmlLocal += htmlTarjetasPartido(partido, 'local');
                 if (!htmlLocal && esJugado) htmlLocal = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';
@@ -2368,7 +2386,7 @@ document.addEventListener('liga:datos-listos', () => {
                 // Incidencias Visitante
                 let htmlVisita = '';
                 if (partido.goleadoresVisitante && partido.goleadoresVisitante.length > 0) {
-                    htmlVisita += partido.goleadoresVisitante.map(g => `<div>${escaparHtml(g.nombre)} ${g.cantidad > 1 ? `x${g.cantidad}` : ''}</div>`).join('');
+                    htmlVisita += htmlGoleadoresPartido(partido.goleadoresVisitante, 'visitante');
                 }
                 htmlVisita += htmlTarjetasPartido(partido, 'visitante');
                 if (!htmlVisita && esJugado) htmlVisita = '<div style="opacity: 0.4;">Sin goles/tarjetas</div>';

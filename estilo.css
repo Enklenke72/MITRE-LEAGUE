@@ -3026,7 +3026,15 @@ body.scrolled .dashboard-container section {
     margin: 0 5px !important;
 }
 
-/* Banner de MVP Abajo */
+/* Dorsal al lado del nombre en los goleadores, las tarjetas y el MVP: se ve, pero sin robarle lugar al nombre */
+.dorsal-tenue {
+    opacity: 0.5;
+}
+
+.mvp-banner .dorsal-tenue {
+    opacity: 0.7;
+}
+
 /* 3-0 automático del Art. 17 Bis: etiqueta debajo del resultado y explicación en el desplegable (18/10/2026) */
 .match-meta-auto {
     display: block;
@@ -3058,16 +3066,14 @@ body.scrolled .dashboard-container section {
     text-align: center;
 }
 
+/* Banner de MVP abajo del partido */
 .mvp-banner {
     margin-top: 12px !important;
     text-align: center !important;
     font-size: 10px !important;
-    color: #f2c00e !important;
+    color: #869bd8 !important;
     font-family: 'Oswald', sans-serif !important;
-    background: rgba(242, 192, 14, 0.08) !important;
-    border: 1px solid rgba(242, 192, 14, 0.2) !important;
     padding: 5px 10px !important;
-    border-radius: 3px !important;
 }
 
 /* 🔎 BUSCADOR GLOBAL DESPLEGABLE */
@@ -3858,9 +3864,7 @@ body::-webkit-scrollbar-thumb {
     border-radius: 3px;
     font-size: 10px;
     letter-spacing: 0.5px;
-    color: #f2c00e;
-    background: rgba(242, 192, 14, 0.08);
-    border: 1px solid rgba(242, 192, 14, 0.35);
+    color: #869bd8;
 }
 .perfil-jugador-vacio {
     font-family: 'Oswald', sans-serif;
