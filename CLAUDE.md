@@ -727,11 +727,11 @@ Implementado en `admin.js` (bloque de Tesorería reescrito) con clases `teso-*` 
     - **Verificado con el Firestore simulado:** banco nuevo `banco-egresos-filtro.html` **22 PASS / 0 FAIL**, sin errores de JS (filtra por fecha y por general, totales con singular y plural, orden, fecha fuera de rango que aparece en el filtro, detalle escapado, el Balance y Recaudación no cambian con el filtro, cancelar el `confirm` no borra y aceptar sí, el filtro se recuerda al recargar, 390 px sin desborde). Integridad **12/0**. Capturas a 1280 y 390 px. **No probado contra Firebase real ni en un celular.**
 
 ### Pendiente
-- **El `.git` de esta PC está dañado (encontrado el 19/11/2026): no se puede commitear desde la carpeta del proyecto.**
+- **`.git` de esta PC: ARREGLADO el 24/11/2026.** Se reemplazó por el de un clon limpio de GitHub (en el commit `0e0e442`) y quedó sano (`git fsck` limpio, `git status` sin cambios). El viejo quedó renombrado como `.git-danada-2026-11-24/`, en la carpeta del proyecto y excluido en `.git/info/exclude` (no aparece en `git status`); Joaquín lo puede borrar cuando quiera. Se puede volver a commitear desde la carpeta, con el autor de abajo. Historia:
+- **El `.git` de esta PC estaba dañado (encontrado el 19/11/2026): no se podía commitear desde la carpeta del proyecto.**
   - Qué pasa: `git fsck` muestra objetos que faltan (empezando por el de `favicon.ico`). Lo más probable es que esta PC haya recibido una copia incompleta del repositorio por OneDrive.
   - GitHub está bien. Joaquín confirmó el 24/11/2026 que en la notebook no quedaba nada sin commitear ni pushear.
   - **Los Hechos #56 a #59 se commitearon y pushearon el 24/11/2026 desde un clon limpio de GitHub** (en una carpeta temporal), copiando solo los 6 archivos cambiados. La carpeta del proyecto no se tocó.
-  - **Sigue pendiente arreglar el `.git` de esta carpeta** (por ejemplo, reemplazarlo por el de un clon limpio). Hasta entonces, commitear desde un clon aparte. No lo repares sin preguntarle a Joaquín.
   - En un clon nuevo, 7 archivos (`.gitignore`, `netlify.toml`, `auth-login.js`, `firebase-config.js`, dos SVG y un README de fuentes) difieren de la carpeta **solo en los saltos de línea** (`core.autocrlf=true`): no son cambios, no copiarlos.
   - **Autor de los commits (decidido por Joaquín):** `Enklenke72 <coriaf141@gmail.com>`, el mismo de los commits anteriores. Se pasa solo en cada commit (`git -c user.name=… -c user.email=…`), sin cambiar la configuración de git de la PC, que no tiene nombre ni email configurados.
 - **Cuaderno de fotos TransferNow → Drive (Hecho #52): anduvo (18 minutos para 6 partes). Falta probar en Colab real la versión con la ruta completa en `CARPETA`, la próxima vez que lleguen fotos.** Detalle en el Hecho #52.
