@@ -99,7 +99,11 @@ document.addEventListener('liga:datos-listos', () => {
             let clasePosicion = 'td-pos-normal';
             const fila = filaDe.get(equipo);
             const copa = fila ? fila.copa : null;
-            const cartel = fila && fila.porComparacion ? textoEntradaPorComparacion(clasificacion, fila, ciclo) : '';
+            // "No juega los playoffs" (Hecho #58): sin color de copa y con la etiqueta NO JUEGA, que va por CSS (::after)
+            // para no meterla en el texto de la celda, que el clic del perfil y el buscador leen como nombre del equipo.
+            const noJuega = !esTablaUnica && !!(fila && fila.noJuega);
+            const cartel = noJuega ? 'No juega los playoffs'
+                : (fila && fila.porComparacion ? textoEntradaPorComparacion(clasificacion, fila, ciclo) : '');
 
             if (esTablaUnica) {
                 if (index < 4) clasePosicion = 'td-pos-bombo1';       // Bombo 1 (1° al 4°)
@@ -120,7 +124,7 @@ document.addEventListener('liga:datos-listos', () => {
             tbody.innerHTML += `
                 <tr class="${claseFila}">
                     <td class="${clasePosicion}" ${cartel ? `title="${escaparHtml(cartel)}"` : ''}>${index + 1}</td>
-                    <td class="td-team-name">${escaparHtml(equipo.nombre)}</td>
+                    <td class="td-team-name${noJuega ? ' td-no-juega-playoffs' : ''}"${noJuega ? ' title="No juega los playoffs"' : ''}>${escaparHtml(equipo.nombre)}</td>
                     <td>${equipo.pj}</td>
                     <td>${equipo.g}</td>
                     <td>${equipo.e}</td>
@@ -1564,7 +1568,7 @@ document.addEventListener('liga:datos-listos', () => {
                     <div class="match-details-drawer seccion-oculta">
                         <div class="drawer-divider-top"></div>
                         
-                        ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `${bannerAusencia(partido)}
+                        ${esJugado || (partido.suspendido && (htmlLocal || htmlVisita)) ? (partido.resultadoAuto ? bannerAusencia(partido) : `${bannerAusencia(partido)}
                             <div class="split-details-container">
                                 <div class="split-col col-left">${htmlLocal}</div>
                                 <div class="split-vertical-line"></div>
@@ -2111,7 +2115,7 @@ document.addEventListener('liga:datos-listos', () => {
         const id = jugador.dni;
         const total = { amarillas: 0, rojas: 0 };
         partidos.forEach(p => {
-            if (!p.jugado) return;
+            if (!p.jugado && !p.suspendido) return; // las de un partido suspendido también cuentan (Joaquín, 19/11/2026)
             const { esLocal, esVisita } = ladosDelEquipoEnPartido(p, equipo);
             const contar = lista => (lista || []).filter(x => x === id).length;
             if (esLocal) { total.amarillas += contar(p.amarillasLocal); total.rojas += contar(p.rojasLocal); }
@@ -2234,6 +2238,12 @@ document.addEventListener('liga:datos-listos', () => {
     // sin jugar. El panel guarda en el partido quién faltó (ausencia: {local, visitante}) y, si el otro se presentó,
     // el 3-0 automático (resultadoAuto). Devuelve la etiqueta de debajo del marcador y el texto del desplegable.
     function estadoAusencia(partido) {
+        // Marcado suspendido en Carga de Partidos (Hecho #56): sin puntos para ninguno, aunque correspondiera un 3-0.
+        if (partido.suspendido && !partido.jugado) {
+            const ninguno = partido.ausencia && partido.ausencia.local && partido.ausencia.visitante;
+            return { etiqueta: 'Suspendido', texto: `Partido suspendido${partido.motivoSuspension ? ': ' + partido.motivoSuspension : ''}. Sin puntos para ninguno.`
+                + (ninguno ? ' No se presentó ninguno de los dos equipos (Art. 17 Bis).' : '') };
+        }
         // Dado por perdido 0-3 por el Tribunal (por ejemplo, un equipo descalificado; pedido de Joaquín, 22/10/2026).
         if (partido.jugado && (partido.perdidoTribunal === 'local' || partido.perdidoTribunal === 'visitante')) {
             const perdedor = partido[partido.perdidoTribunal];
@@ -2433,7 +2443,7 @@ document.addEventListener('liga:datos-listos', () => {
                         <div class="match-details-drawer seccion-oculta">
                             <div class="drawer-divider-top"></div>
                             
-                            ${esJugado ? (partido.resultadoAuto ? bannerAusencia(partido) : `${bannerAusencia(partido)}
+                            ${esJugado || (partido.suspendido && (htmlLocal || htmlVisita)) ? (partido.resultadoAuto ? bannerAusencia(partido) : `${bannerAusencia(partido)}
                                 <div class="split-details-container">
                                     <div class="split-col col-left">${htmlLocal}</div>
                                     <div class="split-vertical-line"></div>
@@ -2502,9 +2512,15 @@ document.addEventListener('liga:datos-listos', () => {
     // Partidos del jugador: los jugados (sin los 3-0 automáticos) en los que figura tildado en la lista de buena fe,
     // hizo goles, vio tarjetas o fue el MVP.
     function htmlPartidosDeJugador(jugador, equipo, partidos) {
-        const filas = partidos.filter(p => p.jugado && !p.resultadoAuto).map(p => {
+        // Un partido suspendido (Hecho #56) entra solo si el jugador vio tarjetas: no suma PJ, goles ni MVP.
+        const filas = partidos.filter(p => (p.jugado && !p.resultadoAuto) || (p.suspendido && !p.jugado)).map(p => {
             const { esLocal, esVisita } = ladosDelEquipoEnPartido(p, equipo);
             if (!esLocal && !esVisita) return null;
+            if (!p.jugado) {
+                const tarjetasSusp = tarjetasDeJugador(jugador, equipo, [p]);
+                return tarjetasSusp.amarillas || tarjetasSusp.rojas
+                    ? { p, esLocal, goles: 0, tarjetas: tarjetasSusp, mvp: false, suspendido: true } : null;
+            }
             const tildado = (p[esLocal ? 'asistentesLocal' : 'asistentesVisitante'] || []).includes(jugador.dni);
             const goles = golesDeJugador(jugador, equipo, [p]);
             const tarjetas = tarjetasDeJugador(jugador, equipo, [p]);
@@ -2516,7 +2532,22 @@ document.addEventListener('liga:datos-listos', () => {
         if (filas.length === 0) return '<p class="perfil-jugador-vacio">Todavía no jugó partidos.</p>';
 
         filas.sort((a, b) => ordenCronologicoFechaPublico(a.p.fecha) - ordenCronologicoFechaPublico(b.p.fecha));
-        return filas.map(({ p, esLocal, goles, tarjetas, mvp }) => {
+        return filas.map(({ p, esLocal, goles, tarjetas, mvp, suspendido }) => {
+            if (suspendido) {
+                const iconoSusp = (clase, etiqueta, n) => `<span class="tarjeta-ico tarjeta-${clase}" role="img" aria-label="${etiqueta}"></span>`.repeat(n);
+                return `
+                <div class="perfil-partido">
+                    <div class="perfil-partido-info">
+                        <span class="perfil-partido-fecha">${escaparHtml(nombreFasePublico(p))}</span>
+                        <span class="perfil-partido-rival">vs ${escaparHtml(esLocal ? p.visitante : p.local)}</span>
+                    </div>
+                    <div class="perfil-partido-detalle">
+                        <span class="perfil-partido-res res-S" title="Suspendido">SUSP.</span>
+                        ${iconoSusp('amarilla', 'Amarilla', tarjetas.amarillas) + iconoSusp('roja', 'Roja', tarjetas.rojas)}
+                    </div>
+                </div>
+            `;
+            }
             const propios = esLocal ? p.golesLocal : p.golesVisitante;
             const ajenos = esLocal ? p.golesVisitante : p.golesLocal;
             let res = propios > ajenos ? 'G' : (propios < ajenos ? 'P' : 'E');

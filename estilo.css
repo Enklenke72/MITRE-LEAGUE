@@ -3852,6 +3852,10 @@ body::-webkit-scrollbar-thumb {
 .perfil-partido-res.res-G { color: #4ade80; background: rgba(74, 222, 128, 0.1); }
 .perfil-partido-res.res-E { color: #cbd5e1; background: rgba(203, 213, 225, 0.08); }
 .perfil-partido-res.res-P { color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
+/* Lote 1 (Hecho #56): partido suspendido en el partido a partido del jugador, y el motivo en el formulario del panel */
+.perfil-partido-res.res-S { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+#partido-motivo-suspension-grupo { margin-top: 6px; }
+#partido-motivo-suspension-grupo input { width: 100%; box-sizing: border-box; }
 .perfil-partido-goles {
     font-size: 12px;
     color: #4ade80;
@@ -4261,6 +4265,53 @@ body.rol-staff .solo-admin {
     cursor: pointer;
 }
 .deudor-btn-pago:hover { background: #2c68e7; }
+
+/* Lote 2 (Hecho #57): "Dejar pasar", "Cobrar inscripción", saldo a favor con su origen y lo perdonado en las tarjetas */
+.deudor-botones { display: flex; flex-wrap: wrap; gap: 6px; }
+.deudor-btn-perdonar {
+    min-height: 34px;
+    padding: 4px 10px;
+    border: 1px solid #869bd8;
+    border-radius: 3px;
+    background: transparent;
+    color: #c5cedc;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+.deudor-btn-perdonar:hover { background: rgba(134, 155, 216, 0.15); color: #ffffff; }
+.deudor-nota-rol { font-family: 'Oswald', sans-serif; font-size: 10px; color: #869bd8; }
+.deudores-saldos-titulo { margin: 18px 0 4px; font-family: 'Oswald', sans-serif; font-size: 14px; color: #4ade80; text-transform: uppercase; letter-spacing: 0.5px; }
+.deudor-monto-saldo { color: #4ade80; }
+.teso-perdon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 10px;
+    margin-top: 8px;
+    padding: 6px 8px;
+    border: 1px dashed rgba(134, 155, 216, 0.5);
+    border-radius: 3px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    color: #c5cedc;
+    overflow-wrap: anywhere;
+}
+.teso-perdon span { flex: 1 1 180px; min-width: 0; }
+.teso-perdon-btn {
+    min-height: 30px;
+    padding: 3px 10px;
+    border: 1px solid #869bd8;
+    border-radius: 3px;
+    background: transparent;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    cursor: pointer;
+}
+.teso-perdon-btn:hover { background: rgba(134, 155, 216, 0.15); }
+.teso-insc-card.teso-insc-resaltada { box-shadow: 0 0 0 2px #2edae3; transition: box-shadow 0.3s; }
 
 /* En el panel, en celular, "clip" en vez del "hidden" de html/body: recorta igual, pero "hidden" convertía al body en
    contenedor de scroll y ningún position: sticky quedaba fijo (esta barra y el aviso de cambios ajenos). Solo el panel:
@@ -6488,3 +6539,53 @@ body.auth-pendiente .auth-gate {
         }
     }
 }
+
+/* Lote 4: filtro y total de la lista de egresos (Hecho #59) */
+.egresos-filtro { margin-bottom: 8px; }
+.egresos-total-filtro { margin: 0 0 10px; font-size: 12px; font-weight: bold; color: #fca5a5; text-align: left; }
+
+/* Lote 3 (Hecho #58): equipos que no juegan los playoffs */
+.table-style td.td-team-name.td-no-juega-playoffs { color: #a9bce8; }
+/* Va por ::after y no dentro de la celda: el clic del perfil y el buscador leen el texto de la celda como nombre */
+.table-style td.td-team-name.td-no-juega-playoffs::after {
+    content: 'NO JUEGA';
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border: 1px solid rgba(169, 188, 232, 0.35);
+    border-radius: 4px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 9px !important;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+    color: #869bd8;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.no-juega-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+    border-color: #869bd8;
+    text-align: left;
+}
+.no-juega-titulo { margin-top: 0; color: #c5cedc; }
+.no-juega-btn { background: #1a3274; border-color: #869bd8; color: #ffffff; }
+.no-juega-lista { margin-top: 12px; }
+.no-juega-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.no-juega-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid rgba(134, 155, 216, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+}
+.no-juega-nombre { flex: 1 1 auto; min-width: 0; font-family: 'Michroma', sans-serif; font-size: 12px; color: #ffffff; overflow-wrap: anywhere; }
+.no-juega-nombre small { display: block; margin-top: 2px; font-family: 'Oswald', sans-serif; font-size: 11px; color: #869bd8; }
+/* En celular ".importar-btn-cancelar" va a todo el ancho: acá queda al lado del nombre */
+.no-juega-item .no-juega-deshacer { flex: 0 0 auto; width: auto; }
+.no-juega-vacio { margin: 0; font-size: 11px; color: #869bd8; }
+.sorteo-no-juegan { margin: -4px 0 10px; color: #c5cedc; }

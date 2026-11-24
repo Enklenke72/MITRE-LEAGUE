@@ -80,6 +80,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
     function textoHistorialPartido(previo, nuevo) {
         const donde = `${nombreFasePartido(nuevo)} (${nombreCicloHistorial(nuevo.ciclo)})`;
         const cruce = `${nuevo.local} vs ${nuevo.visitante}`;
+        if (nuevo.suspendido && !nuevo.jugado && !(previo && previo.suspendido)) {
+            const era = previo && previo.jugado ? ` (era ${marcadorHistorial(previo)})` : '';
+            return `${previo ? 'editó' : 'cargó'} el partido de ${donde}: ${cruce}${era}, lo marcó suspendido${nuevo.motivoSuspension ? ` (${nuevo.motivoSuspension})` : ''}`;
+        }
         if (!nuevo.jugado) {
             if (previo && previo.jugado) return `borró el resultado de ${donde}: ${cruce} (era ${marcadorHistorial(previo)})`;
             return `${previo ? 'editó' : 'cargó'} el partido de ${donde}: ${cruce}`;
@@ -788,15 +792,37 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     // Un egreso no es de un ciclo: se ofrecen las fechas del ciclo que tiene más, más los playoffs.
-    function armarOpcionesFechaEgreso() {
-        const select = document.getElementById('egreso-fecha');
-        if (!select) return;
-        const valor = select.value;
+    function fechasParaEgresos() {
         const config = obtenerFechasGrupos();
         const grupos = listaFechasGrupos(Math.max(config.superior, config.basico), fechasGruposConPartidos(null));
-        select.innerHTML = '<option value="">General del torneo (ej. premios)</option>'
-            + [...grupos, ...fechasPlayoffOfrecidas(null).map(([f]) => f)].map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
-        select.value = [...select.options].some(o => o.value === valor) ? valor : '';
+        return [...grupos, ...fechasPlayoffOfrecidas(null).map(([f]) => f)];
+    }
+
+    function armarOpcionesFechaEgreso() {
+        const select = document.getElementById('egreso-fecha');
+        if (select) {
+            const valor = select.value;
+            select.innerHTML = '<option value="">General del torneo (ej. premios)</option>'
+                + fechasParaEgresos().map(f => `<option value="${f}">${nombreFaseTeso(f)}</option>`).join('');
+            select.value = [...select.options].some(o => o.value === valor) ? valor : '';
+        }
+        armarOpcionesFiltroEgresos();
+    }
+
+    // Filtro de la lista de egresos: las mismas fechas del formulario más las que ya tengan egresos (Hecho #59).
+    function armarOpcionesFiltroEgresos() {
+        const select = document.getElementById('filtro-egresos-fecha');
+        if (!select) return;
+        const valor = select.value || 'todas';
+        const codigos = fechasParaEgresos().map(String);
+        listaEgresos.forEach(eg => {
+            const f = eg.fecha ? String(eg.fecha) : '';
+            if (f && !codigos.includes(f)) codigos.push(f);
+        });
+        codigos.sort((a, b) => ordenCronologicoFecha(a) - ordenCronologicoFecha(b));
+        select.innerHTML = '<option value="todas">Todas las fechas</option><option value="general">General del torneo</option>'
+            + codigos.map(f => `<option value="${f}">${attrSeguro(nombreFaseTeso(f))}</option>`).join('');
+        select.value = [...select.options].some(o => o.value === valor) ? valor : 'todas';
     }
 
     function mostrarFechasGrupos() {
@@ -2346,7 +2372,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             + (eq.jugadores || []).filter(j => j.dni).sort(porDorsal)
                 .map(j => `<option value="${attrSeguro(idJugadorBF(j))}">${dorsalBF(j)} ${attrSeguro(j.nombre)}</option>`).join('')
             + '</optgroup>').join('');
-        selectMvp.value = [...selectMvp.options].some(o => o.value === elegido) ? elegido : '';
+        selectMvp.value = !partidoSuspendidoElegido() && [...selectMvp.options].some(o => o.value === elegido) ? elegido : '';
         nombrarOpcionesPerdidoTribunal();
     }
 
@@ -2373,6 +2399,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const campo = document.getElementById(id);
             if (campo) campo.disabled = !!perdedor;
         });
+        aplicarSuspendido(); // no se combina con "suspendido" y, si está suspendido, vuelve a bloquear los goles
         if (!perdedor) return;
         document.getElementById('goles-local').value = perdedor === 'local' ? 0 : 3;
         document.getElementById('goles-visitante').value = perdedor === 'local' ? 3 : 0;
@@ -2380,6 +2407,33 @@ document.addEventListener('liga:datos-listos', (evento) => {
         document.getElementById('dorsales-goles-visitante').value = '';
     }
     if (selectPerdidoTribunal()) selectPerdidoTribunal().addEventListener('change', aplicarPerdidoTribunal);
+
+    // Partido suspendido a mano (Hecho #56, decisiones de Joaquín del 19/11/2026): sin resultado ni puntos (jugado: false)
+    // y manda sobre el 3-0 automático (sincronizarAusencias no lo carga). Tesorería y el Art. 17 Bis siguen igual.
+    // Se pueden cargar tarjetas (suman en los totales del jugador); el MVP no. No se combina con "perdido por el Tribunal".
+    function selectSuspendido() { return document.getElementById('partido-suspendido'); }
+    function partidoSuspendidoElegido() { return !!selectSuspendido() && selectSuspendido().value === 'si'; }
+
+    function aplicarSuspendido() {
+        const sel = selectSuspendido();
+        if (!sel) return;
+        const selPerdido = selectPerdidoTribunal();
+        const perdedor = selPerdido ? selPerdido.value : '';
+        if (perdedor) sel.value = '';
+        const suspendido = sel.value === 'si';
+        sel.disabled = !!perdedor;
+        if (selPerdido) selPerdido.disabled = suspendido;
+        const grupoMotivo = document.getElementById('partido-motivo-suspension-grupo');
+        if (grupoMotivo) grupoMotivo.hidden = !suspendido;
+        ['goles-local', 'goles-visitante', 'dorsales-goles-local', 'dorsales-goles-visitante', 'penales-local', 'penales-visitante', 'partido-mvp'].forEach(id => {
+            const campo = document.getElementById(id);
+            if (!campo) return;
+            if (suspendido) campo.value = '';
+            const esDeGoles = id.startsWith('goles-') || id.startsWith('dorsales-goles-');
+            campo.disabled = suspendido || (esDeGoles && !!perdedor);
+        });
+    }
+    if (selectSuspendido()) selectSuspendido().addEventListener('change', aplicarSuspendido);
 
     // Al rearmar Local/Visitante (cambio de fecha, grupo o ciclo) se conservan los equipos elegidos si
     // siguen disponibles. Si no: en un partido nuevo, los primeros de la lista como siempre; editando uno,
@@ -2665,7 +2719,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             if (copaDelPartido) faseLabel += ` · ${copaDelPartido}`;
             // Marcado en Aranceles por Partido: no hay que cargarle resultado acá (el 3-0 lo pone el panel solo).
             const ausentes = p.ausencia ? [p.ausencia.local && p.local, p.ausencia.visitante && p.visitante].filter(Boolean) : [];
-            const marcaAusencia = p.jugado && p.perdidoTribunal ? `Lo pierde ${p[p.perdidoTribunal]} por decisión del Tribunal`
+            const marcaAusencia = p.suspendido && !p.jugado ? `Suspendido${p.motivoSuspension ? ' · ' + p.motivoSuspension : ''}${ausentes.length === 2 ? ' · no se presentó ninguno' : ''}`
+                : p.jugado && p.perdidoTribunal ? `Lo pierde ${p[p.perdidoTribunal]} por decisión del Tribunal`
                 : ausentes.length === 2 ? 'No se presentó ninguno'
                 : ausentes.length ? `No se presentó ${ausentes[0]}${p.resultadoAuto ? ' · 3-0 automático' : p.ausencia.suspendido ? ' · suspendido' : ''}` : '';
 
@@ -2748,7 +2803,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     if (document.getElementById('penales-visitante')) document.getElementById('penales-visitante').value = p.penalesVisitante !== null ? p.penalesVisitante : '';
                     if (inputDiaPartido) inputDiaPartido.value = diaStorageAInput(p.dia);
                     diaAutocompletado = diaStorageAInput(diaDeCalendario(p.ciclo, p.fecha));
-                    if (inputArancelPartido) inputArancelPartido.value = p.arancelExigido || 30000;
+                    if (inputArancelPartido) inputArancelPartido.value = p.arancelExigido || arancelPorDefecto();
                     if (checkHorarioConfirmar) checkHorarioConfirmar.checked = !p.horario;
                     armarOpcionesHorario(p.horario || '');
                     aplicarHorarioAConfirmar();
@@ -2772,7 +2827,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     equiposDeLosCampos = { local: p.local, visitante: p.visitante };
                     armarOpcionesMvp(p.mvpId || '');
                     if (selectPerdidoTribunal()) selectPerdidoTribunal().value = p.perdidoTribunal || '';
-                    aplicarPerdidoTribunal();
+                    if (selectSuspendido()) selectSuspendido().value = p.suspendido ? 'si' : '';
+                    if (document.getElementById('partido-motivo-suspension')) document.getElementById('partido-motivo-suspension').value = p.motivoSuspension || '';
+                    aplicarPerdidoTribunal(); // también aplica "suspendido"
 
                     if (submitBtnPartido) {
                         submitBtnPartido.textContent = 'Actualizar Partido';
@@ -2868,7 +2925,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const contexto = contextoForzado || contextoFormularioPartido();
 
         if (formPartido) formPartido.reset();
-        aplicarPerdidoTribunal(); // reset() vuelve a "No" pero no rehabilita los campos de goles
+        aplicarPerdidoTribunal(); // reset() vuelve a "No" (también "suspendido") pero no rehabilita los campos de goles
         if (contextoForzado && cicloSelect) {
             cicloSelect.value = contexto.ciclo;
             armarOpcionesFechaPartido(contexto.fecha);
@@ -2921,6 +2978,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             alinearCamposConEquipos();
             aplicarPerdidoTribunal();
             const perdidoTribunal = selectPerdidoTribunal() ? selectPerdidoTribunal().value : '';
+            const suspendido = partidoSuspendidoElegido();
+            const motivoSuspension = suspendido ? leerCampoTexto('partido-motivo-suspension') : '';
 
             const localInput = localSelect.value;
             const visitanteInput = visitanteSelect ? visitanteSelect.value : "";
@@ -2972,7 +3031,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 amarillasVisitante: leerCampoTexto('dorsales-amarillas-visitante'),
                 rojasVisitante: leerCampoTexto('dorsales-rojas-visitante')
             };
-            if (Object.values(tarjetasTxt).some(t => t !== '') && !esJugado) {
+            if (Object.values(tarjetasTxt).some(t => t !== '') && !esJugado && !suspendido) {
                 alert('Para cargar tarjetas primero cargá el resultado del partido.');
                 return;
             }
@@ -3093,7 +3152,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 mvpId: mvpElegido || null,
                 jugado: esJugado,
                 resultadoAuto: conservaResultadoAuto,
-                perdidoTribunal: perdidoTribunal || null
+                perdidoTribunal: perdidoTribunal || null,
+                suspendido: suspendido || null,
+                motivoSuspension: motivoSuspension || null
             };
 
             // La lista de buena fe (y de ahí los PJ) es de cada equipo: se va con él si cambia de lado, y la de un
@@ -3574,7 +3635,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (!panelSorteo || !sorteo) return;
         const s = sorteo;
         const cuadro = nombreCopa(s.ciclo, s.copa);
-        const encabezado = `<h4 class="sorteo-encabezado">${cuadro || 'Playoffs'} — Ciclo ${nombreCicloHistorial(s.ciclo)}${s.bombos ? ` · ${ETIQUETAS_RONDA[s.bombos.rondaInicial] || s.bombos.rondaInicial} · ${s.bombos.llaves} llaves` : ''}</h4>`;
+        const noJuegan = s.tabla.filas.filter(f => f.noJuega);
+        const encabezado = `<h4 class="sorteo-encabezado">${cuadro || 'Playoffs'} — Ciclo ${nombreCicloHistorial(s.ciclo)}${s.bombos ? ` · ${ETIQUETAS_RONDA[s.bombos.rondaInicial] || s.bombos.rondaInicial} · ${s.bombos.llaves} llaves` : ''}</h4>`
+            + (noJuegan.length ? `<p class="sorteo-texto sorteo-no-juegan">No juegan: ${noJuegan.map(nombreFila).join(', ')}</p>` : '');
         panelSorteo.classList.remove('seccion-oculta-staff');
 
         if (!s.bombos) {
@@ -3728,6 +3791,165 @@ document.addEventListener('liga:datos-listos', (evento) => {
             prepararSorteo();
         });
     }
+
+    // ============================================================
+    // EQUIPOS QUE NO JUEGAN LOS PLAYOFFS (Hecho #58) — decisiones de Joaquín del 19/11/2026
+    // ============================================================
+    // Un clasificado que no quiere seguir jugando queda afuera del sorteo sin descalificarlo: "noJuegaPlayoffs" en el
+    // equipo, y clasificacionDelCiclo (playoffs.js) le da su cupo al siguiente del ranking. Lo marcan Staff y Coordinador.
+    // No se marca si el equipo ya está en los cruces o en un partido de playoffs, y "Deshacer" no se permite si el ciclo
+    // ya tiene cruces o partidos de playoffs (volver a contarlo cambiaría quién entra a cada copa).
+    const selectCicloNoJuega = document.getElementById('no-juega-ciclo');
+    const selectEquipoNoJuega = document.getElementById('no-juega-equipo');
+    const btnMarcarNoJuega = document.getElementById('btn-no-juega-marcar');
+    const listaNoJuega = document.getElementById('no-juega-lista');
+
+    const nombreIgualNoJuega = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+    const esDelCicloNoJuega = (x, ciclo) => (x.ciclo || 'superior') === ciclo;
+
+    function equiposDelCicloNoJuega(ciclo) {
+        const grupos = gruposTorneo[ciclo] || [];
+        return (ciclo === 'basico' ? poolBasico : poolSuperior).filter(e => grupos.includes(e.grupo));
+    }
+
+    // El cruce o el partido de playoffs donde ya figura el equipo (por nombre, o por id en los partidos), o null.
+    function playoffsGuardadosDe(ciclo, eq) {
+        const cruces = (JSON.parse(almacen.getItem('liga_cruces_playoffs')) || []).filter(c => esDelCicloNoJuega(c, ciclo));
+        const cruce = cruces.find(c => nombreIgualNoJuega(c.local, eq.nombre) || nombreIgualNoJuega(c.visitante, eq.nombre));
+        if (cruce) return { tipo: 'cruce', copa: copaDe(cruce) };
+        const partido = partidos.find(p => p && p.esPlayoff && esDelCicloNoJuega(p, ciclo) && (
+            String(p.localId) === String(eq.id) || String(p.visitanteId) === String(eq.id)
+            || nombreIgualNoJuega(p.local, eq.nombre) || nombreIgualNoJuega(p.visitante, eq.nombre)));
+        return partido ? { tipo: 'partido', copa: copaDe(partido) } : null;
+    }
+
+    function cicloConPlayoffsGuardados(ciclo) {
+        const cruces = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || [];
+        return cruces.some(c => esDelCicloNoJuega(c, ciclo)) || partidos.some(p => p && p.esPlayoff && esDelCicloNoJuega(p, ciclo));
+    }
+
+    // Quién cambia de copa si este equipo pasa a no jugar (o vuelve a jugar): "Y entra a la Copa Plata", etc.
+    function cambiosDeCopaNoJuega(ciclo, idEquipo, noJuega) {
+        const tabla = tablaParaSorteo(ciclo);
+        const antes = new Map(tabla.filas.map(f => [String(f.equipo.id), f.copa]));
+        const copia = tabla.equipos.find(e => String(e.id) === String(idEquipo));
+        if (copia) {
+            if (noJuega) copia.noJuegaPlayoffs = true;
+            else delete copia.noJuegaPlayoffs;
+        }
+        const nombreDeCopa = copa => (copa ? (nombreCopa(ciclo, copa) || 'los playoffs') : 'ninguna copa');
+        return clasificacionDelCiclo(tabla.equipos, tabla.grupos, ciclo, tabla.desempates)
+            .filter(f => String(f.equipo.id) !== String(idEquipo) && antes.get(String(f.equipo.id)) !== f.copa)
+            .map(f => {
+                const previa = antes.get(String(f.equipo.id));
+                if (!f.copa) return `${f.equipo.nombre} queda afuera (estaba en ${nombreDeCopa(previa)})`;
+                return previa ? `${f.equipo.nombre} pasa de ${nombreDeCopa(previa)} a ${nombreDeCopa(f.copa)}` : `${f.equipo.nombre} entra a ${nombreDeCopa(f.copa)}`;
+            });
+    }
+
+    function equipoNoJuegaPorId(ciclo, id) {
+        recargarPools();
+        return (ciclo === 'basico' ? poolBasico : poolSuperior).find(e => String(e.id) === String(id));
+    }
+
+    function textoEquipoNoJuega(eq, ciclo) {
+        return `${eq.nombre} (${textoGrupoHistorial(eq.grupo)}, ${nombreCicloHistorial(ciclo)})`;
+    }
+
+    function cicloNoJuega() {
+        return selectCicloNoJuega ? selectCicloNoJuega.value : 'superior';
+    }
+
+    function renderizarNoJuega() {
+        if (!selectEquipoNoJuega || !listaNoJuega) return;
+        recargarPools();
+        const ciclo = cicloNoJuega();
+        const elegido = selectEquipoNoJuega.value;
+        const opciones = equiposDelCicloNoJuega(ciclo)
+            .filter(e => !e.noJuegaPlayoffs)
+            .sort((a, b) => String(a.grupo).localeCompare(String(b.grupo)) || a.nombre.localeCompare(b.nombre));
+        selectEquipoNoJuega.innerHTML = opciones.length
+            ? opciones.map(e => `<option value="${attrSeguro(e.id)}">${attrSeguro(e.nombre)} — ${attrSeguro(textoGrupoHistorial(e.grupo))}</option>`).join('')
+            : '<option value="">-- No hay equipos en los grupos de este ciclo --</option>';
+        if (opciones.some(e => String(e.id) === elegido)) selectEquipoNoJuega.value = elegido;
+        if (btnMarcarNoJuega) btnMarcarNoJuega.disabled = opciones.length === 0;
+
+        const marcados = ['superior', 'basico'].flatMap(c =>
+            (c === 'basico' ? poolBasico : poolSuperior).filter(e => e.noJuegaPlayoffs).map(e => ({ e, c })));
+        listaNoJuega.innerHTML = marcados.length
+            ? `<ul class="no-juega-items">${marcados.map(({ e, c }) => `
+                <li class="no-juega-item">
+                    <span class="no-juega-nombre">${attrSeguro(e.nombre)}<small>${attrSeguro(textoGrupoHistorial(e.grupo))} · ${nombreCicloHistorial(c)}</small></span>
+                    <button type="button" class="importar-btn-cancelar no-juega-deshacer" data-ciclo="${c}" data-id="${attrSeguro(e.id)}">Deshacer</button>
+                </li>`).join('')}</ul>`
+            : '<p class="no-juega-vacio">Ninguno: todos los clasificados juegan los playoffs.</p>';
+    }
+
+    // Si el Asistente está abierto, lo rehace con la clasificación nueva.
+    function rehacerSorteoAbierto() {
+        if (sorteo) prepararSorteo();
+    }
+
+    const avisoSorteoEmpezado = () => (sorteo && (sorteo.cruces.length || sorteo.elegido)
+        ? '\n\nHay un sorteo empezado en el Asistente: se reinicia con la clasificación nueva.' : '');
+
+    function marcarNoJuega() {
+        recargarPools();
+        const ciclo = cicloNoJuega();
+        const eq = equiposDelCicloNoJuega(ciclo).find(e => String(e.id) === selectEquipoNoJuega.value);
+        if (!eq) { alert('Elegí el equipo.'); return; }
+        if (eq.noJuegaPlayoffs) { renderizarNoJuega(); return; }
+        const guardado = playoffsGuardadosDe(ciclo, eq);
+        if (guardado) {
+            const cuadro = nombreCopa(ciclo, guardado.copa);
+            alert(`${eq.nombre} ya está ${guardado.tipo === 'cruce' ? 'en los cruces' : 'en un partido de playoffs'}${cuadro ? ` de la ${cuadro}` : ''} (Ciclo ${nombreCicloHistorial(ciclo)}). Primero hay que sacarlo con el Armador de Cruces o rehacer el sorteo de ${cuadro ? 'esa copa' : 'ese cuadro'}. No se guardó nada.`);
+            return;
+        }
+        const cambios = cambiosDeCopaNoJuega(ciclo, eq.id, true);
+        if (!confirm(`${textoEquipoNoJuega(eq, ciclo)} no juega los playoffs: queda afuera del sorteo y su lugar lo toma el siguiente del ranking. Su tabla no cambia.`
+            + (cambios.length ? `\n\nCon esto:\n- ${cambios.join('\n- ')}` : '\n\nHoy no ocupa ningún cupo: nadie cambia de copa.')
+            + avisoSorteoEmpezado() + '\n\n¿Seguir?')) return;
+        const actual = equipoNoJuegaPorId(ciclo, eq.id); // cambiosDeCopaNoJuega relee los planteles
+        if (!actual) return;
+        actual.noJuegaPlayoffs = true;
+        guardarEquiposEnStorage();
+        registrarHistorial('jugador', `marcó que ${textoEquipoNoJuega(actual, ciclo)} no juega los playoffs`);
+        renderizarNoJuega();
+        rehacerSorteoAbierto();
+    }
+
+    function deshacerNoJuega(ciclo, id) {
+        recargarPools();
+        const eq = (ciclo === 'basico' ? poolBasico : poolSuperior).find(e => String(e.id) === String(id));
+        if (!eq || !eq.noJuegaPlayoffs) { renderizarNoJuega(); return; }
+        if (cicloConPlayoffsGuardados(ciclo)) {
+            alert(`El Ciclo ${nombreCicloHistorial(ciclo)} ya tiene cruces o partidos de playoffs: volver a contar a ${eq.nombre} cambiaría quién entra a cada copa. Primero hay que sacar los cruces con el Armador de Cruces o rehacer el sorteo. No se guardó nada.`);
+            return;
+        }
+        const cambios = cambiosDeCopaNoJuega(ciclo, eq.id, false);
+        if (!confirm(`${textoEquipoNoJuega(eq, ciclo)} vuelve a contar para los playoffs.`
+            + (cambios.length ? `\n\nCon esto:\n- ${cambios.join('\n- ')}` : '')
+            + avisoSorteoEmpezado() + '\n\n¿Seguir?')) return;
+        const actual = equipoNoJuegaPorId(ciclo, eq.id);
+        if (!actual) return;
+        delete actual.noJuegaPlayoffs;
+        guardarEquiposEnStorage();
+        registrarHistorial('jugador', `volvió a contar a ${textoEquipoNoJuega(actual, ciclo)} para los playoffs`);
+        renderizarNoJuega();
+        rehacerSorteoAbierto();
+    }
+
+    if (selectCicloNoJuega) selectCicloNoJuega.addEventListener('change', renderizarNoJuega);
+    if (btnMarcarNoJuega) btnMarcarNoJuega.addEventListener('click', marcarNoJuega);
+    if (listaNoJuega) {
+        listaNoJuega.addEventListener('click', e => {
+            const boton = e.target.closest('.no-juega-deshacer');
+            if (boton) deshacerNoJuega(boton.dataset.ciclo, boton.dataset.id);
+        });
+    }
+    const btnSubPlayoffsNoJuega = document.getElementById('btn-sub-jornada-playoffs');
+    if (btnSubPlayoffsNoJuega) btnSubPlayoffsNoJuega.addEventListener('click', renderizarNoJuega);
+    renderizarNoJuega();
 
     // ============================================================
     // 4. MÓDULO PLANTELES, JUGADORES, GRUPOS Y EMERGENCIAS
@@ -6468,9 +6690,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const deudoresAbiertos = new Set();
     const ASISTENCIAS_REGISTRADAS = ['presente', 'sin_aviso', 'con_aviso'];
 
-    function deudoresDelTorneo() {
-        recargarPools();
-        const calc = calcularTesoreriaPartidos();
+    function deudoresDelTorneo(calc) {
         const deudaInscripcion = deudasInscripcionParaMostrar();
         const equipos = new Map();
         const entrada = (ciclo, clave, nombre) => {
@@ -6488,8 +6708,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 if (!p.jugado && !ASISTENCIAS_REGISTRADAS.includes(t.asistencia)) return;
                 const e = entrada(p.ciclo === 'basico' ? 'basico' : 'superior', equipoTeso(p, lado), t.nombre);
                 e.partidos.push({
-                    fecha: p.fecha, fase: nombreFasePartido(p), rival: lado === 'local' ? p.visitante : p.local,
-                    exigido: t.exigidoBruto, saldo: t.saldoAplicado, pagado: t.pagado, falta: t.falta, ausente: t.ausente
+                    clave: t.clave, fecha: p.fecha, fase: nombreFasePartido(p), rival: lado === 'local' ? p.visitante : p.local,
+                    exigido: t.exigidoBruto, saldo: t.saldoAplicado, pagado: t.pagado, perdonado: t.perdonado, falta: t.falta, ausente: t.ausente
                 });
                 e.faltaPartidos += t.falta;
             }));
@@ -6522,8 +6742,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const ciclo = (document.getElementById('filtro-deudores-ciclo') || {}).value || 'todos';
         const buscador = document.getElementById('buscador-deudores');
         const q = buscador ? normalizarTextoBusqueda(buscador.value.trim()) : '';
-        const todos = deudoresDelTorneo();
-        const lista = todos.filter(e => (ciclo === 'todos' || e.ciclo === ciclo) && (!q || normalizarTextoBusqueda(e.nombre).includes(q)));
+        recargarPools();
+        const calc = calcularTesoreriaPartidos();
+        const todos = deudoresDelTorneo(calc);
+        const pasaFiltro = e => (ciclo === 'todos' || e.ciclo === ciclo) && (!q || normalizarTextoBusqueda(e.nombre).includes(q));
+        const lista = todos.filter(pasaFiltro);
+        const esCoordinador = usuarioPanel.rol === 'coordinador';
 
         const totalPartidos = lista.reduce((acc, e) => acc + e.faltaPartidos, 0);
         const totalInscripcion = lista.reduce((acc, e) => acc + e.inscripcion, 0);
@@ -6544,18 +6768,87 @@ document.addEventListener('liga:datos-listos', (evento) => {
                         <div class="deudor-fila">
                             <div class="deudor-fila-info">
                                 <strong>${attrSeguro(m.fase)}</strong> <span>vs ${attrSeguro(m.rival)}</span>
-                                <small>${m.ausente ? 'No se presentó: debe el 50% · ' : ''}Exigido ${dinero(m.exigido)}${m.saldo > 0 ? ` · Saldo a favor usado ${dinero(m.saldo)}` : ''} · Pagó ${dinero(m.pagado)}</small>
+                                <small>${m.ausente ? 'No se presentó: debe el 50% · ' : ''}Exigido ${dinero(m.exigido)}${m.saldo > 0 ? ` · Saldo a favor usado ${dinero(m.saldo)}` : ''} · Pagó ${dinero(m.pagado)}${m.perdonado > 0 ? ` · Se dejó pasar ${dinero(m.perdonado)}` : ''}</small>
                             </div>
                             <span class="deudor-fila-monto">Falta ${dinero(m.falta)}</span>
-                            <button type="button" class="deudor-btn-pago" data-fecha="${attrSeguro(m.fecha)}" data-equipo="${attrSeguro(e.nombre)}">Cargar pago</button>
+                            <span class="deudor-botones">
+                                <button type="button" class="deudor-btn-pago" data-fecha="${attrSeguro(m.fecha)}" data-equipo="${attrSeguro(e.nombre)}">Cargar pago</button>
+                                <button type="button" class="deudor-btn-perdonar" data-clave="${attrSeguro(m.clave)}" data-equipo="${attrSeguro(e.nombre)}" data-fase="${attrSeguro(m.fase)}">Dejar pasar</button>
+                            </span>
                         </div>`).join('')}
                     ${e.inscripcion > 0 ? `
                         <div class="deudor-fila">
                             <div class="deudor-fila-info"><strong>Inscripción</strong><small>Falta pagar de la inscripción de sus jugadores</small></div>
                             <span class="deudor-fila-monto">Falta ${dinero(e.inscripcion)}</span>
+                            ${esCoordinador && !e.nota ? `
+                                <span class="deudor-botones">
+                                    <button type="button" class="deudor-btn-pago deudor-btn-insc" data-ciclo="${e.ciclo}" data-clave="${attrSeguro(e.clave)}">Cobrar inscripción</button>
+                                    <button type="button" class="deudor-btn-perdonar deudor-btn-perdonar-insc" data-clave="${attrSeguro(e.clave)}">Dejar pasar</button>
+                                </span>`
+                                : esCoordinador ? '' : '<small class="deudor-nota-rol">La cobra el Coordinador</small>'}
                         </div>` : ''}
                 </div>
-            </details>`).join('');
+            </details>`).join('') + htmlSaldosAFavor(calc, pasaFiltro, dinero);
+    }
+
+    // Equipos con saldo a favor y de dónde sale (pedido de Joaquín, 19/11/2026, Hecho #57): en plena jornada apareció un equipo
+    // con saldo que nadie esperaba. El saldo es el que queda hoy (después del último partido jugado o con pago).
+    function htmlSaldosAFavor(calc, pasaFiltro, dinero) {
+        const poolDe = c => (c === 'basico' ? poolBasico : poolSuperior) || [];
+        const lista = Object.entries(calc.saldosVigentes || {})
+            .filter(([, s]) => s.monto > 0)
+            .map(([clave, s]) => {
+                const actual = poolDe(s.ciclo).find(eq => claveInscripcion(eq) === clave);
+                return { ...s, clave, key: 'saldo|' + s.ciclo + '|' + clave, nombre: actual ? actual.nombre : s.nombre };
+            })
+            .filter(pasaFiltro)
+            .sort((a, b) => b.monto - a.monto || a.nombre.localeCompare(b.nombre, 'es'));
+        if (!lista.length) return '';
+        const textoOrigen = o => {
+            const base = `Pagó ${dinero(o.pagado)} y se le exigía ${dinero(o.exigido)}: ${o.motivo}.`;
+            if (!o.arrastres.length) return base;
+            return `${base} Se siguió arrastrando en ${o.arrastres.map(nombreFaseTeso).join(', ')} porque se cobró el valor completo sin descontar el saldo.`;
+        };
+        return `
+            <h4 class="deudores-saldos-titulo">Equipos con saldo a favor</h4>
+            <p class="calendario-ayuda">El saldo a favor se descuenta solo en el próximo partido. Si en cancha se le vuelve a cobrar el valor completo, el saldo no se gasta y sigue apareciendo. Si fue un error (arancel mal cargado o un pago repetido), corregilo en esa tarjeta de Aranceles.</p>
+            ${lista.map(s => `
+                <details class="teso-team-box deudor-item deudor-saldo" data-key="${attrSeguro(s.key)}"${deudoresAbiertos.has(s.key) ? ' open' : ''}>
+                    <summary class="deudor-resumen-fila">
+                        <span class="deudor-nombre">${attrSeguro(s.nombre)}</span>
+                        <span class="deudor-meta">${nombreCicloHistorial(s.ciclo)}</span>
+                        <span class="teso-chip teso-chip-verde">A favor ${dinero(s.monto)}</span>
+                    </summary>
+                    <div class="deudor-detalle">
+                        ${s.origenes.map(o => `
+                            <div class="deudor-fila">
+                                <div class="deudor-fila-info">
+                                    <strong>Viene de ${attrSeguro(nombreFaseTeso(o.fecha))}</strong>
+                                    <small>${attrSeguro(textoOrigen(o))}</small>
+                                </div>
+                                <span class="deudor-fila-monto deudor-monto-saldo">${dinero(o.monto)}</span>
+                                <button type="button" class="deudor-btn-pago" data-fecha="${attrSeguro(o.fecha)}" data-equipo="${attrSeguro(s.nombre)}">Ver en Aranceles</button>
+                            </div>`).join('')}
+                    </div>
+                </details>`).join('')}`;
+    }
+
+    // "Cobrar inscripción" (solo Coordinador): abre Inscripciones por Jugador en el ciclo del equipo y deja la tarjeta
+    // resaltada, con el cursor en Efectivo.
+    function irAInscripcionDe(ciclo, clave) {
+        if (usuarioPanel.rol !== 'coordinador' || !btnSubTesoInscripciones) return;
+        if (filtroInscripcionesCiclo && filtroInscripcionesCiclo.value !== ciclo) {
+            filtroInscripcionesCiclo.value = ciclo;
+            filtroInscripcionesCiclo.dispatchEvent(new Event('change'));
+        }
+        btnSubTesoInscripciones.click();
+        const tarjeta = [...document.querySelectorAll('#contenedor-tesoreria-inscripciones .teso-insc-card')].find(c => c.dataset.eq === clave);
+        if (!tarjeta) return;
+        tarjeta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        tarjeta.classList.add('teso-insc-resaltada');
+        setTimeout(() => tarjeta.classList.remove('teso-insc-resaltada'), 2500);
+        const efectivo = tarjeta.querySelector('.in-insc-ef');
+        if (efectivo) efectivo.focus({ preventScroll: true });
     }
 
     // "Cargar pago": deja Aranceles por Partido mostrando justo ese partido (esa fecha, todas las canchas y ese equipo).
@@ -6594,6 +6887,12 @@ document.addEventListener('liga:datos-listos', (evento) => {
             else deudoresAbiertos.delete(item.dataset.key);
         }, true);
         contenedorDeudores.addEventListener('click', (e) => {
+            const insc = e.target.closest('.deudor-btn-insc');
+            if (insc) { irAInscripcionDe(insc.dataset.ciclo, insc.dataset.clave); return; }
+            const perdonInsc = e.target.closest('.deudor-btn-perdonar-insc');
+            if (perdonInsc) { dejarPasarInscripcion(perdonInsc.dataset.clave); return; }
+            const perdon = e.target.closest('.deudor-btn-perdonar');
+            if (perdon) { dejarPasarPartido(perdon.dataset.clave, perdon.dataset.equipo, perdon.dataset.fase); return; }
             const boton = e.target.closest('.deudor-btn-pago');
             if (boton) irAArancelesDe(boton.dataset.fecha, boton.dataset.equipo);
         });
@@ -6685,20 +6984,36 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return { bruto, exigido, bonificado: bruto - exigido };
     }
 
+    // "Dejar pasar" (Hecho #57): lo perdonado cuenta como pagado pero no es plata que entró. Solo cubre lo que falta, así un
+    // pago que llega después no lo convierte en saldo a favor.
+    function perdonAplicado(perdonado, exigido, pagado) {
+        const guardado = Math.max(0, Number(perdonado && perdonado.monto) || 0);
+        return Math.min(guardado, Math.max(0, exigido - pagado));
+    }
+
+    function estadoInscripcion(eq, valorIndividual) {
+        const pago = tesoreriaInscripciones[claveInscripcion(eq)] || {};
+        const montos = montosInscripcion((eq.jugadores || []).length, valorIndividual, pago.beneficio);
+        const pagado = (pago.ef || 0) + (pago.tr || 0);
+        const perdonado = perdonAplicado(pago.perdonado, montos.exigido, pagado);
+        return { montos, pagado, perdonado, falta: montos.exigido - pagado - perdonado };
+    }
+
     function valorInscripcionGuardado() {
         return parseFloat(almacen.getItem('liga_valor_inscripcion')) || 3000;
     }
 
     // Cobrado: ef + tr de todas las entradas (igual que el Balance Central de Caja). Bonificado: solo informativo.
     function totalesInscripciones() {
-        let cobrado = 0, bonificado = 0;
+        let cobrado = 0, bonificado = 0, perdonado = 0;
         Object.values(tesoreriaInscripciones).forEach(p => { cobrado += (p.ef || 0) + (p.tr || 0); });
         const valor = valorInscripcionGuardado();
         [...(poolSuperior || []), ...(poolBasico || [])].forEach(eq => {
-            const pago = tesoreriaInscripciones[claveInscripcion(eq)];
-            bonificado += montosInscripcion(eq.jugadores ? eq.jugadores.length : 0, valor, pago && pago.beneficio).bonificado;
+            const estado = estadoInscripcion(eq, valor);
+            bonificado += estado.montos.bonificado;
+            perdonado += estado.perdonado;
         });
-        return { cobrado, bonificado };
+        return { cobrado, bonificado, perdonado };
     }
 
     function textoExigidoInscripcion(cantJugadores, montos) {
@@ -6716,7 +7031,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // la lista entera, o se pierde el foco y el scroll en el equipo que se estaba cargando (celular en cancha).
     function htmlResumenInscripcion(montos, pagoData) {
         const pagado = (pagoData.ef || 0) + (pagoData.tr || 0);
-        const diferencia = montos.exigido - pagado;
+        const perdonado = perdonAplicado(pagoData.perdonado, montos.exigido, pagado);
+        const diferencia = montos.exigido - pagado - perdonado;
         let chip = '<span class="teso-chip teso-chip-verde">AL DÍA</span>';
         if (diferencia > 0) chip = `<span class="teso-chip teso-chip-rojo">Falta $${diferencia.toLocaleString()}</span>`;
         // Pagó de más (por ejemplo, se lo pasó a exento después de que pagó): no es una deuda negativa.
@@ -6725,8 +7041,22 @@ document.addEventListener('liga:datos-listos', (evento) => {
             <div class="teso-insc-resumen">
                 <span class="teso-insc-total">Total pagado: $${pagado.toLocaleString()}${montos.bonificado > 0 ? `<span class="teso-insc-bonif">Bonificado: $${montos.bonificado.toLocaleString()} (no suma a la caja)</span>` : ''}</span>
                 ${chip}
+                ${htmlPerdonado(pagoData.perdonado, perdonado, 'teso-insc-perdon-deshacer')}
             </div>
         `;
+    }
+
+    // Línea "Se dejó pasar $X (quién, hora)" con "Deshacer", en la tarjeta de Aranceles y en la de Inscripciones.
+    // Muestra lo que se perdonó; si después pagó y ya no hacía falta, lo aclara.
+    function htmlPerdonado(perdonado, aplicado, claseBoton, datos) {
+        if (!perdonado || !(Number(perdonado.monto) > 0)) return '';
+        const d = perdonado.hora ? new Date(perdonado.hora) : null;
+        const cuando = d && !isNaN(d) ? ` · ${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}` : '';
+        const sinUso = aplicado < Number(perdonado.monto) ? ` (hoy cubre $${Math.round(aplicado).toLocaleString()}: el resto ya lo pagó)` : '';
+        return `<div class="teso-perdon">
+                <span>Se dejó pasar $${Math.round(Number(perdonado.monto)).toLocaleString()}${sinUso} · ${attrSeguro(perdonado.autor || '')}${cuando} (no suma a la caja)</span>
+                <button type="button" class="teso-perdon-btn ${claseBoton}"${datos || ''}>Deshacer</button>
+            </div>`;
     }
 
     function htmlCardInscripcion(idEq, nombreEq, cantJugadores, valorIndividual, pagoData) {
@@ -6775,7 +7105,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
     // Actualiza lo que depende de los montos y del beneficio sin reemplazar la tarjeta (no toca los inputs).
     function actualizarCardInscripcion(card) {
         if (!card) return;
-        const beneficio = (tesoreriaInscripciones[card.dataset.eq] || {}).beneficio || null;
+        const guardado = tesoreriaInscripciones[card.dataset.eq] || {};
+        const beneficio = guardado.beneficio || null;
         const cant = parseInt(card.dataset.cant) || 0;
         const montos = montosInscripcion(cant, parseFloat(card.dataset.valor) || 0, beneficio);
         card.dataset.exigido = montos.exigido;
@@ -6784,7 +7115,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const ef = parseFloat(card.querySelector('.in-insc-ef').value) || 0;
         const tr = parseFloat(card.querySelector('.in-insc-tr').value) || 0;
         const resumenViejo = card.querySelector('.teso-insc-resumen');
-        if (resumenViejo) resumenViejo.outerHTML = htmlResumenInscripcion(montos, { ef, tr });
+        if (resumenViejo) resumenViejo.outerHTML = htmlResumenInscripcion(montos, { ef, tr, perdonado: guardado.perdonado });
     }
 
     // Cambiar el beneficio no mueve plata: no registra nada en la Caja.
@@ -6889,6 +7220,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
     }
 
     if (filtroInscripcionesCiclo) filtroInscripcionesCiclo.addEventListener('change', renderizarTesoreriaInscripciones);
+    // Delegado (una sola vez): el resumen de cada tarjeta se reemplaza al cargar un monto y perdería un listener propio.
+    const contenedorInscripciones = document.getElementById('contenedor-tesoreria-inscripciones');
+    if (contenedorInscripciones) {
+        contenedorInscripciones.addEventListener('click', (e) => {
+            if (e.target.closest('.teso-insc-perdon-deshacer')) deshacerPerdonInscripcion(e.target.closest('.teso-insc-card'));
+        });
+    }
 
     if (document.getElementById('monto-inscripcion-individual')) {
         document.getElementById('monto-inscripcion-individual').addEventListener('change', (e) => {
@@ -6989,10 +7327,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const valor = valorInscripcionGuardado();
         const deudas = {};
         [...(poolSuperior || []), ...(poolBasico || [])].forEach(eq => {
-            const clave = claveInscripcion(eq);
-            const pago = tesoreriaInscripciones[clave] || {};
-            const falta = montosInscripcion((eq.jugadores || []).length, valor, pago.beneficio).exigido - ((pago.ef || 0) + (pago.tr || 0));
-            if (falta > 0) deudas[clave] = falta;
+            const { falta } = estadoInscripcion(eq, valor);
+            if (falta > 0) deudas[claveInscripcion(eq)] = falta;
         });
         return deudas;
     }
@@ -7199,6 +7535,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const historial = {};
         const saldos = {};
         const deudasPrevias = {};
+        const origenesSaldo = {};
+        const saldosVigentes = {};
         const ordenados = partidos
             .filter(p => p && p.local && p.visitante)
             .sort((a, b) => ordenCronologicoFecha(a.fecha) - ordenCronologicoFecha(b.fecha));
@@ -7227,7 +7565,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 const saldoAplicado = Math.min(saldoPrevio, exigidoBruto);
                 const exigido = exigidoBruto - saldoAplicado;
                 const pagado = (data.ef || 0) + (data.tr || 0);
-                const falta = Math.max(0, exigido - pagado);
+                // "Dejar pasar" desde Deudores (Hecho #57): cuenta como pagado, también para el Art. 17 Bis, pero no es plata
+                // que entró y nunca genera saldo a favor.
+                const perdonado = perdonAplicado(data.perdonado, exigido, pagado);
+                const falta = Math.max(0, exigido - pagado - perdonado);
                 let saldoGenerado = Math.max(0, pagado - exigido);
 
                 // Lo que sobra paga primero las deudas de partidos anteriores (de la más vieja a la más nueva).
@@ -7245,10 +7586,46 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 });
                 saldos[equipoKey] = saldoPrevio - saldoAplicado + saldoGenerado;
 
-                const cubierto = pagado + saldoAplicado;
+                // De dónde sale el saldo a favor (Hecho #57): el saldo se gasta del más viejo al más nuevo. Si en un partido
+                // se cobró el valor completo sin descontar el saldo que traía, ese saldo no es nuevo: es el mismo de antes,
+                // que se sigue arrastrando, y conserva su origen.
+                const origenes = origenesSaldo[equipoKey] || (origenesSaldo[equipoKey] = []);
+                const consumidos = [];
+                let porConsumir = saldoAplicado;
+                while (porConsumir > 0 && origenes.length) {
+                    const usa = Math.min(origenes[0].monto, porConsumir);
+                    consumidos.push({ ...origenes[0], monto: usa });
+                    origenes[0].monto -= usa;
+                    porConsumir -= usa;
+                    if (origenes[0].monto <= 0) origenes.shift();
+                }
+                let motivoSaldo = '';
+                if (saldoGenerado > 0) {
+                    let resto = saldoGenerado;
+                    if (saldoAplicado > 0 && pagado >= exigidoBruto) {
+                        const arrastrados = [];
+                        consumidos.forEach(c => {
+                            if (resto <= 0) return;
+                            const monto = Math.min(c.monto, resto);
+                            arrastrados.push({ ...c, monto, arrastres: [...c.arrastres, p.fecha] });
+                            resto -= monto;
+                        });
+                        origenes.unshift(...arrastrados);
+                        if (arrastrados.length) motivoSaldo = `se cobró el valor completo sin descontar el saldo a favor que ya tenía (viene de ${[...new Set(arrastrados.map(a => nombreFaseTeso(a.fecha)))].join(', ')})`;
+                    }
+                    if (resto > 0) {
+                        const motivo = motivoSaldoNuevo({ ausente, exento, pctBeneficio, bonificado, fecha: p.fecha, arancelBase, arancelManual: !!data.arancel });
+                        origenes.push({ fecha: p.fecha, pagado, exigido: exigidoBruto, motivo, monto: resto, arrastres: [] });
+                        const texto = `pagó ${dineroSaldo(pagado)} y se le exigía ${dineroSaldo(exigidoBruto)}: ${motivo}`;
+                        motivoSaldo = motivoSaldo ? `${motivoSaldo}; además ${texto}` : texto;
+                    }
+                }
+                if (saldos[equipoKey] <= 0) origenes.length = 0;
+
+                const cubierto = pagado + saldoAplicado + perdonado;
                 const entradaCalc = {
                     clave, nombre, lado, fecha: p.fecha, data, arancelBase, arancelNeto, exento, bonificado, asistencia, ausente,
-                    exigidoBruto, saldoAplicado, exigido, pagado, falta, saldoGenerado, cubierto,
+                    exigidoBruto, saldoAplicado, exigido, pagado, perdonado, falta, saldoGenerado, cubierto, motivoSaldo,
                     porcentaje: arancelNeto > 0 ? cubierto / arancelNeto : 1,
                     aDeudasPrevias, cubiertoPorPosterior: []
                 };
@@ -7257,6 +7634,14 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 if (!historial[equipoKey]) historial[equipoKey] = [];
                 historial[equipoKey].push(entradaHistorial);
                 const resuelto = !!p.jugado || ['presente', 'sin_aviso', 'con_aviso'].includes(asistencia);
+                // El saldo "de hoy" es el que queda después del último partido que ya se jugó o que tiene algún pago: los
+                // partidos que vienen todavía no lo usaron.
+                if (resuelto || pagado > 0) {
+                    saldosVigentes[equipoKey] = {
+                        monto: saldos[equipoKey], nombre, ciclo: p.ciclo === 'basico' ? 'basico' : 'superior',
+                        origenes: origenes.map(o => ({ ...o, arrastres: [...o.arrastres] }))
+                    };
+                }
                 if (falta > 0 && resuelto) {
                     if (!deudasPrevias[equipoKey]) deudasPrevias[equipoKey] = [];
                     deudasPrevias[equipoKey].push({ t: entradaCalc, h: entradaHistorial });
@@ -7264,7 +7649,23 @@ document.addEventListener('liga:datos-listos', (evento) => {
             });
         });
 
-        return { porClave, historial };
+        return { porClave, historial, saldosVigentes };
+    }
+
+    function dineroSaldo(n) {
+        return `$${Math.round(n).toLocaleString()}`;
+    }
+
+    // Por qué un partido dejó saldo a favor (Hecho #57; Joaquín se enteró en plena jornada de un saldo que no esperaba).
+    function motivoSaldoNuevo({ ausente, exento, pctBeneficio, bonificado, fecha, arancelBase, arancelManual }) {
+        if (exento) return 'estaba exento en ese partido';
+        if (ausente) return Number(fecha) >= 100 ? 'faltó en playoffs, donde no debía nada' : 'faltó, así que debía solo el 50%';
+        if (bonificado > 0) return `tenía un descuento del ${pctBeneficio}% en ese partido`;
+        const defecto = arancelPorDefecto();
+        if (arancelBase < defecto) {
+            return `el partido estaba en ${dineroSaldo(arancelBase)}${arancelManual ? ' (cargado a mano en la tarjeta)' : ''} y el derecho de partido es ${dineroSaldo(defecto)}`;
+        }
+        return 'pagó de más';
     }
 
     // equipoKey = equipoTeso(partido, lado)
@@ -7418,7 +7819,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 }
             });
 
-            if (ev.ganadorAuto) {
+            // Marcado suspendido en Carga de Partidos (Hecho #56): manda sobre el 3-0, que no se carga (y si estaba, se
+            // deshace abajo). Las sanciones de arriba no cambian: la quita del Art. 17 Bis sigue.
+            if (ev.ganadorAuto && p.suspendido) {
+                ev.avisos = ev.avisos.filter(a => !a.texto.startsWith('Resultado automático: 3-0'));
+                ev.avisos.push({ tipo: 'info', texto: 'Partido marcado suspendido en Carga de Partidos: no se carga el 3-0 automático. Los pagos y la quita del Art. 17 Bis siguen igual.' });
+            }
+            if (ev.ganadorAuto && !p.suspendido) {
                 if (!p.jugado || p.resultadoAuto) {
                     const golesLocal = ev.ganadorAuto === 'local' ? 3 : 0;
                     const golesVisitante = ev.ganadorAuto === 'visita' ? 3 : 0;
@@ -8161,8 +8568,10 @@ document.addEventListener('liga:datos-listos', (evento) => {
         // Un pago de más cancela primero las deudas viejas (calcularTesoreriaPartidos): se dice en las dos tarjetas.
         t.aDeudasPrevias.forEach(a => notas.push(`Pagó de más: ${dinero(a.monto)} fueron a la deuda de ${nombreFaseTeso(a.fecha)}.`));
         t.cubiertoPorPosterior.forEach(c => notas.push(`Se cubrieron ${dinero(c.monto)} con un pago de ${nombreFaseTeso(c.fecha)}.`));
-        if (t.saldoGenerado > 0) notas.push(`Le queda saldo a favor de ${dinero(t.saldoGenerado)} para su próxima fecha.`);
-        const notasHtml = notas.map(n => `<div class="teso-nota">${n}</div>`).join('');
+        if (t.saldoGenerado > 0) notas.push(`Le queda saldo a favor de ${dinero(t.saldoGenerado)} para su próxima fecha${t.motivoSaldo ? ` (${attrSeguro(t.motivoSaldo)})` : ''}.`);
+        const notasHtml = notas.map(n => `<div class="teso-nota">${n}</div>`).join('')
+            + htmlPerdonado(t.data && t.data.perdonado, t.perdonado, 'teso-p-perdon-deshacer',
+                ` data-key="${attrSeguro(t.clave)}" data-equipo="${attrSeguro(t.nombre)}" data-fase="${attrSeguro(faseLabel)}"`);
 
         const opcion = (valor, texto) => `<option value="${valor}" ${t.asistencia === valor ? 'selected' : ''}>${texto}</option>`;
         const badgeDeuda = hist.deudaTotal > 0
@@ -8352,6 +8761,71 @@ document.addEventListener('liga:datos-listos', (evento) => {
         guardarTesoreriaPartidos();
         registrarMovimientoCaja({ equipo: cont.dataset.equipo, concepto: 'Arancel de Partido', detalle: `${cont.dataset.fase} (pago borrado)`, medio: MEDIOS_PAGO[pago.medio], monto: -Number(pago.monto) });
         renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
+    }
+
+    // ── "Dejar pasar" una deuda (pedido de Joaquín, 19/11/2026, Hecho #57): cuando el staff considera que lo que falta es
+    // muy poco. Se usa solo desde Deudores, sin tope; cuenta como pagado (también para el Art. 17 Bis: puede levantar la
+    // quita o completar el 100% del rival para el 3-0), no suma a la caja y queda en el Historial. "Deshacer" está en la
+    // tarjeta de Aranceles o de Inscripciones. En partidos lo usan Staff y Coordinador; en inscripción, solo el Coordinador.
+    function datosPerdon(monto) {
+        return { monto, autor: usuarioPanel.nombre || usuarioPanel.email || 'Staff', email: usuarioPanel.email || '', hora: new Date().toISOString() };
+    }
+
+    function dejarPasarPartido(clave, equipo, fase) {
+        const t = calcularTesoreriaPartidos().porClave[clave];
+        if (!t || t.falta <= 0) { alert('Ese partido ya no tiene deuda.'); renderizarDeudores(); return; }
+        if (!confirm(`¿Dejar pasar ${dineroSaldo(t.falta)} que debe ${equipo} en ${fase}?\n\nCuenta como pagado (también para el Art. 17 Bis), no suma a la caja y queda en el Historial. Se puede deshacer desde su tarjeta en Aranceles por Partido.`)) return;
+        if (!tesoreriaPartidos[clave]) tesoreriaPartidos[clave] = { ef: 0, tr: 0 };
+        tesoreriaPartidos[clave].perdonado = datosPerdon(t.perdonado + t.falta);
+        guardarTesoreriaPartidos();
+        registrarHistorial('pago', `dejó pasar ${dineroSaldo(t.falta)} de la deuda de ${equipo} en ${fase}`);
+        // Redibujar Aranceles corre sincronizarAusencias (levanta la quita si ahora llega al 50%).
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
+    }
+
+    function deshacerPerdonPartido(boton) {
+        const clave = boton.dataset.key;
+        const perdon = tesoreriaPartidos[clave] && tesoreriaPartidos[clave].perdonado;
+        if (!perdon) { renderizarTesoreriaPartidos(); return; }
+        if (!confirm(`¿Deshacer el "dejar pasar" de ${dineroSaldo(perdon.monto)} de ${boton.dataset.equipo} en ${boton.dataset.fase}? Vuelve a deberlo.`)) return;
+        delete tesoreriaPartidos[clave].perdonado;
+        guardarTesoreriaPartidos();
+        registrarHistorial('pago', `deshizo el "dejar pasar" de ${dineroSaldo(perdon.monto)} de ${boton.dataset.equipo} en ${boton.dataset.fase}`);
+        renderizarTesoreriaPartidos();
+        calcularBalanceGeneral();
+    }
+
+    function equipoDeInscripcion(clave) {
+        recargarPools();
+        return [...(poolSuperior || []), ...(poolBasico || [])].find(eq => claveInscripcion(eq) === clave) || null;
+    }
+
+    function dejarPasarInscripcion(clave) {
+        if (usuarioPanel.rol !== 'coordinador') return;
+        const eq = equipoDeInscripcion(clave);
+        if (!eq) { alert('No se encontró el equipo en los planteles.'); return; }
+        const estado = estadoInscripcion(eq, valorInscripcionGuardado());
+        if (estado.falta <= 0) { alert('Ese equipo ya no debe inscripción.'); renderizarDeudores(); return; }
+        if (!confirm(`¿Dejar pasar ${dineroSaldo(estado.falta)} que debe ${eq.nombre} de inscripción?\n\nCuenta como pagado, no suma a la caja y queda en el Historial. Se puede deshacer desde su tarjeta en Inscripciones por Jugador.`)) return;
+        if (!tesoreriaInscripciones[clave]) tesoreriaInscripciones[clave] = { ef: 0, tr: 0 };
+        tesoreriaInscripciones[clave].perdonado = datosPerdon(estado.perdonado + estado.falta);
+        almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+        registrarHistorial('inscripcion', `dejó pasar ${dineroSaldo(estado.falta)} de la inscripción de ${eq.nombre}`);
+        calcularBalanceGeneral();
+    }
+
+    function deshacerPerdonInscripcion(card) {
+        if (usuarioPanel.rol !== 'coordinador' || !card) return;
+        const clave = card.dataset.eq;
+        const perdon = tesoreriaInscripciones[clave] && tesoreriaInscripciones[clave].perdonado;
+        if (!perdon) return;
+        if (!confirm(`¿Deshacer el "dejar pasar" de ${dineroSaldo(perdon.monto)} de la inscripción de ${card.dataset.nombre}? Vuelve a deberlo.`)) return;
+        delete tesoreriaInscripciones[clave].perdonado;
+        almacen.setItem('liga_tesoreria_inscripciones', JSON.stringify(tesoreriaInscripciones));
+        registrarHistorial('inscripcion', `deshizo el "dejar pasar" de ${dineroSaldo(perdon.monto)} de la inscripción de ${card.dataset.nombre}`);
+        actualizarCardInscripcion(card);
         calcularBalanceGeneral();
     }
 
@@ -8649,6 +9123,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const btnFalta = e.target.closest('.teso-btn-pago-falta');
             if (btnFalta) { btnFalta.closest('.teso-pagos').querySelector('.in-pago-monto').value = btnFalta.dataset.falta; return; }
             if (e.target.closest('.btn-confirmar-pago')) { confirmarPago(e.target.closest('.teso-pagos')); return; }
+            const btnDeshacerPerdon = e.target.closest('.teso-p-perdon-deshacer');
+            if (btnDeshacerPerdon) { deshacerPerdonPartido(btnDeshacerPerdon); return; }
             const filaPago = e.target.closest('.teso-pago-fila');
             if (filaPago && e.target.closest('.teso-pago-editar')) { abrirEdicionPago(filaPago); return; }
             if (filaPago && e.target.closest('.teso-pago-guardar')) { guardarEdicionPago(filaPago); return; }
@@ -8733,6 +9209,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         return String(eg.medio || '').toLowerCase() === 'transferencia';
     }
 
+    const filtroEgresosFecha = document.getElementById('filtro-egresos-fecha');
+    if (filtroEgresosFecha) filtroEgresosFecha.addEventListener('change', renderizarEgresosAdmin);
+
     const formEgreso = document.getElementById('form-egreso');
     if (formEgreso) {
         formEgreso.addEventListener('submit', (e) => {
@@ -8760,13 +9239,29 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const contenedor = document.getElementById('lista-egresos-admin');
         if (!contenedor) return;
         contenedor.innerHTML = '';
+        armarOpcionesFiltroEgresos();
+        const filtro = (document.getElementById('filtro-egresos-fecha') || {}).value || 'todas';
+        const totalFiltro = document.getElementById('egresos-total-filtro');
+
+        // Solo cambia lo que se ve: el Balance y Recaudación por Fecha usan todos los egresos.
+        const visibles = listaEgresos
+            .filter(eg => filtro === 'todas' || (filtro === 'general' ? !eg.fecha : String(eg.fecha) === filtro))
+            .sort((a, b) => b.id - a.id);
+        const sumaVisibles = visibles.reduce((s, eg) => s + (Number(eg.monto) || 0), 0);
+        if (totalFiltro) {
+            totalFiltro.textContent = `${visibles.length} ${visibles.length === 1 ? 'egreso' : 'egresos'} · Total $${sumaVisibles.toLocaleString()}`;
+        }
 
         if (listaEgresos.length === 0) {
             contenedor.innerHTML = '<p style="color:#869bd8; text-align:center; font-size:11px;">No hay egresos cargados.</p>';
             return;
         }
+        if (visibles.length === 0) {
+            contenedor.innerHTML = '<p style="color:#869bd8; text-align:center; font-size:11px;">No hay egresos en esta fecha.</p>';
+            return;
+        }
 
-        listaEgresos.forEach(eg => {
+        visibles.forEach(eg => {
             contenedor.innerHTML += `
                 <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(244,63,94,0.05); padding:8px 12px; margin-bottom:6px; border-radius:3px; border-left: 4px solid #f43f5e;">
                     <div style="text-align:left;">
@@ -8784,6 +9279,9 @@ document.addEventListener('liga:datos-listos', (evento) => {
         document.querySelectorAll('.btn-borrar-egreso').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idBorrar = parseInt(btn.getAttribute('data-id'));
+                const egreso = listaEgresos.find(e => e.id === idBorrar);
+                if (!egreso) return;
+                if (!confirm(`¿Eliminar este egreso?\n\n${egreso.detalle} (${String(egreso.concepto).toUpperCase()})\n-$${(Number(egreso.monto) || 0).toLocaleString()} · ${textoFechaEgreso(egreso)}`)) return;
                 listaEgresos = listaEgresos.filter(e => e.id !== idBorrar);
                 almacen.setItem('liga_egresos', JSON.stringify(listaEgresos));
                 renderizarEgresosAdmin();
@@ -8829,8 +9327,13 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (document.getElementById('txt-saldo-mp')) document.getElementById('txt-saldo-mp').textContent = dineroConSigno(trTotal - (egresosTotal - egresosEf));
         const txtBonifPartidos = document.getElementById('txt-bonificado-partidos');
         if (txtBonifPartidos) {
-            const bonifPartidos = Object.values(calcularTesoreriaPartidos().porClave).reduce((acc, t) => acc + (t.bonificado || 0), 0);
-            txtBonifPartidos.textContent = bonifPartidos > 0 ? `Bonificado: $${bonifPartidos.toLocaleString()} (no suma)` : '';
+            const entradasCalc = Object.values(calcularTesoreriaPartidos().porClave);
+            const bonifPartidos = entradasCalc.reduce((acc, t) => acc + (t.bonificado || 0), 0);
+            const perdonPartidos = entradasCalc.reduce((acc, t) => acc + (t.perdonado || 0), 0);
+            txtBonifPartidos.textContent = [
+                bonifPartidos > 0 ? `Bonificado: $${bonifPartidos.toLocaleString()} (no suma)` : '',
+                perdonPartidos > 0 ? `Perdonado: $${perdonPartidos.toLocaleString()} (no suma)` : ''
+            ].filter(Boolean).join(' · ');
         }
 
         if (document.getElementById('txt-total-inscripciones')) document.getElementById('txt-total-inscripciones').textContent = `$${totalInscripciones.toLocaleString()}`;
@@ -8839,8 +9342,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (document.getElementById('txt-saldo-neto')) document.getElementById('txt-saldo-neto').textContent = `$${neto.toLocaleString()}`;
         const txtBonificado = document.getElementById('txt-bonificado-inscripciones');
         if (txtBonificado) {
-            const { bonificado } = totalesInscripciones();
-            txtBonificado.textContent = bonificado > 0 ? `Bonificado: $${bonificado.toLocaleString()} (no suma)` : '';
+            const { bonificado, perdonado } = totalesInscripciones();
+            txtBonificado.textContent = [
+                bonificado > 0 ? `Bonificado: $${bonificado.toLocaleString()} (no suma)` : '',
+                perdonado > 0 ? `Perdonado: $${perdonado.toLocaleString()} (no suma)` : ''
+            ].filter(Boolean).join(' · ');
         }
         renderizarRecaudacionPorFecha();
         sincronizarDeudasInscripcion();
@@ -8858,7 +9364,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         // Cada monto separado en efectivo y Mercado Pago (pedido de Joaquín, 18/10/2026): ef = efectivo, tr = transferencia,
         // que siempre va a Mercado Pago.
         const porFecha = {};
-        const filaDe = f => porFecha[f] || (porFecha[f] = { partidos: 0, ef: 0, tr: 0, egEf: 0, egTr: 0, bonificado: 0 });
+        const filaDe = f => porFecha[f] || (porFecha[f] = { partidos: 0, ef: 0, tr: 0, egEf: 0, egTr: 0, bonificado: 0, perdonado: 0 });
         const clavesContadas = new Set();
         const calcTeso = calcularTesoreriaPartidos();
         partidos.forEach(p => {
@@ -8873,6 +9379,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 fila.ef += d.ef || 0;
                 fila.tr += d.tr || 0;
                 fila.bonificado += (calcTeso.porClave[clave] && calcTeso.porClave[clave].bonificado) || 0;
+                fila.perdonado += (calcTeso.porClave[clave] && calcTeso.porClave[clave].perdonado) || 0;
             });
         });
 
@@ -8941,6 +9448,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
                     <div class="teso-recaud-fila teso-recaud-neto"><span>Neto de la fecha</span><strong class="${neto < 0 ? 'teso-recaud-egreso' : ''}">${dinero(neto)}</strong></div>
                     ${htmlQueda('Tiene que quedar de esta fecha', r.ef - r.egEf, r.tr - r.egTr)}
                     ${r.bonificado > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en aranceles (no suma)</span><span>${dinero(r.bonificado)}</span></div>` : ''}
+                    ${r.perdonado > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Perdonado en aranceles (no suma)</span><span>${dinero(r.perdonado)}</span></div>` : ''}
                 </div>
             `;
         }).join('');
@@ -8950,7 +9458,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         const egresosPorFechaEf = fechas.reduce((acc, f) => acc + porFecha[f].egEf, 0);
         const egresosPorFecha = fechas.reduce((acc, f) => acc + porFecha[f].egEf + porFecha[f].egTr, 0);
         const bonificadoAranceles = fechas.reduce((acc, f) => acc + porFecha[f].bonificado, 0);
-        const { cobrado: inscripciones, bonificado } = totalesInscripciones();
+        const perdonadoAranceles = fechas.reduce((acc, f) => acc + porFecha[f].perdonado, 0);
+        const { cobrado: inscripciones, bonificado, perdonado: perdonadoInscripciones } = totalesInscripciones();
         const inscripcionesEf = Object.values(tesoreriaInscripciones).reduce((acc, d) => acc + ((d && d.ef) || 0), 0);
         const netoTotal = arancelesTotal + inscripciones - egresosPorFecha - egresosGenerales;
         const quedaEf = arancelesEf + inscripcionesEf - egresosPorFechaEf - egresosGeneralesEf;
@@ -8975,6 +9484,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 ${htmlQueda('Tiene que haber en total', quedaEf, netoTotal - quedaEf)}
                 ${bonificadoAranceles > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en aranceles (informativo, no suma)</span><span>${dinero(bonificadoAranceles)}</span></div>` : ''}
                 ${bonificado > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Bonificado en inscripciones (informativo, no suma)</span><span>${dinero(bonificado)}</span></div>` : ''}
+                ${perdonadoAranceles > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Perdonado en aranceles (informativo, no suma)</span><span>${dinero(perdonadoAranceles)}</span></div>` : ''}
+                ${perdonadoInscripciones > 0 ? `<div class="teso-recaud-fila teso-recaud-bonif"><span>Perdonado en inscripciones (informativo, no suma)</span><span>${dinero(perdonadoInscripciones)}</span></div>` : ''}
             </div>
         `;
     }
@@ -9359,7 +9870,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
     const SELECCIONES_RECORDADAS = [
         'partido-ciclo', 'partido-fecha', 'partido-grupo-select', 'partido-cancha', 'partido-horario', 'partido-arbitro-nombre',
         'filtro-fecha-cronograma-admin', 'filtro-tesoreria-cancha', 'filtro-tesoreria-fecha', 'filtro-inscripciones-ciclo',
-        'egreso-concepto', 'egreso-medio', 'egreso-fecha', 'plantel-ciclo', 'sancion-ciclo'
+        'egreso-concepto', 'egreso-medio', 'egreso-fecha', 'filtro-egresos-fecha', 'plantel-ciclo', 'sancion-ciclo'
     ];
     const PREFIJO_SELECCION = 'panel_seleccion_';
 
@@ -9510,11 +10021,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
             const valorIndividual = valorInscripcionGuardado();
             const equiposTotal = [...(poolSuperior || []), ...(poolBasico || [])];
             const pendientesPago = equiposTotal.filter(eq => {
-                const cant = eq.jugadores ? eq.jugadores.length : 0;
-                const pago = tesoreriaInscripciones[claveInscripcion(eq)] || { ef: 0, tr: 0 };
-                const exigido = montosInscripcion(cant, valorIndividual, pago.beneficio).exigido;
-                const pagado = (pago.ef || 0) + (pago.tr || 0);
-                return exigido > 0 && pagado < exigido;
+                const estado = estadoInscripcion(eq, valorIndividual);
+                return estado.montos.exigido > 0 && estado.falta > 0;
             });
 
             contPagos.innerHTML = pendientesPago.length === 0

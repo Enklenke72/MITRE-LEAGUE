@@ -245,6 +245,19 @@
                             <p class="calendario-ayuda">El resultado queda 0-3 y no cuentan los goles de ese partido (las tarjetas sí). Publicá el motivo en el Tribunal.</p>
                         </div>
 
+                        <!-- SUSPENDIDO (Hecho #56): sin resultado ni puntos; Tesorería y el Art. 17 Bis siguen igual -->
+                        <div class="form-group">
+                            <label style="color:#f59e0b;">Partido suspendido (opcional)</label>
+                            <select id="partido-suspendido">
+                                <option value="">No</option>
+                                <option value="si">Sí</option>
+                            </select>
+                            <div id="partido-motivo-suspension-grupo" hidden>
+                                <input type="text" id="partido-motivo-suspension" maxlength="120" placeholder="Motivo (opcional). Ej.: lluvia">
+                            </div>
+                            <p class="calendario-ayuda">Queda sin resultado y sin puntos para ninguno, y no se carga el 3-0 automático. Tesorería y la quita del Art. 17 Bis siguen igual. Se pueden cargar tarjetas; el MVP no.</p>
+                        </div>
+
                         <!-- PENALES (En Playoffs) -->
                         <div class="form-row" id="row-penales-partido"
                             style="display: none; background: rgba(244,63,94,0.08); padding: 8px; border-radius: 3px; border: 1px dashed rgba(244,63,94,0.3); margin-bottom: 12px;">
@@ -570,6 +583,30 @@
                         </div>
                     </form>
                     <div id="resumen-config-bracket" style="font-size:10px; color:#869bd8; margin-top:8px;"></div>
+                </section>
+
+                <section class="admin-card-panel no-juega-panel" id="no-juega-playoffs">
+                    <h3 class="no-juega-titulo">Equipos que no juegan los playoffs</h3>
+                    <p class="sorteo-texto">
+                        Un equipo clasificado que no quiere seguir jugando queda afuera del sorteo sin descalificarlo: su
+                        lugar lo toma el siguiente del ranking y su tabla no cambia. No se puede marcar si ya está en los
+                        cruces o en un partido de playoffs.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ciclo</label>
+                            <select id="no-juega-ciclo">
+                                <option value="superior">Superior</option>
+                                <option value="basico">Básico</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Equipo</label>
+                            <select id="no-juega-equipo"></select>
+                        </div>
+                    </div>
+                    <button type="button" id="btn-no-juega-marcar" class="btn-submit-admin no-juega-btn">Marcar que no juega</button>
+                    <div id="no-juega-lista" class="no-juega-lista"></div>
                 </section>
 
                 <section class="admin-card-panel sorteo-panel" id="asistente-sorteo">
@@ -1441,7 +1478,7 @@
                 <section class="admin-card-panel" style="border-color: #f43f5e;">
                     <h3 style="color:#f43f5e; margin-top:0;">Equipos Deudores</h3>
                     <p class="calendario-ayuda">
-                        Lo que debe cada equipo, partido por partido, sin tener que buscar fecha por fecha. Cuenta los partidos ya jugados o donde el equipo figura como "Se presentó" o "Faltó"; los que todavía no se jugaron no aparecen. "Cargar pago" te lleva a esa tarjeta en Aranceles por Partido.
+                        Lo que debe cada equipo, partido por partido, sin tener que buscar fecha por fecha. Cuenta los partidos ya jugados o donde el equipo figura como "Se presentó" o "Faltó"; los que todavía no se jugaron no aparecen. "Cargar pago" te lleva a esa tarjeta en Aranceles por Partido. "Dejar pasar" da por pagado lo que falta (por ejemplo, una deuda muy chica): no suma a la caja, queda en el Historial y se deshace desde la tarjeta. Abajo están los equipos con saldo a favor y de dónde sale.
                     </p>
                     <div class="deudores-filtros">
                         <div class="form-group">
@@ -1654,6 +1691,13 @@
                 </form>
 
                 <hr style="border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 15px 0;">
+                <div class="form-group egresos-filtro">
+                    <label for="filtro-egresos-fecha">Ver egresos de</label>
+                    <select id="filtro-egresos-fecha">
+                        <option value="todas">Todas las fechas</option>
+                    </select>
+                </div>
+                <p id="egresos-total-filtro" class="egresos-total-filtro"></p>
                 <div id="lista-egresos-admin"></div>
             </section>
 

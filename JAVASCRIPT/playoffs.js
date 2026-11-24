@@ -187,27 +187,30 @@ function calcularEstadisticas(equiposCiclo, partidos, sanciones, ciclo) {
  * Ranking del ciclo: primero todos los 1° de grupo, después todos los 2°, y así; dentro de cada puesto, con el
  * criterio de la tabla. Asigna a cada fila la copa a la que clasifica (los cupos salen de la config del cuadro:
  * llaves de la ronda inicial × 2) y marca 'porComparacion' cuando su puesto quedó repartido (ej. "mejores 3°").
- * Devuelve [{equipo, grupo, puesto, rank, copa (o null), porComparacion}].
+ * Un equipo con "noJuegaPlayoffs" (Hecho #58) conserva su puesto y su rank, pero queda con 'noJuega' y sin copa: los
+ * cupos se reparten solo entre los que juegan, así su lugar lo toma el siguiente del ranking.
+ * Devuelve [{equipo, grupo, puesto, rank, copa (o null), porComparacion, noJuega}].
  */
 function clasificacionDelCiclo(equipos, grupos, ciclo, desempates, configParam) {
     const filas = [];
     (grupos || []).forEach(grupo => {
         ordenarTabla(equipos.filter(e => e.grupo === grupo), desempates)
-            .forEach((equipo, i) => filas.push({ equipo, grupo, puesto: i + 1, copa: null, porComparacion: false }));
+            .forEach((equipo, i) => filas.push({ equipo, grupo, puesto: i + 1, copa: null, porComparacion: false, noJuega: !!equipo.noJuegaPlayoffs }));
     });
     filas.sort((a, b) => a.puesto - b.puesto || compararEquipos(a.equipo, b.equipo, desempates));
     filas.forEach((f, i) => { f.rank = i + 1; });
 
+    const juegan = filas.filter(f => !f.noJuega);
     let desde = 0;
     copasDelCiclo(ciclo, configParam).forEach(copa => {
         const cupos = cuposDeCopa(ciclo, copa, configParam);
-        filas.slice(desde, desde + cupos).forEach(f => { f.copa = copa; });
+        juegan.slice(desde, desde + cupos).forEach(f => { f.copa = copa; });
         desde += cupos;
     });
 
     const destinosPorPuesto = {};
-    filas.forEach(f => { (destinosPorPuesto[f.puesto] = destinosPorPuesto[f.puesto] || new Set()).add(f.copa); });
-    filas.forEach(f => { f.porComparacion = f.copa !== null && destinosPorPuesto[f.puesto].size > 1; });
+    juegan.forEach(f => { (destinosPorPuesto[f.puesto] = destinosPorPuesto[f.puesto] || new Set()).add(f.copa); });
+    juegan.forEach(f => { f.porComparacion = f.copa !== null && destinosPorPuesto[f.puesto].size > 1; });
     return filas;
 }
 
@@ -218,7 +221,8 @@ function fraseParcialClasificacion(puesto, cantidad, restante) {
 }
 
 /** Quiénes van a una copa, en palabras: "1° y 2° de cada grupo + los 2 mejores 3°". */
-function textoClasificacionCopa(filas, copa, cantidadGrupos) {
+function textoClasificacionCopa(filasCiclo, copa, cantidadGrupos) {
+    const filas = filasCiclo.filter(f => !f.noJuega);
     const deCadaGrupo = cantidadGrupos > 1 ? ' de cada grupo' : '';
     const puestos = [...new Set(filas.map(f => f.puesto))].sort((a, b) => a - b);
     const completos = [];
@@ -258,7 +262,7 @@ function textoClasificacion(filas, ciclo, cantidadGrupos, configParam) {
 
 /** Cartelito de una fila que entra por comparación: "Copa Oro: entra como uno de los 2 mejores 3°". */
 function textoEntradaPorComparacion(filas, fila, ciclo, configParam) {
-    const delPuesto = filas.filter(f => f.puesto === fila.puesto);
+    const delPuesto = filas.filter(f => f.puesto === fila.puesto && !f.noJuega);
     const enCopa = delPuesto.filter(f => f.copa === fila.copa);
     const restante = delPuesto.some(f => f.copa !== fila.copa && f.rank < enCopa[0].rank);
     const frase = fraseParcialClasificacion(fila.puesto, enCopa.length, restante);
