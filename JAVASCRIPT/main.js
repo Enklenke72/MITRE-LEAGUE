@@ -375,7 +375,16 @@ document.addEventListener('liga:datos-listos', () => {
                 ultimoSeparador = infoSeparador;
             }
 
-            if (partido.jugado) {
+            if (partidoSuspendido(partido)) {
+                contenedor.innerHTML += `
+                    <div class="match-card match-card-suspendida">
+                        <span class="team-name">${escaparHtml(partido.local)}</span>
+                        <span class="score score-suspendido">SUSPENDIDO</span>
+                        <span class="team-name">${escaparHtml(partido.visitante)}</span>
+                    </div>
+                    ${bannerReemplazo(partido)}
+                `;
+            } else if (partido.jugado) {
                 contenedor.innerHTML += `
                     <div class="match-card">
                         <span class="team-name">${escaparHtml(partido.local)}</span>
@@ -1534,7 +1543,7 @@ document.addEventListener('liga:datos-listos', () => {
             const mvpTxt = htmlMvpPartido(partido);
 
             contenedor.innerHTML += `
-                <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}" data-pid="${escaparHtml(partido.id)}">
+                <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}${partidoSuspendido(partido) ? ' suspendido' : ''}" data-pid="${escaparHtml(partido.id)}">
 
                     <!-- HEADER EN GRILLA 3 COLUMNAS -->
                     <div class="match-header-grid">
@@ -1546,14 +1555,16 @@ document.addEventListener('liga:datos-listos', () => {
 
                         <!-- Columna 2: Resultado / Metas (Centro exacto) -->
                         <div class="col-center">
-                            ${esJugado
-                                ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>${etiquetaAusencia(partido)}`
-                                : `<span class="vs-badge">VS</span>${etiquetaAusencia(partido)}`
-                            }
+                            ${partidoSuspendido(partido)
+                                ? '<span class="score-main score-suspendido">SUSPENDIDO</span>'
+                                : `${esJugado
+                                    ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>${etiquetaAusencia(partido)}`
+                                    : `<span class="vs-badge">VS</span>${etiquetaAusencia(partido)}`
+                                }
                             ${diaTxt ? `<span class="match-meta-dia">${diaTxt}</span>` : ''}
                             <div class="match-meta-info">
                                  ${canchaTxt} | ${horarioTxt}
-                            </div>
+                            </div>`}
                         </div>
 
                         <!-- Columna 3: Equipo Visitante + Flecha pegadita -->
@@ -2285,6 +2296,11 @@ document.addEventListener('liga:datos-listos', () => {
                 ? `Lo jugó ${viejo}, antes del reemplazo (Art. 9 Bis).`
                 : `${viejo} fue reemplazado por ${nuevo.nombre} (Art. 9 Bis).`)}</div>`).join('');
     }
+    // Suspendido a mano (Hecho #56): la tarjeta lleva "SUSPENDIDO" al medio, sin día, horario ni cancha (pedido de
+    // Joaquín, 26/11/2026). El motivo va en el desplegable.
+    function partidoSuspendido(partido) {
+        return !!partido.suspendido && !partido.jugado;
+    }
     function etiquetaAusencia(partido) {
         const e = estadoAusencia(partido);
         return e ? `<span class="match-meta-auto">${escaparHtml(e.etiqueta)}</span>` : '';
@@ -2416,8 +2432,8 @@ document.addEventListener('liga:datos-listos', () => {
                     : '';
 
                 contPartidos.innerHTML += `
-                    <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}">
-                        
+                    <div class="match-card-desplegable ${esJugado ? 'jugado' : 'pendiente'}${partidoSuspendido(partido) ? ' suspendido' : ''}">
+
                         <div class="match-header-grid">
                             <div class="col-team col-local">
                                 <span class="team-name">${escaparHtml(partido.local)}</span>
@@ -2425,12 +2441,14 @@ document.addEventListener('liga:datos-listos', () => {
 
                             <div class="col-center">
                                 <span style="font-size: 9px; color: #869bd8; font-family: 'Oswald'; display: block;">${escaparHtml(nombreFasePublico(partido))}</span>
-                                ${esJugado
-                                    ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>${etiquetaAusencia(partido)}`
-                                    : `<span class="vs-badge">VS</span>${etiquetaAusencia(partido)}`
-                                }
+                                ${partidoSuspendido(partido)
+                                    ? '<span class="score-main score-suspendido">SUSPENDIDO</span>'
+                                    : `${esJugado
+                                        ? `<span class="score-main">${escaparHtml(partido.golesLocal)} - ${escaparHtml(partido.golesVisitante)}</span>${etiquetaAusencia(partido)}`
+                                        : `<span class="vs-badge">VS</span>${etiquetaAusencia(partido)}`
+                                    }
                                 ${diaTxt ? `<span class="match-meta-dia">${diaTxt}</span>` : ''}
-                                <div class="match-meta-info">${canchaTxt} | ${horarioTxt}</div>
+                                <div class="match-meta-info">${canchaTxt} | ${horarioTxt}</div>`}
                             </div>
 
                             <div class="col-team col-visita">

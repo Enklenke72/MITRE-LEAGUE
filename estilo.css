@@ -3856,6 +3856,19 @@ body::-webkit-scrollbar-thumb {
 .perfil-partido-res.res-S { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
 #partido-motivo-suspension-grupo { margin-top: 6px; }
 #partido-motivo-suspension-grupo input { width: 100%; box-sizing: border-box; }
+/* Tarjeta de un partido suspendido (26/11/2026): bordes grises y "SUSPENDIDO" en lugar del resultado */
+.match-card.match-card-suspendida { border-left-color: #8a94a6; border-right-color: #8a94a6; }
+.match-card-desplegable.suspendido {
+    border-left: 4px solid #8a94a6 !important;
+    border-right: 4px solid #8a94a6 !important;
+}
+.score.score-suspendido,
+.score-main.score-suspendido {
+    font-size: 12px !important;
+    letter-spacing: 1px;
+    color: #a3acbd !important;
+    margin-top: 0;
+}
 .perfil-partido-goles {
     font-size: 12px;
     color: #4ade80;
