@@ -6605,3 +6605,7 @@ body.auth-pendiente .auth-gate {
 .no-juega-item .no-juega-deshacer { flex: 0 0 auto; width: auto; }
 .no-juega-vacio { margin: 0; font-size: 11px; color: #869bd8; }
 .sorteo-no-juegan { margin: -4px 0 10px; color: #c5cedc; }
+
+/* Partidos de los cruces de playoffs (27/11/2026) */
+.cruces-a-partidos { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; gap: 8px; }
+.cruces-a-partidos label { font-size: 12px; color: #869bd8; }

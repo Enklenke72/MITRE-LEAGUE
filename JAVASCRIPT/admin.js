@@ -3435,6 +3435,60 @@ document.addEventListener('liga:datos-listos', (evento) => {
         });
     }
 
+    // Partidos de los cruces (27/11/2026, pedido por Joaquín): el sorteo guarda cruces, y el Armador de Horarios
+    // trabaja con partidos. Crea uno sin jugar por cada cruce con los dos equipos que todavía no tiene partido.
+    const btnCrearPartidosCruces = document.getElementById('btn-crear-partidos-cruces');
+    if (btnCrearPartidosCruces) {
+        btnCrearPartidosCruces.addEventListener('click', () => {
+            const CODIGO_RONDA = { octavos: 108, cuartos: 104, semis: 102, final: 100 };
+            crucesPlayoffs = JSON.parse(almacen.getItem('liga_cruces_playoffs')) || crucesPlayoffs;
+            partidos = JSON.parse(almacen.getItem('liga_partidos')) || partidos;
+            recargarPools();
+            const tienePartido = c => partidos.some(p => p && p.esPlayoff && p.ronda === c.ronda && (p.ciclo || 'superior') === c.ciclo
+                && copaDe(p) === copaDe(c) && ((p.local === c.local && p.visitante === c.visitante) || (p.local === c.visitante && p.visitante === c.local)));
+            const faltan = crucesPlayoffs.filter(c => c.local && c.visitante && CODIGO_RONDA[c.ronda] && !tienePartido(c))
+                .sort((a, b) => a.ciclo.localeCompare(b.ciclo) || (copaDe(a) === copaDe(b) ? 0 : copaDe(a) === 'oro' ? -1 : 1)
+                    || ORDEN_RONDAS.indexOf(a.ronda) - ORDEN_RONDAS.indexOf(b.ronda) || (a.slot || 0) - (b.slot || 0));
+            if (faltan.length === 0) {
+                alert('Todos los cruces con los dos equipos definidos ya tienen su partido en el Cronograma.');
+                return;
+            }
+            const inputDia = document.getElementById('cruces-partidos-dia');
+            const dia = inputDia ? diaInputAStorage(inputDia.value) : '';
+            const arancel = arancelPorDefecto();
+            const nuevos = faltan.map(c => {
+                const pool = c.ciclo === 'basico' ? poolBasico : poolSuperior;
+                const idDe = nombre => { const eq = pool.find(e => e.nombre.trim().toLowerCase() === nombre.trim().toLowerCase()); return eq ? eq.id : null; };
+                return {
+                    fecha: CODIGO_RONDA[c.ronda], ciclo: c.ciclo, grupo: 'Playoffs', local: c.local, visitante: c.visitante,
+                    localId: idDe(c.local), visitanteId: idDe(c.visitante), golesLocal: null, golesVisitante: null,
+                    penalesLocal: null, penalesVisitante: null, esPlayoff: true, ronda: c.ronda, copa: copaDe(c),
+                    dia, arancelExigido: arancel, horario: '', cancha: '', arbitro: ARBITRO_SIN_ASIGNAR,
+                    goleadoresLocal: [], goleadoresVisitante: [], amarillasLocal: [], rojasLocal: [], amarillasVisitante: [], rojasVisitante: [],
+                    asistentesLocal: [], asistentesVisitante: [], mvpId: null, jugado: false, resultadoAuto: false,
+                    perdidoTribunal: null, suspendido: null, motivoSuspension: null
+                };
+            });
+            const lista = nuevos.map(p => `• ${nombreFasePartido(p)} (${nombreCicloHistorial(p.ciclo)}): ${p.local} vs ${p.visitante}`).join('\n');
+            if (!confirm(`Se van a crear ${nuevos.length} ${nuevos.length === 1 ? 'partido' : 'partidos'}, con horario y cancha a confirmar, árbitro "Por asignar", derecho de partido de $${arancel.toLocaleString('es-AR')}${dia ? ` y día ${dia}` : ' y sin día'}:\n\n${lista}\n\n¿Seguir?`)) return;
+            const ids = idsNuevosPartido(nuevos.length);
+            nuevos.forEach((p, i) => { p.id = ids[i]; });
+            partidos = partidos.concat(nuevos);
+            almacen.setItem('liga_partidos', JSON.stringify(partidos));
+            nuevos.forEach(p => registrarHistorial('partido', textoHistorialPartido(null, p)));
+            actualizarListaAdmin();
+            actualizarSelectFechasCronograma();
+            armarOpcionesFechaEgreso();
+            if (typeof actualizarFiltroFechasTesoreria === 'function') actualizarFiltroFechasTesoreria();
+            armarOpcionesFechaHorarios();
+            if (selectFechaHorarios) {
+                selectFechaHorarios.value = String(nuevos[0].fecha);
+                selectFechaHorarios.dispatchEvent(new Event('change'));
+            }
+            alert(`Listo: ${nuevos.length} ${nuevos.length === 1 ? 'partido creado' : 'partidos creados'}. Ya están en el Cronograma y en el Armador de Horarios (${nombreFaseTeso(nuevos[0].fecha)}).`);
+        });
+    }
+
     // ============================================================
     // AVANCE AUTOMÁTICO DE GANADORES ENTRE RONDAS DE PLAYOFFS
     // ============================================================
