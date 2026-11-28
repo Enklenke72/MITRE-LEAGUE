@@ -2734,7 +2734,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
             }
 
             contenedor.innerHTML += `
-                <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(255,255,255,0.03); padding:8px 10px; margin-bottom:6px; border-radius:3px; border-left: 4px solid ${p.jugado ? '#2c68e7' : '#e11d48'};">
+                <div class="match-card" style="display:flex; justify-content:space-between; align-items:center; background-color:rgba(255,255,255,0.03); padding:8px 10px; margin-bottom:6px; border-radius:3px; border-left: 4px solid ${p.jugado ? '#2c68e7' : p.suspendido ? '#8a94a6' : '#e11d48'};">
                     <div style="text-align:left;">
                         <span style="font-size:9px; color:#869bd8; display:block;">${faseLabel} — ${p.dia ? attrSeguro(p.dia) + ' — ' : ''}${attrSeguro(p.cancha || 'Cancha a confirmar')} (${p.ciclo ? p.ciclo.toUpperCase() : 'SUP'})</span>
                         <span style="font-size:12px; color:white;">${attrSeguro(p.local)} <strong style="color:#2edae3;">${attrSeguro(marcador)}</strong> ${attrSeguro(p.visitante)}</span>
@@ -3602,10 +3602,32 @@ document.addEventListener('liga:datos-listos', (evento) => {
         sorteo = {
             ciclo, copa, tabla, bombos,
             empates: empatesQueImportan(tabla.equipos, tabla.grupos, ciclo, tabla.desempates),
-            sinJugar: partidos.filter(p => p && (p.ciclo || 'superior') === ciclo && Number(p.fecha) < 100 && !p.jugado).length,
-            cruces: [], elegido: null, rival: null
+            // Un suspendido está cerrado: no se reprograma (Joaquín, 26/11/2026).
+            sinJugar: partidos.filter(p => p && (p.ciclo || 'superior') === ciclo && Number(p.fecha) < 100 && !p.jugado && !p.suspendido).length,
+            cruces: [], elegido: null, rival: null,
+            // Papelitos del Bombo 2 que salieron para uno de su mismo grupo: no vuelven al bombo y esperan al próximo del
+            // Bombo 1 que no sea de su grupo (decisión de Joaquín, 26/11/2026). "pasos" guarda el estado antes de cada
+            // acción, para "Deshacer último".
+            esperando: [], pasos: []
         };
         renderizarSorteo();
+    }
+
+    function guardarPasoSorteo() {
+        const s = sorteo;
+        s.pasos.push({ cruces: s.cruces.map(c => ({ ...c })), elegido: s.elegido, rival: s.rival, esperando: [...s.esperando] });
+    }
+
+    // Sin rival de otro grupo para el elegido (ni esperando ni en el bombo): se cambia por el rival de una llave ya
+    // armada (decisión de Joaquín, 26/11/2026). Cada opción: el elegido se lleva el rival de esa llave, y a esa llave va
+    // el que esperaba. Ninguno de los dos cruces queda del mismo grupo.
+    function intercambiosSorteo() {
+        const s = sorteo;
+        const opciones = [];
+        s.cruces.forEach(c => s.esperando.forEach(w => {
+            if (!mismoGrupo(s.elegido, c.visitante) && !mismoGrupo(c.local, w)) opciones.push({ llave: c.llave, w });
+        }));
+        return opciones;
     }
 
     function cerrarSorteo() {
@@ -3668,8 +3690,11 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         const { uno, dos, salieron } = restantesSorteo();
         const listaBombo = (titulo, filas) => `<div class="sorteo-bombo"><h5 class="sorteo-bombo-titulo">${titulo}</h5><ul class="sorteo-lista">${filas.map(f =>
-            `<li class="${salieron.has(f) ? 'sorteo-salio' : ''}"><span class="sorteo-rank">${f.rank}°</span><span>${nombreFila(f)}</span><span class="sorteo-grupo">${grupoFila(f)}</span></li>`).join('')}</ul></div>`;
+            `<li class="${salieron.has(f) ? 'sorteo-salio' : ''}${s.esperando.includes(f) ? ' sorteo-esperando' : ''}"><span class="sorteo-rank">${f.rank}°</span><span>${nombreFila(f)}</span><span class="sorteo-grupo">${grupoFila(f)}${s.esperando.includes(f) ? ' · esperando' : ''}</span></li>`).join('')}</ul></div>`;
         html += `<div class="sorteo-bombos">${listaBombo('Bombo 1', s.bombos.bombo1)}${listaBombo('Bombo 2', s.bombos.bombo2)}</div>`;
+        if (s.esperando.length) {
+            html += `<p class="sorteo-aviso sorteo-esperando-aviso">Esperando rival (en el orden en que salieron): ${s.esperando.map(f => `${nombreFila(f)} (${grupoFila(f)})`).join(', ')}.</p>`;
+        }
 
         const completo = s.cruces.length === s.bombos.llaves;
         if (completo) {
@@ -3680,18 +3705,38 @@ document.addEventListener('liga:datos-listos', (evento) => {
             html += `<div class="sorteo-paso"><p class="sorteo-paso-titulo">¿Quién salió del Bombo 1?</p><div class="sorteo-opciones">${uno.map(f =>
                 `<button type="button" class="sorteo-opcion" data-accion="elegir" data-rank="${f.rank}">${nombreFila(f)}<small>${grupoFila(f)}</small></button>`).join('')}</div></div>`;
         } else if (!s.rival) {
-            const estados = estadoRivales(s.elegido, [s.elegido, ...uno], dos);
-            const detalle = { prohibido: 'no puede: mismo grupo', sinSalida: 'no puede: deja el sorteo sin salida', posible: '' };
-            html += `<div class="sorteo-paso"><p class="sorteo-paso-titulo">Rival de ${nombreFila(s.elegido)} (${grupoFila(s.elegido)}): ¿quién salió del Bombo 2?</p><div class="sorteo-opciones">${estados.map(e =>
-                `<button type="button" class="sorteo-opcion${e.estado === 'prohibido' ? ' sorteo-opcion-prohibido' : ''}${e.estado === 'sinSalida' ? ' sorteo-opcion-sinsalida' : ''}" data-accion="rival" data-rank="${e.rival.rank}" data-estado="${e.estado}" ${e.estado === 'posible' ? '' : 'disabled'}>${nombreFila(e.rival)}<small>${grupoFila(e.rival)}${detalle[e.estado] ? ' — ' + detalle[e.estado] : ''}</small></button>`).join('')}</div>
-                <p class="sorteo-texto">Si sale uno que no puede, se vuelve a sacar.</p></div>`;
+            const titulo = `<p class="sorteo-paso-titulo">Rival de ${nombreFila(s.elegido)} (${grupoFila(s.elegido)})`;
+            const enEspera = s.esperando.find(w => !mismoGrupo(s.elegido, w));
+            const papelitos = dos.filter(f => !s.esperando.includes(f));
+            if (enEspera) {
+                html += `<div class="sorteo-paso">${titulo}: es el que estaba esperando.</p><div class="sorteo-opciones">
+                    <button type="button" class="sorteo-opcion sorteo-opcion-sugerida" data-accion="rival" data-rank="${enEspera.rank}">${nombreFila(enEspera)}<small>${grupoFila(enEspera)} — estaba esperando: no se saca papelito</small></button></div></div>`;
+            } else if (papelitos.length) {
+                html += `<div class="sorteo-paso">${titulo}: ¿quién salió del Bombo 2?</p><div class="sorteo-opciones">${papelitos.map(f => mismoGrupo(s.elegido, f)
+                    ? `<button type="button" class="sorteo-opcion sorteo-opcion-prohibido" data-accion="esperar" data-rank="${f.rank}">${nombreFila(f)}<small>${grupoFila(f)} — mismo grupo: queda esperando</small></button>`
+                    : `<button type="button" class="sorteo-opcion" data-accion="rival" data-rank="${f.rank}">${nombreFila(f)}<small>${grupoFila(f)}</small></button>`).join('')}</div>
+                    <p class="sorteo-texto">Si sale uno de su mismo grupo, tocalo igual: queda esperando y se saca otro papelito. Se cruza con el próximo del Bombo 1 que no sea de su grupo.</p></div>`;
+            } else {
+                const opciones = intercambiosSorteo();
+                html += `<div class="sorteo-paso">${titulo}: no queda ninguno de otro grupo.</p>`
+                    + (opciones.length
+                        ? `<p class="sorteo-texto">Se cambia con una llave ya armada: ${nombreFila(s.elegido)} se lleva al rival de esa llave, y a esa llave va el que estaba esperando. Elegí cuál.</p><div class="sorteo-opciones">${opciones.map(o => {
+                            const c = s.cruces.find(x => x.llave === o.llave);
+                            return `<button type="button" class="sorteo-opcion" data-accion="intercambio" data-llave="${o.llave}" data-rank="${o.w.rank}">Llave ${o.llave}<small>${nombreFila(s.elegido)} vs ${nombreFila(c.visitante)} · ${nombreFila(c.local)} vs ${nombreFila(o.w)}</small></button>`;
+                        }).join('')}</div>`
+                        : `<p class="sorteo-aviso">No hay forma de evitarlo: con lo que queda en los bombos, dos del mismo grupo se tienen que cruzar. Se cruza con el que estaba esperando.</p><div class="sorteo-opciones">${s.esperando.map((w, i) =>
+                            `<button type="button" class="sorteo-opcion${i === 0 ? ' sorteo-opcion-sugerida' : ''}" data-accion="rival" data-rank="${w.rank}">${nombreFila(w)}<small>${grupoFila(w)} — mismo grupo, inevitable${i === 0 ? ' (salió primero)' : ''}</small></button>`).join('')}</div>`)
+                    + '</div>';
+            }
         } else {
             const evaluadas = evaluarLlaves(s.cruces, { local: s.elegido, visitante: s.rival }, uno, dos, s.bombos.llaves);
             const usadas = new Set(s.cruces.map(c => c.llave));
-            const opciones = evaluadas || Array.from({ length: s.bombos.llaves }, (_, i) => ({ llave: i + 1 })).filter(o => !usadas.has(o.llave));
             const minimo = evaluadas ? Math.min(...evaluadas.map(e => e.costo)) : 0;
+            // Con equipos esperando, lo que queda puede no tener forma de completarse sin intercambios: sin sugerencia.
+            const conSugerencia = evaluadas && isFinite(minimo);
+            const opciones = conSugerencia ? evaluadas : Array.from({ length: s.bombos.llaves }, (_, i) => ({ llave: i + 1 })).filter(o => !usadas.has(o.llave));
             const nota = o => {
-                if (!evaluadas) return '';
+                if (!conSugerencia) return '';
                 if (o.sugerida) return minimo > 0 ? `sugerida — inevitable: ${minimo} ${minimo === 1 ? 'cruce' : 'cruces'} del mismo grupo antes de la final` : 'sugerida';
                 return o.costo > minimo ? 'deja más cruces del mismo grupo antes de la final' : 'igual de buena';
             };
@@ -3705,7 +3750,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
         }).join('')}</div>`;
         html += `<div class="sorteo-acciones">
             <button type="button" class="importar-btn-cancelar" data-accion="reiniciar">Reiniciar</button>
-            <button type="button" class="importar-btn-cancelar" data-accion="deshacer" ${s.cruces.length || s.elegido ? '' : 'disabled'}>Deshacer último</button>
+            <button type="button" class="importar-btn-cancelar" data-accion="deshacer" ${s.pasos.length ? '' : 'disabled'}>Deshacer último</button>
             <button type="button" class="btn-submit-admin" data-accion="guardar" ${completo ? '' : 'disabled'}>Guardar cruces</button>
         </div>`;
         panelSorteo.innerHTML = html;
@@ -3750,16 +3795,25 @@ document.addEventListener('liga:datos-listos', (evento) => {
                 prepararSorteo();
                 return;
             }
+            if (['elegir', 'rival', 'esperar', 'llave', 'intercambio'].includes(accion)) guardarPasoSorteo();
             if (accion === 'elegir') sorteo.elegido = filaPorRank(boton.dataset.rank);
-            else if (accion === 'rival') sorteo.rival = filaPorRank(boton.dataset.rank);
-            else if (accion === 'llave') {
+            else if (accion === 'rival') {
+                sorteo.rival = filaPorRank(boton.dataset.rank);
+                sorteo.esperando = sorteo.esperando.filter(f => f !== sorteo.rival);
+            } else if (accion === 'esperar') sorteo.esperando.push(filaPorRank(boton.dataset.rank));
+            else if (accion === 'intercambio') {
+                const c = sorteo.cruces.find(x => x.llave === Number(boton.dataset.llave));
+                const w = filaPorRank(boton.dataset.rank);
+                sorteo.rival = c.visitante;
+                c.visitante = w;
+                sorteo.esperando = sorteo.esperando.filter(f => f !== w);
+            } else if (accion === 'llave') {
                 sorteo.cruces.push({ local: sorteo.elegido, visitante: sorteo.rival, llave: Number(boton.dataset.llave) });
                 sorteo.elegido = null;
                 sorteo.rival = null;
             } else if (accion === 'deshacer') {
-                if (sorteo.rival) sorteo.rival = null;
-                else if (sorteo.elegido) sorteo.elegido = null;
-                else sorteo.cruces.pop();
+                const previo = sorteo.pasos.pop();
+                if (previo) Object.assign(sorteo, previo);
             } else if (accion === 'reiniciar') {
                 if ((sorteo.cruces.length || sorteo.elegido) && !confirm('¿Empezar el sorteo de nuevo? Se pierden las llaves que ya salieron.')) return;
                 prepararSorteo();
@@ -7272,7 +7326,8 @@ document.addEventListener('liga:datos-listos', (evento) => {
         if (!(nuevo > 0)) { alert('Escribí el arancel por equipo, mayor a $0.'); return; }
         const dinero = n => `$${Math.round(n).toLocaleString()}`;
         const arancelDe = p => p.arancelExigido || ARANCEL_PARTIDO_DEFECTO;
-        const sinJugar = partidos.filter(p => p && p.local && p.visitante && !p.jugado);
+        // Un suspendido (Hecho #56) está cerrado: sus ausentes deben el 50% del arancel que tenía (Joaquín, 26/11/2026).
+        const sinJugar = partidos.filter(p => p && p.local && p.visitante && !p.jugado && !p.suspendido);
         const aCambiar = sinJugar.filter(p => arancelDe(p) !== nuevo);
         const anteriores = [...new Set(aCambiar.map(arancelDe))];
 
@@ -7291,7 +7346,7 @@ document.addEventListener('liga:datos-listos', (evento) => {
 
         if (aCambiar.length || sacarOverride.length) {
             const lineas = [`El derecho de partido pasa a ${dinero(nuevo)} por equipo en ${aCambiar.length} ${aCambiar.length === 1 ? 'partido sin jugar' : 'partidos sin jugar'}`
-                + (anteriores.length === 1 ? ` (era ${dinero(anteriores[0])}).` : '.') + ' Los ya jugados no cambian.'];
+                + (anteriores.length === 1 ? ` (era ${dinero(anteriores[0])}).` : '.') + ' Los ya jugados y los suspendidos no cambian.'];
             if (respetados.length) lineas.push(`Se respeta el arancel cargado a mano de: ${respetados.join('; ')}.`);
             if (conPago.length) lineas.push(`Ya pagaron algo de esos partidos: ${conPago.join('; ')}. Si pagaron el valor anterior, van a quedar debiendo la diferencia.`);
             lineas.push(`También queda ${dinero(nuevo)} para los partidos nuevos. ¿Aplicar?`);

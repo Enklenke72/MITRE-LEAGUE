@@ -3862,6 +3862,9 @@ body::-webkit-scrollbar-thumb {
     border-left: 4px solid #8a94a6 !important;
     border-right: 4px solid #8a94a6 !important;
 }
+/* Asistente de sorteo: papelito del mismo grupo que queda esperando rival (26/11/2026) */
+.sorteo-lista li.sorteo-esperando { color: #fcd34d; }
+.sorteo-esperando-aviso { border-color: #f59e0b; color: #fcd34d; }
 .score.score-suspendido,
 .score-main.score-suspendido {
     font-size: 12px !important;
